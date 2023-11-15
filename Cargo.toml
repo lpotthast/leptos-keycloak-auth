@@ -1,0 +1,27 @@
+[package]
+name = "leptos-keycloak-auth"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70.0"
+authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/lpotthast/leptos-keycloak-auth"
+description = "Secure Leptos applications using Keycloak."
+categories = ["web-programming", "api-bindings", "network-programming"]
+keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
+
+[dependencies]
+# Contains an unreleased wasm fix, fixing a "time is not implemented..." bug when decoding a JWT. Switch to an official realase if a version newer than 9.1.0 is out!
+jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "master" }
+leptos = "0.5.2"
+leptos-use = { version = "0.8.2", features = ["storage"] }
+leptos_router = "0.5.2"
+reqwest = { version = "0.11", features = ["json", "serde_json"] }
+serde = { version = "1.0.192", features = ["derive"] }
+serde_json = "1.0.108"
+thiserror = "1.0.50"
+time = { version = "0.3.30", features = ["wasm-bindgen", "serde"] }
+tracing = "0.1.40"
+url = "2.4.1"
+web-sys = { version = "0.3.65", features = ["Storage"] }
