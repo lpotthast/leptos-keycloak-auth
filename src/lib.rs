@@ -31,7 +31,7 @@ type EndSessionEndpoint = Url;
 
 type AuthorizationCode = String;
 type SessionState = String;
-type AccessToken = String;
+//type AccessToken = String;
 type RefreshToken = String;
 
 /// Represents authentication parameters required for initializing the `Auth`
