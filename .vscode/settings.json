@@ -1,7 +1,10 @@
 {
     "cSpell.words": [
+        "jsonwebtoken",
+        "jwks",
         "keycloak",
         "leptos",
+        "oidc",
         "reqwest"
     ]
 }

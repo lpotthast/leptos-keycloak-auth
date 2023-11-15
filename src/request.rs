@@ -24,9 +24,7 @@ pub async fn retrieve_jwk_set(
     for key in raw_set.keys {
         match serde_json::from_value::<jsonwebtoken::jwk::Jwk>(key) {
             Ok(parsed) => set.keys.push(parsed),
-            // Note: We expect to reach this error often, as jose_jwk currently only decodes "signing" keys.
-            // But these are the ones we are mainly interested in anyway, so we simply ignore this error.
-            Err(err) => tracing::debug!(?err, "Found non-decodable JWK"),
+            Err(err) => tracing::warn!(?err, "Found non-decodable JWK"),
         }
     }
     Ok(set)
