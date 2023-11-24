@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 rust-version = "1.70.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -12,8 +12,7 @@ categories = ["web-programming", "api-bindings", "network-programming"]
 keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 
 [dependencies]
-# The "master" branch contains an unreleased wasm fix, fixing a "time is not implemented..." bug when decoding a JWT. TODO: Update, as soon as a version newer than 9.1.0 is out! This crate might not work as intended when used from crates.io.
-jsonwebtoken = { version = "9.1.0", git = "https://github.com/Keats/jsonwebtoken", branch = "master" }
+jsonwebtoken = { version = "9.1.0", git = "https://github.com/Keats/jsonwebtoken", rev = "f112c08729ad383e8cf3b8dd7e98d40f0eecd4af" }
 leptos = "0.5.2"
 leptos-use = { version = "0.8.2", features = ["storage"] }
 leptos_router = "0.5.2"
@@ -25,3 +24,8 @@ time = { version = "0.3.30", features = ["wasm-bindgen", "serde"] }
 tracing = "0.1.40"
 url = "2.4.1"
 web-sys = { version = "0.3.65", features = ["Storage"] }
+
+[patch.crates-io]
+# Contains an unreleased wasm fix for a "time is not implemented..." bug when decoding a JWT.
+# TODO: Remove this and update main dependency if breaking, as soon as a version newer than 9.1.0 is out!
+jsonwebtoken = { git = 'https://github.com/Keats/jsonwebtoken', rev = "f112c08729ad383e8cf3b8dd7e98d40f0eecd4af" }
