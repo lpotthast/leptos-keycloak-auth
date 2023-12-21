@@ -2,7 +2,7 @@ use error::{NoIdToken, UrlError};
 use leptos::*;
 use leptos_router::use_query;
 use leptos_use::{
-    storage::{use_storage_with_options, UseStorageOptions},
+    storage::{use_storage_with_options, JsonCodec, UseStorageOptions},
     use_interval, UseIntervalReturn,
 };
 use oidc_discovery::OidcConfig;
@@ -164,19 +164,19 @@ pub enum AuthState {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct LastUsedCode {
     session_state: Option<SessionState>,
     code: AuthorizationCode,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct OidcConfigWithTimestamp {
     oidc_config: OidcConfig,
     retrieved: OffsetDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct JwkSetWithTimestamp {
     jwk_set: jsonwebtoken::jwk::JwkSet,
     retrieved: OffsetDateTime,
@@ -205,30 +205,32 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let (auth_error, set_auth_error) = create_signal::<Option<KeycloakAuthError>>(None);
 
     let (last_used_code, set_last_used_code, _remove_last_used_code_from_storage) =
-        use_storage_with_options(
+        use_storage_with_options::<Option<LastUsedCode>, JsonCodec>(
+            storage_type_provider.call(()),
             "leptos_keycloak_auth__last_used_code",
-            Option::<LastUsedCode>::None,
-            UseStorageOptions::default().storage_type(storage_type_provider.call(())),
+            UseStorageOptions::default().initial_value(None),
         );
 
-    let (token, set_token, remove_token_from_storage) = use_storage_with_options(
-        "leptos_keycloak_auth__raw_token",
-        Option::<TokenData>::None,
-        UseStorageOptions::default().storage_type(storage_type_provider.call(())),
-    );
+    let (token, set_token, remove_token_from_storage) =
+        use_storage_with_options::<Option<TokenData>, JsonCodec>(
+            storage_type_provider.call(()),
+            "leptos_keycloak_auth__raw_token",
+            UseStorageOptions::default().initial_value(None),
+        );
 
     let (oidc_config_wt, set_oidc_config_wt, _remove_oidc_config_from_storage) =
-        use_storage_with_options(
+        use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonCodec>(
+            storage_type_provider.call(()),
             "leptos_keycloak_auth__oidc_config",
-            Option::<OidcConfigWithTimestamp>::None,
-            UseStorageOptions::default().storage_type(storage_type_provider.call(())),
+            UseStorageOptions::default().initial_value(None),
         );
 
-    let (jwk_set_wt, set_jwk_set_wt, _remove_jwk_set_from_storage) = use_storage_with_options(
-        "leptos_keycloak_auth__jwk_set",
-        Option::<JwkSetWithTimestamp>::None,
-        UseStorageOptions::default().storage_type(storage_type_provider.call(())),
-    );
+    let (jwk_set_wt, set_jwk_set_wt, _remove_jwk_set_from_storage) =
+        use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonCodec>(
+            storage_type_provider.call(()),
+            "leptos_keycloak_auth__jwk_set",
+            UseStorageOptions::default().initial_value(None),
+        );
 
     let DerivedUrls {
         jwks_endpoint,

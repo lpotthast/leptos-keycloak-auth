@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// See: https://openid.net/specs/openid-connect-discovery-1_0.html#WellKnownContents
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OidcConfig {
     #[serde(flatten)]
     pub standard_claims: OpenIDConnectStandardDiscoveryClaims,
@@ -40,7 +40,7 @@ pub struct OidcConfig {
 }
 
 /// See: https://www.rfc-editor.org/rfc/rfc8414.html#section-2
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OAuthDiscoveryClaims {
     /// OPTIONAL. URL of the authorization server's OAuth 2.0
     /// introspection endpoint [RFC7662].
@@ -70,7 +70,7 @@ pub struct OAuthDiscoveryClaims {
 }
 
 /// See: https://openid.net/specs/openid-connect-frontchannel-1_0.html#OPLogout
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpenIDConnectFrontChannelLogoutDiscoveryClaims {
     /// OPTIONAL. Boolean value specifying whether the OP supports HTTP-based logout, with true indicating support.
     /// If omitted, the default value is false.
@@ -86,7 +86,7 @@ pub struct OpenIDConnectFrontChannelLogoutDiscoveryClaims {
 }
 
 /// See: https://openid.net/specs/openid-connect-backchannel-1_0.html#BCSupport
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpenIDConnectBackChannelLogoutDiscoveryClaims {
     /// OPTIONAL. Boolean value specifying whether the OP supports back-channel logout, with true indicating support.
     /// If omitted, the default value is false.
@@ -100,7 +100,7 @@ pub struct OpenIDConnectBackChannelLogoutDiscoveryClaims {
 }
 
 /// See: https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpenIDConnectRPInitiatedLogoutClaims {
     /// REQUIRED. URL at the OP to which an RP can perform a redirect to request that the End-User be logged out at the OP.
     /// This URL MUST use the https scheme and MAY contain port, path, and query parameter components.
@@ -108,7 +108,7 @@ pub struct OpenIDConnectRPInitiatedLogoutClaims {
 }
 
 /// See: https://openid.net/specs/oauth-v2-jarm.html#name-authorization-server-metada
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpenIDConnectJARMDiscoveryClaims {
     /// OPTIONAL. A JSON array containing a list of the JWS [RFC7515] signing algorithms (alg values) supported by the authorization endpoint to sign the response.
     pub authorization_signing_alg_values_supported: Option<Vec<String>>,
@@ -121,7 +121,7 @@ pub struct OpenIDConnectJARMDiscoveryClaims {
 }
 
 /// See: https://openid.net/specs/openid-connect-session-1_0.html#OPMetadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OidcDiscoverySessionDiscoveryClaims {
     /// REQUIRED. URL of an OP iframe that supports cross-origin communications for session state information with the RP Client, using the HTML5 postMessage API.
     /// This URL MUST use the https scheme and MAY contain port, path, and query parameter components.
@@ -131,7 +131,7 @@ pub struct OidcDiscoverySessionDiscoveryClaims {
 }
 
 /// See: https://openid.net/specs/openid-connect-discovery-1_0.html#WellKnownContents
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OpenIDConnectStandardDiscoveryClaims {
     /// REQUIRED. URL using the https scheme with no query or fragment component that the OP asserts as its Issuer Identifier.
     /// If Issuer discovery is supported (see Section 2), this value MUST be identical to the issuer value returned by WebFinger.

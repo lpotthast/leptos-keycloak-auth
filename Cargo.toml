@@ -14,7 +14,7 @@ keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 [dependencies]
 jsonwebtoken = "9.2.0"
 leptos = "0.5.2"
-leptos-use = { version = "0.8.2", features = ["storage"] }
+leptos-use = { version = "0.9.0", features = ["serde"] }
 leptos_router = "0.5.2"
 reqwest = { version = "0.11", features = ["json", "serde_json"] }
 serde = { version = "1.0.192", features = ["derive"] }
