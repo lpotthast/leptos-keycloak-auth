@@ -1,13 +1,28 @@
 use crate::{
-    oidc_discovery::OidcConfig, response::TokenResponse, token::TokenData, KeycloakAuthError,
+    oidc::OidcConfig,
+    response::{ErrorResponse, TokenResponse},
+    token::TokenData,
 };
 use reqwest::IntoUrl;
 use serde::Deserialize;
-use std::{collections::HashMap, rc::Rc};
+use snafu::{ResultExt, Snafu};
+use std::collections::HashMap;
+
+#[derive(Debug, Snafu)]
+pub enum RequestError {
+    #[snafu(display("RequestError: Could not send request"))]
+    Send { source: reqwest::Error },
+
+    #[snafu(display("RequestError: Could not decode payload"))]
+    Decode { source: reqwest::Error },
+
+    #[snafu(display("RequestError: Received an error response"))]
+    ErrResponse { error_response: ErrorResponse },
+}
 
 pub async fn retrieve_jwk_set(
     jwk_set_endpoint: impl IntoUrl,
-) -> Result<jsonwebtoken::jwk::JwkSet, KeycloakAuthError> {
+) -> Result<jsonwebtoken::jwk::JwkSet, RequestError> {
     #[derive(Deserialize)]
     pub struct RawJwkSet {
         pub keys: Vec<serde_json::Value>,
@@ -16,10 +31,10 @@ pub async fn retrieve_jwk_set(
         .get(jwk_set_endpoint)
         .send()
         .await
-        .map_err(|err| KeycloakAuthError::Request(Rc::new(err)))?
+        .context(SendSnafu {})?
         .json::<RawJwkSet>()
         .await
-        .map_err(|err| KeycloakAuthError::Request(Rc::new(err)))?;
+        .context(DecodeSnafu {})?;
     let mut set = jsonwebtoken::jwk::JwkSet { keys: Vec::new() };
     for key in raw_set.keys {
         match serde_json::from_value::<jsonwebtoken::jwk::Jwk>(key) {
@@ -32,15 +47,15 @@ pub async fn retrieve_jwk_set(
 
 pub async fn retrieve_oidc_config(
     discovery_endpoint: impl IntoUrl,
-) -> Result<OidcConfig, KeycloakAuthError> {
+) -> Result<OidcConfig, RequestError> {
     reqwest::Client::new()
         .get(discovery_endpoint)
         .send()
         .await
-        .map_err(|err| KeycloakAuthError::Request(Rc::new(err)))?
+        .context(SendSnafu {})?
         .json::<OidcConfig>()
         .await
-        .map_err(|err| KeycloakAuthError::Request(Rc::new(err)))
+        .context(DecodeSnafu {})
 }
 
 pub async fn exchange_code_for_token(
@@ -49,7 +64,7 @@ pub async fn exchange_code_for_token(
     token_endpoint: impl IntoUrl,
     code: impl AsRef<str>,
     session_state: Option<impl AsRef<str>>,
-) -> Result<TokenData, KeycloakAuthError> {
+) -> Result<TokenData, RequestError> {
     let mut params = HashMap::new();
     params.insert("grant_type", "authorization_code");
     params.insert("client_id", client_id.as_ref());
@@ -63,13 +78,16 @@ pub async fn exchange_code_for_token(
         .form(&params)
         .send()
         .await
-        .map_err(Rc::new)?
+        .context(SendSnafu {})?
         .json::<TokenResponse>()
         .await
-        .map_err(Rc::new)?
+        .context(DecodeSnafu {})?
     {
         TokenResponse::Success(success) => Ok(success.into()),
-        TokenResponse::Error(error) => Err(KeycloakAuthError::Provider(error)),
+        TokenResponse::Error(error) => Err(ErrResponseSnafu {
+            error_response: error,
+        }
+        .build()),
     }
 }
 
@@ -77,7 +95,7 @@ pub async fn refresh_token(
     client_id: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
     refresh_token: impl AsRef<str>,
-) -> Result<TokenData, KeycloakAuthError> {
+) -> Result<TokenData, RequestError> {
     let params = [
         ("grant_type", "refresh_token"),
         ("client_id", client_id.as_ref()),
@@ -88,12 +106,15 @@ pub async fn refresh_token(
         .form(&params)
         .send()
         .await
-        .map_err(Rc::new)?
+        .context(SendSnafu {})?
         .json::<TokenResponse>()
         .await
-        .map_err(Rc::new)?
+        .context(DecodeSnafu {})?
     {
         TokenResponse::Success(success) => Ok(success.into()),
-        TokenResponse::Error(error) => Err(KeycloakAuthError::Provider(error)),
+        TokenResponse::Error(error) => Err(ErrResponseSnafu {
+            error_response: error,
+        }
+        .build()),
     }
 }

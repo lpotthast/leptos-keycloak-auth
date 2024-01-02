@@ -3,42 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 
-use crate::{error::JwtValidationError, response::SuccessTokenResponse};
-
-pub fn validate_and_decode_base64_encoded_token(
-    base64_encoded_token: &str,
-    expected_audiences: &[String],
-    jwk_set: &jsonwebtoken::jwk::JwkSet,
-) -> Result<StandardIdTokenClaims, JwtValidationError> {
-    let jwt_header = jsonwebtoken::decode_header(base64_encoded_token)
-        .map_err(JwtValidationError::DecodeHeader)?;
-
-    tracing::debug!(?jwt_header, "Decoded JWT header");
-
-    let mut validation = jsonwebtoken::Validation::new(jwt_header.alg);
-    validation.set_audience(expected_audiences);
-
-    let jwk = jwk_set
-        .keys
-        .iter()
-        .find(|it| it.common.key_id == jwt_header.kid)
-        .ok_or_else(|| JwtValidationError::NoMatchingJwk(jwt_header.kid))?;
-
-    let jwt_decoding_key =
-        jsonwebtoken::DecodingKey::from_jwk(jwk).map_err(JwtValidationError::JwkToDecodingKey)?;
-
-    let token_data = jsonwebtoken::decode::<StandardIdTokenClaims>(
-        base64_encoded_token,
-        &jwt_decoding_key,
-        &validation,
-    )
-    .map_err(JwtValidationError::Decode)?;
-
-    let raw_claims: StandardIdTokenClaims = token_data.claims;
-    tracing::debug!(?raw_claims, "Decoded JWT");
-
-    Ok(raw_claims)
-}
+use crate::response::SuccessTokenResponse;
 
 /// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
