@@ -69,3 +69,8 @@ pub fn Login() -> impl IntoView {
 }
 
 ```
+
+## Acknowledgements
+
+The crate was initially based on the fantastic work of [leptos_oidc](https://gitlab.com/kerkmann/leptos_oidc).
+Definitely check this out as well if you do not want a Keycloak specific dependency.
