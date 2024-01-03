@@ -23,4 +23,3 @@ snafu = "0.8.0"
 time = { version = "0.3.30", features = ["wasm-bindgen", "serde"] }
 tracing = "0.1.40"
 url = "2.4.1"
-web-sys = { version = "0.3.65", features = ["Storage"] }
