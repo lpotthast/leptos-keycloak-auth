@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// An enumeration representing different callback responses during the
 /// authentication process.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub enum CallbackResponse {
+pub(crate) enum CallbackResponse {
     SuccessLogin(SuccessCallbackResponse),
     SuccessLogout(SuccessLogoutResponse),
     Error(ErrorResponse),
@@ -12,14 +12,14 @@ pub enum CallbackResponse {
 
 /// A structure representing a successful login callback response.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SuccessCallbackResponse {
+pub(crate) struct SuccessCallbackResponse {
     pub session_state: Option<String>,
     pub code: String,
 }
 
 /// A structure representing a successful logout callback response.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SuccessLogoutResponse {
+pub(crate) struct SuccessLogoutResponse {
     pub destroy_session: bool,
 }
 
@@ -27,14 +27,14 @@ pub struct SuccessLogoutResponse {
 /// success and error responses.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum TokenResponse {
+pub(crate) enum TokenResponse {
     Success(SuccessTokenResponse),
     Error(ErrorResponse),
 }
 
 /// A structure representing a successful token response.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SuccessTokenResponse {
+pub(crate) struct SuccessTokenResponse {
     pub access_token: String,
     pub expires_in: i64,
     pub refresh_expires_in: Option<i64>,

@@ -25,10 +25,8 @@ pub(crate) fn create_retrieve_oidc_config_action(
                         oidc_config,
                         retrieved: OffsetDateTime::now_utc(),
                     }));
-                    // set_auth_error.set(None);
                 }
                 Err(err) => {
-                    // set_token.set(None);
                     tracing::error!(?err, "Could not retrieve OIDC config through discovery.");
                     set_req_error.call(Some(err));
                 }
@@ -51,10 +49,8 @@ pub(crate) fn create_retrieve_jwk_set_action(
                         jwk_set,
                         retrieved: OffsetDateTime::now_utc(),
                     }));
-                    // set_auth_error.set(None);
                 }
                 Err(err) => {
-                    // set_token.set(None);
                     tracing::error!(?err, "Could not retrieve JWK set.");
                     set_req_error.call(Some(err));
                 }
@@ -91,10 +87,8 @@ pub(crate) fn create_exchange_code_for_token_action(
                 match result {
                     Ok(token) => {
                         set_token.call(Some(token));
-                        // set_auth_error.set(None);
                     }
                     Err(err) => {
-                        // set_token.set(None);
                         set_req_error.call(Some(err));
                     }
                 }
