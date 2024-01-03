@@ -20,6 +20,7 @@ pub enum JwtValidationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Snafu)]
+#[allow(clippy::enum_variant_names)]
 pub enum KeycloakIdTokenClaimsError {
     #[snafu(display("KeycloakIdTokenClaimsError: No token"))]
     NoToken,
