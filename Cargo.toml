@@ -10,6 +10,7 @@ repository = "https://github.com/lpotthast/leptos-keycloak-auth"
 description = "Secure Leptos applications using Keycloak."
 categories = ["web-programming", "api-bindings", "network-programming"]
 keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
+include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [dependencies]
 jsonwebtoken = "9.2.0"
