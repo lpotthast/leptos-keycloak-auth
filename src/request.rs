@@ -20,7 +20,7 @@ pub enum RequestError {
     ErrResponse { error_response: ErrorResponse },
 }
 
-pub async fn retrieve_jwk_set(
+pub(crate) async fn retrieve_jwk_set(
     jwk_set_endpoint: impl IntoUrl,
 ) -> Result<jsonwebtoken::jwk::JwkSet, RequestError> {
     #[derive(Deserialize)]
@@ -45,7 +45,7 @@ pub async fn retrieve_jwk_set(
     Ok(set)
 }
 
-pub async fn retrieve_oidc_config(
+pub(crate) async fn retrieve_oidc_config(
     discovery_endpoint: impl IntoUrl,
 ) -> Result<OidcConfig, RequestError> {
     reqwest::Client::new()
@@ -58,63 +58,84 @@ pub async fn retrieve_oidc_config(
         .context(DecodeSnafu {})
 }
 
-pub async fn exchange_code_for_token(
+pub(crate) async fn exchange_code_for_token(
     client_id: impl AsRef<str>,
     redirect_uri: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
     code: impl AsRef<str>,
     session_state: Option<impl AsRef<str>>,
 ) -> Result<TokenData, RequestError> {
-    let mut params = HashMap::new();
-    params.insert("grant_type", "authorization_code");
-    params.insert("client_id", client_id.as_ref());
-    params.insert("redirect_uri", redirect_uri.as_ref());
-    params.insert("code", code.as_ref());
+    fn build_params<'a>(
+        client_id: &'a str,
+        redirect_uri: &'a str,
+        code: &'a str,
+    ) -> HashMap<&'static str, &'a str> {
+        let mut params: HashMap<&str, &str> = HashMap::new();
+        params.insert("grant_type", "authorization_code");
+        params.insert("client_id", client_id);
+        params.insert("redirect_uri", redirect_uri);
+        params.insert("code", code);
+        params
+    }
+    async fn inner(
+        params: HashMap<&str, &str>,
+        token_endpoint: impl IntoUrl,
+    ) -> Result<TokenData, RequestError> {
+        match reqwest::Client::new()
+            .post(token_endpoint)
+            .form(&params)
+            .send()
+            .await
+            .context(SendSnafu {})?
+            .json::<TokenResponse>()
+            .await
+            .context(DecodeSnafu {})?
+        {
+            TokenResponse::Success(success) => Ok(success.into()),
+            TokenResponse::Error(error) => Err(ErrResponseSnafu {
+                error_response: error,
+            }
+            .build()),
+        }
+    }
+    let mut params = build_params(client_id.as_ref(), redirect_uri.as_ref(), code.as_ref());
     if let Some(state) = &session_state {
         params.insert("state", state.as_ref());
     }
-    match reqwest::Client::new()
-        .post(token_endpoint)
-        .form(&params)
-        .send()
-        .await
-        .context(SendSnafu {})?
-        .json::<TokenResponse>()
-        .await
-        .context(DecodeSnafu {})?
-    {
-        TokenResponse::Success(success) => Ok(success.into()),
-        TokenResponse::Error(error) => Err(ErrResponseSnafu {
-            error_response: error,
-        }
-        .build()),
-    }
+    inner(params, token_endpoint).await
 }
 
-pub async fn refresh_token(
+pub(crate) async fn refresh_token(
     client_id: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
     refresh_token: impl AsRef<str>,
 ) -> Result<TokenData, RequestError> {
-    let params = [
-        ("grant_type", "refresh_token"),
-        ("client_id", client_id.as_ref()),
-        ("refresh_token", refresh_token.as_ref()),
-    ];
-    match reqwest::Client::new()
-        .post(token_endpoint)
-        .form(&params)
-        .send()
-        .await
-        .context(SendSnafu {})?
-        .json::<TokenResponse>()
-        .await
-        .context(DecodeSnafu {})?
-    {
-        TokenResponse::Success(success) => Ok(success.into()),
-        TokenResponse::Error(error) => Err(ErrResponseSnafu {
-            error_response: error,
+    async fn inner(
+        client_id: &str,
+        token_endpoint: impl IntoUrl,
+        refresh_token: &str,
+    ) -> Result<TokenData, RequestError> {
+        let params = [
+            ("grant_type", "refresh_token"),
+            ("client_id", client_id),
+            ("refresh_token", refresh_token),
+        ];
+        match reqwest::Client::new()
+            .post(token_endpoint)
+            .form(&params)
+            .send()
+            .await
+            .context(SendSnafu {})?
+            .json::<TokenResponse>()
+            .await
+            .context(DecodeSnafu {})?
+        {
+            TokenResponse::Success(success) => Ok(success.into()),
+            TokenResponse::Error(error) => Err(ErrResponseSnafu {
+                error_response: error,
+            }
+            .build()),
         }
-        .build()),
     }
+    inner(client_id.as_ref(), token_endpoint, refresh_token.as_ref()).await
 }
