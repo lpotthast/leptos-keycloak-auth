@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.70.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -14,13 +14,13 @@ include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [dependencies]
 jsonwebtoken = "9.2.0"
-leptos = "0.5.2"
-leptos-use = { version = "0.9.0", features = ["serde"] }
-leptos_router = "0.5.2"
-reqwest = { version = "0.11", features = ["json", "serde_json"] }
-serde = { version = "1.0.192", features = ["derive"] }
-serde_json = "1.0.108"
+leptos = "0.6.5"
+leptos-use = { version = "0.10.1", features = ["serde"] }
+leptos_router = "0.6.5"
+reqwest = { version = "0.11.24", features = ["json", "serde_json"] }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.113"
 snafu = "0.8.0"
-time = { version = "0.3.30", features = ["wasm-bindgen", "serde"] }
+time = { version = "=0.3.31", features = ["wasm-bindgen", "serde"] }
 tracing = "0.1.40"
-url = "2.4.1"
+url = "2.5.0"
