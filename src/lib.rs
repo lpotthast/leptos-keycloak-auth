@@ -1,8 +1,7 @@
 use leptos::*;
 use leptos_router::use_query;
 use leptos_use::{
-    storage::{use_storage_with_options, JsonCodec, UseStorageOptions},
-    use_interval, UseIntervalReturn,
+    storage::{use_storage_with_options, UseStorageOptions}, use_interval, utils::JsonCodec, UseIntervalReturn
 };
 use oidc::OidcConfig;
 use request::RequestError;
