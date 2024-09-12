@@ -1,7 +1,8 @@
+use codee::string::JsonSerdeCodec;
 use leptos::*;
 use leptos_router::use_query;
 use leptos_use::{
-    storage::{use_storage_with_options, UseStorageOptions}, use_interval, utils::JsonCodec, UseIntervalReturn
+    storage::{use_storage_with_options, UseStorageOptions}, use_interval, UseIntervalReturn
 };
 use oidc::OidcConfig;
 use request::RequestError;
@@ -157,14 +158,14 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     });
 
     let (last_used_code, set_last_used_code, _remove_last_used_code_from_storage) =
-        use_storage_with_options::<Option<LastUsedCode>, JsonCodec>(
+        use_storage_with_options::<Option<LastUsedCode>, JsonSerdeCodec>(
             storage_type_provider.call(()),
             "leptos_keycloak_auth__last_used_code",
             UseStorageOptions::default().initial_value(None),
         );
 
     let (token, set_token, remove_token_from_storage) =
-        use_storage_with_options::<Option<TokenData>, JsonCodec>(
+        use_storage_with_options::<Option<TokenData>, JsonSerdeCodec>(
             storage_type_provider.call(()),
             "leptos_keycloak_auth__raw_token",
             UseStorageOptions::default().initial_value(None),
@@ -172,7 +173,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let handle_token = Callback::new(move |val| set_token.set(val));
 
     let (oidc_config_wt, set_oidc_config_wt, _remove_oidc_config_from_storage) =
-        use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonCodec>(
+        use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonSerdeCodec>(
             storage_type_provider.call(()),
             "leptos_keycloak_auth__oidc_config",
             UseStorageOptions::default().initial_value(None),
@@ -180,7 +181,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let handle_oidc_config = Callback::new(move |val| set_oidc_config_wt.set(val));
 
     let (jwk_set_wt, set_jwk_set_wt, _remove_jwk_set_from_storage) =
-        use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonCodec>(
+        use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
             storage_type_provider.call(()),
             "leptos_keycloak_auth__jwk_set",
             UseStorageOptions::default().initial_value(None),

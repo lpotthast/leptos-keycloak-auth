@@ -13,9 +13,10 @@ keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [dependencies]
+codee = { version = "0.2.0", features = ["json_serde"] }
 jsonwebtoken = "9.2.0"
 leptos = "0.6.5"
-leptos-use = { version = "0.10.1", features = ["serde"] }
+leptos-use = "0.13.4"
 leptos_router = "0.6.5"
 reqwest = { version = "0.12.5", features = ["json"] }
 serde = { version = "1.0.196", features = ["derive"] }
