@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 use leptos_use::storage::StorageType;
 use snafu::{ResultExt, Snafu};
 use url::Url;
@@ -36,7 +36,7 @@ pub struct AdvancedOptions {
     /// This library persists information in order to regain knowledge after cold app startup.
     /// The storage pin the storage provided here.
     ///
-    pub storage_type_provider: Callback<(), leptos_use::storage::StorageType>,
+    pub storage_type_provider: Callback<(), StorageType>,
 
     pub access_token_expiration_check_interval_milliseconds: u64,
 

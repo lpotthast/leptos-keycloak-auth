@@ -13,7 +13,7 @@ Secure Leptos applications using Keycloak.
 ## Usage
 
 ```rust
-use leptos::*;
+use leptos::prelude::*;
 use leptos_keycloak_auth::{use_keycloak_auth, Authenticated, Url, UseKeycloakAuthOptions};
 
 #[component]
@@ -59,7 +59,7 @@ pub fn Login() -> impl IntoView {
 
     view! {
         <H1>"Unauthenticated"</H1>
-
+s
         view! {
             <a href={ move || login_url.get() } target="self" disabled={ move || login_disabled.get() }>
                 "Log in"
@@ -67,8 +67,19 @@ pub fn Login() -> impl IntoView {
         }
     }
 }
-
 ```
+
+## Leptos compatibility
+
+| Crate version | Compatible Leptos version |
+|---------------|---------------------------|
+| 0.1           | 0.6                       |
+| 0.2           | 0.6                       |
+| 0.3           | 0.7                       |
+
+## MSRV
+
+The minimum supported rust version is `1.70.0`
 
 ## Acknowledgements
 

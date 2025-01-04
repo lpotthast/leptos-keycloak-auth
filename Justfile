@@ -9,11 +9,11 @@ install-tools:
   cargo install cargo-whatfeatures
   cargo install cargo-upgrades
   cargo install cargo-edit
+  cargo install cargo-msrv
 
 # Find the minimum supported rust version
-msrv:
-    cargo install cargo-msrv
-    cargo msrv --min "2021"
+find-msrv:
+    cargo msrv find
 
 # Run `cargo sort` for every crate.
 sort:

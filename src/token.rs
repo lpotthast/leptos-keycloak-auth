@@ -79,7 +79,7 @@ pub struct KeycloakIdTokenClaims {
     /// (This corresponds to the OpenID 2.0 PAPE [OpenID.PAPE] nist_auth_level 0.)
     /// An absolute URI or an RFC 6711 [RFC6711] registered name SHOULD be used as the acr value; registered names MUST NOT be used with a different meaning than that which is registered.
     /// Parties using this claim will need to agree upon the meanings of the values used, which may be context-specific.
-    /// The acr value is a case sensitive string.
+    /// The acr value is a case-sensitive string.
     pub auth_context_class_reference: Option<String>,
 
     /// (amr) OPTIONAL. Authentication Methods References.
@@ -87,14 +87,14 @@ pub struct KeycloakIdTokenClaims {
     /// For instance, values might indicate that both password and OTP authentication methods were used.
     /// The definition of particular values to be used in the amr Claim is beyond the scope of this specification.
     /// Parties using this claim will need to agree upon the meanings of the values used, which may be context-specific.
-    /// The amr value is an array of case sensitive strings.
+    /// The amr value is an array of case-sensitive strings.
     pub authentication_methods_references: Option<Vec<String>>,
 
     /// (azp) OPTIONAL. Authorized party - the party to which the ID Token was issued.
     /// If present, it MUST contain the OAuth 2.0 Client ID of this party.
     /// This Claim is only needed when the ID Token has a single audience value and that audience is different than the authorized party.
     /// It MAY be included even when the authorized party is the same as the sole audience.
-    /// The azp value is a case sensitive string containing a StringOrURI value.
+    /// The azp value is a case-sensitive string containing a StringOrURI value.
     pub authorized_party: Option<String>,
 
     /// KEYCLOAK SPECIFIC. Whether the user verified his email address.
@@ -103,7 +103,7 @@ pub struct KeycloakIdTokenClaims {
     /// KEYCLOAK SPECIFIC. Full name of the user. Expect this to roughly be `format!("{given_name} {family_name}")`.
     pub name: String,
 
-    // KEYCLOAK SPECIFIC. Preferred username. May be the users email, name or something else entirely.
+    // KEYCLOAK SPECIFIC. Preferred username. It may be the users email, name or something else entirely.
     pub preferred_username: String,
 
     // KEYCLOAK SPECIFIC. First name.
