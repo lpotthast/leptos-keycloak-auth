@@ -15,6 +15,14 @@ use tokio::{net::TcpListener, task::JoinHandle};
 use tower_http::trace::TraceLayer;
 use url::Url;
 
+pub struct AbortOnDrop<T>(JoinHandle<T>);
+
+impl Drop for AbortOnDrop<()> {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<()> {
     let keycloak_auth_instance = KeycloakAuthInstance::new(
         KeycloakConfig::builder()

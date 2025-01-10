@@ -6,6 +6,8 @@ use testcontainers::{
 };
 use url::Url;
 
+/// The contained testcontainer instance implements a custom Drop function, cleaning up the running
+/// container. This means that even in a panic, the container will be shut down.
 #[allow(dead_code)]
 pub struct KeycloakContainer {
     container: testcontainers::ContainerAsync<GenericImage>,
@@ -76,8 +78,8 @@ impl KeycloakContainer {
             &self.admin_password,
             &client,
         )
-            .await
-            .expect("Correct credentials");
+        .await
+        .expect("Correct credentials");
 
         KeycloakAdmin::new(self.url.as_str(), admin_token, client)
     }
@@ -100,8 +102,8 @@ impl KeycloakContainer {
             "password",
             &client,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let access_token = token.get(self.url.as_str()).await.unwrap();
 

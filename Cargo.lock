@@ -87,7 +87,7 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 [[package]]
 name = "assertr"
 version = "0.1.0"
-source = "git+https://github.com/lpotthast/assertr?branch=main#642125349c652211daebf663fafa20727aed0507"
+source = "git+https://github.com/lpotthast/assertr?branch=main#a9dc4c35f9725ff3d0213a7a769d04c0719b4e01"
 dependencies = [
  "indoc",
  "num",
@@ -419,7 +419,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chrome-for-testing"
 version = "0.1.0"
-source = "git+https://github.com/lpotthast/chrome-for-testing?branch=main#02c7b4ef46dcf53d3c2cfc19ffb8eb426fcd0816"
+source = "git+https://github.com/lpotthast/chrome-for-testing?branch=main#2a6ead7241df71a3051870602181f5102e617309"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -430,7 +430,7 @@ dependencies = [
 [[package]]
 name = "chrome-for-testing-manager"
 version = "0.1.0"
-source = "git+https://github.com/lpotthast/chrome-for-testing-manager?branch=main#6528b37919fae41fc5a3946696d6e6319e320c57"
+source = "git+https://github.com/lpotthast/chrome-for-testing-manager?branch=main#65809987ce6744cc1bf3d5d7475b8b320b331891"
 dependencies = [
  "anyhow",
  "chrome-for-testing",
@@ -3680,9 +3680,10 @@ dependencies = [
 [[package]]
 name = "tokio-process-tools"
 version = "0.1.0"
-source = "git+https://github.com/lpotthast/tokio-process-tools?branch=main#65d68ae0181baf0c23bac2b2cb73f23af6ee1ca9"
+source = "git+https://github.com/lpotthast/tokio-process-tools?branch=main#204fd44c1bdeefd1f50b2dfbc073f1c76ccf1ff5"
 dependencies = [
  "nix",
+ "thiserror 2.0.10",
  "tokio",
  "tracing",
  "windows-sys 0.59.0",

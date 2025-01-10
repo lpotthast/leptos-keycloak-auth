@@ -20,26 +20,13 @@ use thirtyfour::error::{WebDriverErrorInfo, WebDriverErrorValue};
 use thirtyfour::prelude::*;
 use tokio::process::Command;
 use tokio::time::error::Elapsed;
-use tokio_process_tools::WaitFor;
+use tokio_process_tools::{TerminateOnDrop, WaitFor};
 
 mod backend;
 mod common;
 mod keycloak_container;
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_integration() {
-    common::tracing::init_subscriber();
-
-    /*
-    let keycloak_container = KeycloakContainer::start().await;
-
-    let admin_client = keycloak_container.admin_client().await;
-
-    configure_keycloak(&admin_client).await;
-
-    let be_jh =
-        backend::start_axum_backend(keycloak_container.url.clone(), "test-realm".to_owned()).await;
-    */
+async fn start_frontend() -> TerminateOnDrop {
     let fe_dir = env::current_dir().unwrap().join("tests").join("frontend");
     tracing::info!("Starting frontend in {:?}", fe_dir);
     let fe = Command::new("cargo")
@@ -72,12 +59,33 @@ async fn test_integration() {
             tracing::error!("Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work.");
         }
     };
-    let _fe =
+    let fe =
         fe_process.terminate_on_drop(Some(Duration::from_secs(10)), Some(Duration::from_secs(10)));
 
     tracing::info!("Frontend started!");
+    fe
+}
 
-    async fn fe_test() -> anyhow::Result<()> {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_integration() {
+    common::tracing::init_subscriber();
+
+    // Start and configure keycloak.
+    let keycloak_container = KeycloakContainer::start().await;
+    let admin_client = keycloak_container.admin_client().await;
+    configure_keycloak(&admin_client).await;
+
+    // Start axum backend.
+    let be_jh =
+        backend::start_axum_backend(keycloak_container.url.clone(), "test-realm".to_owned()).await;
+
+    // Start leptos frontend.
+    let _fe = start_frontend().await;
+
+    // Optional long wait-time. Use this if you want to play around with a fully running stack.
+    // tokio::time::sleep(Duration::from_secs(600)).await;
+
+    async fn ui_test() -> anyhow::Result<()> {
         let mgr = ChromeForTestingManager::new();
         let selected = mgr.resolve_version(VersionRequest::Latest).await?;
         let loaded = mgr.download(selected).await?;
@@ -94,9 +102,18 @@ async fn test_integration() {
         let count_text = count_span.text().await?;
         assert_that(count_text).is_equal_to("Count: 0");
 
+        // Click login button.
+        // Wait for navigation to keycloak site.
+        // Enter user and password and click login.
+        // Wait for redirect to leptos app.
+        // Check page being updated to reflect authentication state.
+        // Click logout.
+        // Wait for redirect to logout page.
+
         Ok(())
     }
-    match fe_test().await {
+
+    match ui_test().await {
         Ok(()) => {
             tracing::info!("Frontend test passed!");
         }
@@ -104,10 +121,6 @@ async fn test_integration() {
             tracing::error!("Frontend test failed: {:?}", err);
         }
     }
-
-    // tokio::time::sleep(Duration::from_secs(180)).await;
-
-    /*
 
     let access_token = keycloak_container
         .perform_password_login(
@@ -143,8 +156,7 @@ async fn test_integration() {
     assert_that(data.keycloak_uuid.as_str()).is_equal_to("a7060488-c80b-40c5-83e2-d7000bf9738e");
     assert_that(data.token_valid_for_whole_seconds).is_greater_than(0);
 
-    */
-    //be_jh.abort();
+    be_jh.abort();
 }
 
 async fn configure_keycloak(admin_client: &KeycloakAdmin) {
