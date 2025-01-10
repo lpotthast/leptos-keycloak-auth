@@ -25,3 +25,19 @@ snafu = "0.8.5"
 time = { version = "0.3.37", features = ["wasm-bindgen", "serde"] }
 tracing = "0.1.41"
 url = "2.5.4"
+
+[dev-dependencies]
+assertr = { git = "https://github.com/lpotthast/assertr", branch = "main" }
+anyhow = "1.0.95"
+axum = "0.8.1"
+axum-keycloak-auth = "0.7.0"
+chrome-for-testing-manager = { git = "https://github.com/lpotthast/chrome-for-testing-manager", branch = "main", features = ["thirtyfour"] }
+http = "1.2.0"
+keycloak = "26.0.700"
+testcontainers = "0.23.1"
+thirtyfour = "0.35.0"
+tokio = "1.42.0"
+tokio-process-tools = { git = "https://github.com/lpotthast/tokio-process-tools", branch = "main" }
+tower-http = { version = "0.6.2", features = ["trace"] }
+tracing-subscriber = "0.3.19"
+uuid = { version = "1.11.0", features = ["v7", "serde"] }
