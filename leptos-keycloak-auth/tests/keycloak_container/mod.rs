@@ -43,6 +43,8 @@ impl KeycloakContainer {
         let container_request = keycloak_image
             .with_env_var("KEYCLOAK_ADMIN", admin_user.as_str())
             .with_env_var("KEYCLOAK_ADMIN_PASSWORD", admin_password.as_str())
+            .with_env_var("KC_HTTP_ENABLED", "true")
+            .with_env_var("KC_HOSTNAME_STRICT_HTTPS", "false")
             .with_cmd(["start-dev"]);
 
         let container = container_request.start().await.expect("Keycloak started");

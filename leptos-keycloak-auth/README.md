@@ -81,6 +81,18 @@ s
 
 The minimum supported rust version is `1.70.0`
 
+## Troubleshooting
+
+Q: My app no longer compiles using an Apple Silicon chip (M1 or upwards) after including this crate.
+
+A: This crate depends on `jsonwebtoken` which depends on `ring` which needs to compile C code in its build-script.
+   MacOS comes with its own (rather quirky) version of Clang, which often leads to weird issues. Make sure to use Clang
+   provided through the `llvm` installation. Follow these instructions: https://github.com/briansmith/ring/issues/1824#issuecomment-2059955073
+      
+      brew install llvm
+
+      echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc
+
 ## Acknowledgements
 
 The crate was initially based on the fantastic work of [leptos_oidc](https://gitlab.com/kerkmann/leptos_oidc).

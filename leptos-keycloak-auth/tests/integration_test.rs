@@ -1,7 +1,3 @@
-use std::env;
-use std::process::Stdio;
-use std::time::Duration;
-
 use assertr::prelude::*;
 use chrome_for_testing_manager::{ChromeForTestingManager, PortRequest, VersionRequest};
 use http::StatusCode;
@@ -12,59 +8,16 @@ use keycloak::{
     },
     KeycloakAdmin,
 };
-use reqwest::Client;
-
 use keycloak_container::KeycloakContainer;
+use reqwest::Client;
 use serde::Deserialize;
-use thirtyfour::error::{WebDriverErrorInfo, WebDriverErrorValue};
+use std::time::Duration;
 use thirtyfour::prelude::*;
-use tokio::process::Command;
-use tokio::time::error::Elapsed;
-use tokio_process_tools::{TerminateOnDrop, WaitFor};
 
 mod backend;
 mod common;
+mod frontend;
 mod keycloak_container;
-
-async fn start_frontend() -> TerminateOnDrop {
-    let fe_dir = env::current_dir().unwrap().join("tests").join("frontend");
-    tracing::info!("Starting frontend in {:?}", fe_dir);
-    let fe = Command::new("cargo")
-        .arg("leptos")
-        .arg("serve")
-        .current_dir(fe_dir)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    let fe_process =
-        tokio_process_tools::ProcessHandle::new_from_child_with_piped_io("cargo leptos serve", fe);
-
-    let _out_inspector = fe_process.stdout().inspect(|stdout_line| tracing::info!(stdout_line, "cargo leptos log"));
-    let _err_inspector = fe_process.stderr().inspect(|stderr_line| tracing::info!(stderr_line, "cargo leptos log"));
-
-    let fe_start_timeout = Duration::from_secs(60 * 10);
-    tracing::info!("Waiting {fe_start_timeout:?} for frontend to start...");
-    match fe_process
-        .stdout()
-        .wait_for_with_timeout(
-            |line| line.contains("listening on http://127.0.0.1:3000"),
-            fe_start_timeout,
-        )
-        .await
-    {
-        Ok(_wait_for) => {}
-        Err(_elapsed) => {
-            tracing::error!("Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work.");
-        }
-    };
-    let fe =
-        fe_process.terminate_on_drop(Some(Duration::from_secs(10)), Some(Duration::from_secs(10)));
-
-    tracing::info!("Frontend started!");
-    fe
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_integration() {
@@ -80,10 +33,10 @@ async fn test_integration() {
         backend::start_axum_backend(keycloak_container.url.clone(), "test-realm".to_owned()).await;
 
     // Start leptos frontend.
-    let _fe = start_frontend().await;
+    let _fe = frontend::start_frontend(keycloak_container.port).await;
 
     // Optional long wait-time. Use this if you want to play around with a fully running stack.
-    // tokio::time::sleep(Duration::from_secs(600)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     async fn ui_test() -> anyhow::Result<()> {
         let mgr = ChromeForTestingManager::new();
@@ -165,6 +118,7 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
     admin_client
         .post(RealmRepresentation {
             enabled: Some(true),
+            ssl_required: Some("none".to_owned()),
             realm: Some("test-realm".to_owned()),
             display_name: Some("test-realm".to_owned()),
             registration_email_as_username: Some(true),
@@ -174,6 +128,7 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
                     enabled: Some(true),
                     public_client: Some(true),
                     direct_access_grants_enabled: Some(true),
+                    redirect_uris: Some(vec!["http://127.0.0.1:3000/*".to_owned()]),
                     id: Some("test-client".to_owned()),
                     ..Default::default()
                 },

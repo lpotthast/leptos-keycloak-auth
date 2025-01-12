@@ -13,6 +13,7 @@ keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [dependencies]
+# Must stick to 0.2 until leptos-use is updated.
 codee = { version = "0.2.0", features = ["json_serde"] }
 jsonwebtoken = "9.3.0"
 leptos = "0.7.3"

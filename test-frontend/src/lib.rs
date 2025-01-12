@@ -1,5 +1,4 @@
 pub mod app;
-pub mod pages;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
