@@ -17,7 +17,7 @@ use url::Url;
 
 pub struct AbortOnDrop<T>(JoinHandle<T>);
 
-impl Drop for AbortOnDrop<()> {
+impl<T> Drop for AbortOnDrop<T> {
     fn drop(&mut self) {
         self.0.abort();
     }
