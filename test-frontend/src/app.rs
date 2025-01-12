@@ -149,13 +149,19 @@ pub fn MyAccount() -> impl IntoView {
             .map(|claims| claims.name.clone())
             .unwrap_or_default()
     });
+    let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
+    let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
 
     view! {
         <h1>
             "Hello, " {move || user_name.get()}
         </h1>
 
-        <LinkButton attr:id="back-to-root" href=routes::Root.materialize()>
+        <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
+            "Logout"
+        </LinkButton>
+
+        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
             "Back to root"
         </LinkButton>
     }
