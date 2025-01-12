@@ -1,6 +1,5 @@
 use assertr::prelude::*;
 use chrome_for_testing_manager::{ChromeForTestingManager, PortRequest, VersionRequest};
-use http::StatusCode;
 use keycloak::{
     types::{
         ClientRepresentation, CredentialRepresentation, RealmRepresentation, RoleRepresentation,
@@ -9,8 +8,6 @@ use keycloak::{
     KeycloakAdmin,
 };
 use keycloak_container::KeycloakContainer;
-use reqwest::Client;
-use serde::Deserialize;
 use std::time::Duration;
 use thirtyfour::prelude::*;
 
@@ -36,7 +33,7 @@ async fn test_integration() {
     let _fe = frontend::start_frontend(keycloak_container.port).await;
 
     // Optional long wait-time. Use this if you want to play around with a fully running stack.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(900)).await;
 
     async fn ui_test() -> anyhow::Result<()> {
         let mgr = ChromeForTestingManager::new();
@@ -45,23 +42,85 @@ async fn test_integration() {
         let (_chromedriver, port) = mgr.launch_chromedriver(&loaded, PortRequest::Any).await?;
 
         tracing::info!("Starting webdriver...");
-        let caps = mgr.prepare_caps(&loaded).await?;
+        let mut caps = mgr.prepare_caps(&loaded).await?;
+        caps.unset_headless()?;
         let driver = WebDriver::new(format!("http://localhost:{port}"), caps).await?;
 
         tracing::info!("Navigating to frontend...");
         driver.goto("http://127.0.0.1:3000").await?;
 
+        let mut timeouts = TimeoutConfiguration::default();
+        timeouts.set_implicit(Some(Duration::from_secs(3)));
+        driver.update_timeouts(timeouts).await?;
+
         let count_span = driver.find(By::Id("count")).await?;
         let count_text = count_span.text().await?;
         assert_that(count_text).is_equal_to("Count: 0");
 
-        // Click login button.
-        // Wait for navigation to keycloak site.
-        // Enter user and password and click login.
-        // Wait for redirect to leptos app.
-        // Check page being updated to reflect authentication state.
-        // Click logout.
-        // Wait for redirect to logout page.
+        tracing::info!("Navigating to 'My Account' page.");
+        let my_account_button = driver.find(By::LinkText("My Account")).await?;
+        my_account_button.click().await?;
+
+        tracing::info!("Expect that we are not logged in yet.");
+        let heading = driver.find(By::Id("unauthenticated")).await?;
+        assert_that(heading.text().await?).is_equal_to("Unauthenticated");
+
+        let keycloak_port_div = driver.find(By::Id("keycloak-port")).await?;
+        let keycloak_port = keycloak_port_div.text().await?;
+        let keycloak_port = keycloak_port.trim().parse::<u16>()?;
+
+        tracing::info!("Click 'Log in' button.");
+        let login_button = driver.find(By::LinkText("Log in")).await?;
+        login_button.click().await?;
+        login_button.wait_until().stale().await?;
+
+        tracing::info!("Wait for navigation to keycloak site.");
+        assert_that(driver.current_url().await?.as_str()).is_equal_to(format!("http://localhost:{keycloak_port}/realms/test-realm/protocol/openid-connect/auth?response_type=code&client_id=test-client&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fmy-account&scope=openid"));
+
+        tracing::info!("Enter username.");
+        let username_input = driver.find(By::Id("username")).await?;
+        username_input.send_keys("test-user-mail@foo.bar").await?;
+
+        tracing::info!("Enter password.");
+        let password_input = driver.find(By::Id("password")).await?;
+        password_input.send_keys("password").await?;
+
+        tracing::info!("Click 'Sign In'.");
+        let sign_in_button = driver.find(By::Id("kc-login")).await?;
+        sign_in_button.click().await?;
+        sign_in_button.wait_until().stale().await?;
+
+        tracing::info!("Wait for redirect to 'My Account' page.");
+        assert_that(driver.current_url().await?.as_str()).starts_with("http://127.0.0.1:3000/my-account?session_state=");
+
+        let greeting = driver.find(By::Id("greeting")).await?;
+        assert_that(greeting.text().await?).is_equal_to("Hello, firstName lastName!");
+
+        let back_to_root_button = driver.find(By::LinkText("Back to root")).await?;
+        back_to_root_button.click().await?;
+
+        tracing::info!("Wait for redirect to 'Root' page.");
+        assert_that(driver.current_url().await?.as_str()).starts_with("http://127.0.0.1:3000/");
+
+        tracing::info!("Navigate to 'My Account' page.");
+        let my_account_button = driver.find(By::LinkText("My Account")).await?;
+        my_account_button.click().await?;
+
+        tracing::info!("Wait for redirect to 'My Account' page.");
+        assert_that(driver.current_url().await?.as_str()).is_equal_to("http://127.0.0.1:3000/my-account");
+
+        let greeting = driver.find(By::Id("greeting")).await?;
+        assert_that(greeting.text().await?).is_equal_to("Hello, firstName lastName!");
+
+        tracing::info!("Click 'Logout' button.");
+        let logout_button = driver.find(By::LinkText("Logout")).await?;
+        logout_button.click().await?;
+
+        tracing::info!("Expect that we are not logged in again.");
+        let heading = driver.find(By::Id("unauthenticated")).await?;
+        assert_that(heading.text().await?).is_equal_to("Unauthenticated");
+
+        driver.quit().await?;
 
         Ok(())
     }
@@ -69,47 +128,12 @@ async fn test_integration() {
     match ui_test().await {
         Ok(()) => {
             tracing::info!("Frontend test passed!");
+            be_jh.abort();
         }
         Err(err) => {
-            tracing::error!("Frontend test failed: {:?}", err);
+            panic!("Frontend test failed: {:?}", err);
         }
     }
-
-    let access_token = keycloak_container
-        .perform_password_login(
-            "test-user-mail@foo.bar",
-            "password",
-            "test-realm",
-            "test-client",
-        )
-        .await;
-
-    let response = Client::new()
-        .get("http://127.0.0.1:9999/who-am-i")
-        .bearer_auth(access_token)
-        .timeout(Duration::from_secs(10))
-        .send()
-        .await
-        .unwrap();
-
-    #[derive(Debug, Deserialize)]
-    struct WhoAmIResponse {
-        name: String,
-        keycloak_uuid: String,
-        token_valid_for_whole_seconds: i32,
-    }
-
-    tracing::info!(?response);
-    let status = response.status();
-    let data = response.json::<WhoAmIResponse>().await.unwrap();
-    tracing::info!(?status, ?data);
-
-    assert_that(status).is_equal_to(StatusCode::OK);
-    assert_that(data.name.as_str()).is_equal_to("test-user-mail@foo.bar");
-    assert_that(data.keycloak_uuid.as_str()).is_equal_to("a7060488-c80b-40c5-83e2-d7000bf9738e");
-    assert_that(data.token_valid_for_whole_seconds).is_greater_than(0);
-
-    be_jh.abort();
 }
 
 async fn configure_keycloak(admin_client: &KeycloakAdmin) {

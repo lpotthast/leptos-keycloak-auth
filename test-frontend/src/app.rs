@@ -71,6 +71,83 @@ pub fn App() -> impl IntoView {
     }
 }
 
+#[component]
+pub fn Welcome() -> impl IntoView {
+    let (count, set_count) = signal(0);
+
+    view! {
+        <h2>"Welcome to Leptonic"</h2>
+
+        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
+            "My Account"
+        </LinkButton>
+
+        <span id="count" style="margin-top: 3em;">
+            "Count: " { move || count.get() }
+        </span>
+
+        <Button attr:id="increase" on_press=move|_| set_count.update(|c| *c += 1)>
+            "Increase"
+        </Button>
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct WhoAmIResponse {
+    name: String,
+    keycloak_uuid: String,
+    token_valid_for_whole_seconds: i32,
+}
+
+#[component]
+pub fn MyAccount() -> impl IntoView {
+    let auth = expect_context::<KeycloakAuth>();
+
+    let user_name = Signal::derive(move || {
+        auth.id_token_claims
+            .get()
+            .map(|claims| claims.name.clone())
+            .unwrap_or_default()
+    });
+    let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
+    let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
+
+    let token = auth.token;
+    let who_am_i = LocalResource::new(move || async move {
+        reqwest::Client::new()
+            .get("http://127.0.0.1:9999/who-am-i")
+            .bearer_auth(token.get().unwrap().access_token.clone())
+            .send()
+            .await
+            .unwrap()
+            .json::<WhoAmIResponse>()
+            .await
+            .unwrap()
+    });
+
+    view! {
+        <h1 id="greeting">
+            "Hello, " { move || user_name.get() } "!"
+        </h1>
+
+        <Suspense fallback=|| view! { "" }>
+            { move || who_am_i.get().map(|who_am_i| view! {
+                "Name: " { who_am_i.name.clone() }
+                "UUID: " { who_am_i.keycloak_uuid.clone() }
+                "Token valid for: " { who_am_i.token_valid_for_whole_seconds }
+            }) }
+        </Suspense>
+
+        <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
+            "Logout"
+        </LinkButton>
+
+        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
+            "Back to root"
+        </LinkButton>
+    }
+}
+
 #[server]
 async fn get_keycloak_port() -> Result<u16, ServerFnError> {
     let _ = dotenvy::dotenv().ok();
@@ -87,7 +164,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
         LocalResource::new(|| async move { get_keycloak_port().await.unwrap_or(8443) });
 
     view! {
-        <Suspense fallback=|| view! { "loading..." }>
+        <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let p = keycloak_port.await;
                 let _ = use_keycloak_auth(UseKeycloakAuthOptions {
@@ -119,13 +196,23 @@ pub fn Login() -> impl IntoView {
             .map(|url| url.to_string())
             .unwrap_or_default()
     });
+    let keycloak_port =
+        Signal::derive(
+            move || match auth.login_url.get().and_then(|it| it.port()) {
+                None => "".to_owned(),
+                Some(port) => format!("{port}"),
+            },
+        );
     let auth_state = Signal::derive(move || format!("{:#?}", auth.auth_state.get()));
 
     view! {
-       <h1>"Unauthenticated 1"</h1>
+       <h1 id="unauthenticated">"Unauthenticated"</h1>
 
-        <div>
-            "Auth State:"
+        <div id="keycloak-port">
+            { move || keycloak_port.get() }
+        </div>
+
+        <div id="auth-state">
             { move || auth_state.get() }
         </div>
 
@@ -136,54 +223,5 @@ pub fn Login() -> impl IntoView {
         >
             "Log in"
         </LinkButton>
-    }
-}
-
-#[component]
-pub fn MyAccount() -> impl IntoView {
-    let auth = expect_context::<KeycloakAuth>();
-
-    let user_name = Signal::derive(move || {
-        auth.id_token_claims
-            .get()
-            .map(|claims| claims.name.clone())
-            .unwrap_or_default()
-    });
-    let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
-    let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
-
-    view! {
-        <h1>
-            "Hello, " {move || user_name.get()}
-        </h1>
-
-        <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
-            "Logout"
-        </LinkButton>
-
-        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
-            "Back to root"
-        </LinkButton>
-    }
-}
-
-#[component]
-pub fn Welcome() -> impl IntoView {
-    let (count, set_count) = signal(0);
-
-    view! {
-        <h2>"Welcome to Leptonic"</h2>
-
-        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
-            "My Account"
-        </LinkButton>
-
-        <span id="count" style="margin-top: 3em;">
-            "Count: " { move || count.get() }
-        </span>
-
-        <Button attr:id="increase" on_press=move|_| set_count.update(|c| *c += 1)>
-            "Increase"
-        </Button>
     }
 }

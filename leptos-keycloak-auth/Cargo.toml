@@ -39,6 +39,7 @@ testcontainers = "0.23.1"
 thirtyfour = "0.35.0"
 tokio = "1.42.0"
 tokio-process-tools = { git = "https://github.com/lpotthast/tokio-process-tools", branch = "main" }
-tower-http = { version = "0.6.2", features = ["trace"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["full"] }
 tracing-subscriber = "0.3.19"
 uuid = { version = "1.11.0", features = ["v7", "serde"] }

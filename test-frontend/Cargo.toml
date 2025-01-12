@@ -29,6 +29,8 @@ leptos-routes = { git = "https://github.com/lpotthast/leptos-routes", branch = "
 leptos_axum = { version = "0.7.3", optional = true }
 leptos_meta = { version = "0.7.3", features = [] }
 leptos_router = { version = "0.7.3", features = [] }
+reqwest = { version = "0.12.12", features = ["json"] }
+serde = "1.0.217"
 tokio = { version = "1.42.0", features = ["rt-multi-thread"], optional = true }
 tower = { version = "0.5.2", optional = true }
 tower-http = { version = "0.6.2", features = ["fs"], optional = true }
