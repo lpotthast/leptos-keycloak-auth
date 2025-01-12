@@ -51,12 +51,22 @@ pub fn App() -> impl IntoView {
         <Title text="Leptonic SSR template"/>
 
         <Root default_theme=LeptonicTheme::default()>
-            <Router>
-                <Routes fallback=|| view! { "Page not found." }>
-                    <Route path=routes::Root.path() view=Welcome/>
-                    <Route path=routes::MyAccount.path() view=|| view! { <Protected> <MyAccount/> </Protected> }/>
-                </Routes>
-            </Router>
+            <main style=r#"
+                height: 100%;
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 1em;
+                background-color: antiquewhite;
+            "#>
+                <Router>
+                    <Routes fallback=|| view! { "Page not found." }>
+                        <Route path=routes::Root.path() view=Welcome/>
+                        <Route path=routes::MyAccount.path() view=|| view! { <Protected> <MyAccount/> </Protected> }/>
+                    </Routes>
+                </Router>
+            </main>
         </Root>
     }
 }
@@ -84,8 +94,8 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     keycloak_server_url: Url::parse(&format!("http://localhost:{}/", p)).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
-                    post_login_redirect_url: Url::parse("http://127.0.0.1:3000/").unwrap(),
-                    post_logout_redirect_url: Url::parse("http://127.0.0.1:3000/").unwrap(),
+                    post_login_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
+                    post_logout_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
                     scope: Some("openid".to_string()),
                     advanced: Default::default(),
                 });
@@ -109,9 +119,15 @@ pub fn Login() -> impl IntoView {
             .map(|url| url.to_string())
             .unwrap_or_default()
     });
+    let auth_state = Signal::derive(move || format!("{:#?}", auth.auth_state.get()));
 
     view! {
-       <h1>"Unauthenticated"</h1>
+       <h1>"Unauthenticated 1"</h1>
+
+        <div>
+            "Auth State:"
+            { move || auth_state.get() }
+        </div>
 
         <LinkButton
             href=move || login_url.get()
@@ -135,9 +151,13 @@ pub fn MyAccount() -> impl IntoView {
     });
 
     view! {
-        <div>
+        <h1>
             "Hello, " {move || user_name.get()}
-        </div>
+        </h1>
+
+        <LinkButton attr:id="back-to-root" href=routes::Root.materialize()>
+            "Back to root"
+        </LinkButton>
     }
 }
 
@@ -146,28 +166,18 @@ pub fn Welcome() -> impl IntoView {
     let (count, set_count) = signal(0);
 
     view! {
-        <div style=r#"
-            height: 100%;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1em;
-            background-color: antiquewhite;
-        "#>
-            <h2>"Welcome to Leptonic"</h2>
+        <h2>"Welcome to Leptonic"</h2>
 
-            <span id="count" style="margin-top: 3em;">
-                "Count: " { move || count.get() }
-            </span>
+        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
+            "My Account"
+        </LinkButton>
 
-            <Button attr:id="increase" on_press=move|_| set_count.update(|c| *c += 1)>
-                "Increase"
-            </Button>
+        <span id="count" style="margin-top: 3em;">
+            "Count: " { move || count.get() }
+        </span>
 
-            <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
-                "My Account"
-            </LinkButton>
-        </div>
+        <Button attr:id="increase" on_press=move|_| set_count.update(|c| *c += 1)>
+            "Increase"
+        </Button>
     }
 }
