@@ -43,13 +43,9 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
 
     let router = router.layer(
         ServiceBuilder::new()
-            // Mark the specific headers as sensitive so that they don't show up in logs.
-            .layer(SetSensitiveRequestHeadersLayer::new([
-                http::header::AUTHORIZATION,
-                http::header::COOKIE,
-            ]))
-            .layer(SetSensitiveResponseHeadersLayer::new([]))
             // Add high level tracing to all requests.
+            // Tracing as innermost layer so it can capture the request after / response before 
+            // (including) all other middleware.
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(
@@ -65,16 +61,26 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
                         );
                     }),
             )
-            // Set a timeout
-            .layer(TimeoutLayer::new(Duration::from_secs(60)))
-            // Allow origins using a CORS layers.
+            // Sensitive headers should be set before tracing to ensure
+            // sensitive data doesn't leak into logs.
+            .layer(SetSensitiveRequestHeadersLayer::new([
+                http::header::AUTHORIZATION,
+                http::header::COOKIE,
+            ]))
+            .layer(SetSensitiveResponseHeadersLayer::new([]))
+            // Timeout should be near the bottom to ensure the entire
+            // request pipeline respects the timeout.
+            .layer(TimeoutLayer::new(Duration::from_secs(10)))
+            // CORS should usually be early to handle preflight requests
+            // before other middleware.
             .layer(
                 CorsLayer::new()
                     .allow_origin(AllowOrigin::list(vec!["http://127.0.0.1:3000"
                         .parse()
                         .expect("valid url")]))
                     .allow_methods(Any)
-                    .allow_headers(Any),
+                    .allow_headers(Any)
+                    .allow_credentials(true),
             ),
     );
 
