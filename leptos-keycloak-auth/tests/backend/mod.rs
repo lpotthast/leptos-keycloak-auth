@@ -9,7 +9,8 @@ use axum_keycloak_auth::{
     layer::KeycloakAuthLayer,
     PassthroughMode,
 };
-use http::StatusCode;
+use http::header::{ACCEPT, AUTHORIZATION};
+use http::{Method, StatusCode};
 use serde::Serialize;
 use std::time::Duration;
 use tokio::{net::TcpListener, task::JoinHandle};
@@ -42,9 +43,12 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
     let router = Router::new().route("/who-am-i", get(who_am_i));
 
     let router = router.layer(
+        // NOTE: The earlier layers of a ServiceBuilder are the OUTERMOST ones, and executed first.
+        // The later layers are the INNERMOST ones, and executed last when receiving a request.
+        // This differs to adding one layer at a time to a router, where the first ones ore INNERMOST.
         ServiceBuilder::new()
             // Add high level tracing to all requests.
-            // Tracing as innermost layer so it can capture the request after / response before 
+            // Tracing as innermost layer so it can capture the request after / response before
             // (including) all other middleware.
             .layer(
                 TraceLayer::new_for_http()
@@ -78,19 +82,18 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
                     .allow_origin(AllowOrigin::list(vec!["http://127.0.0.1:3000"
                         .parse()
                         .expect("valid url")]))
-                    .allow_methods(Any)
-                    .allow_headers(Any)
+                    .allow_methods([Method::GET, Method::POST])
+                    .allow_headers([AUTHORIZATION, ACCEPT])
                     .allow_credentials(true),
+            )
+            .layer(
+                KeycloakAuthLayer::<String>::builder()
+                    .instance(keycloak_auth_instance)
+                    .passthrough_mode(PassthroughMode::Block)
+                    .expected_audiences(vec![])
+                    .persist_raw_claims(false)
+                    .build(),
             ),
-    );
-
-    let router = router.layer(
-        KeycloakAuthLayer::<String>::builder()
-            .instance(keycloak_auth_instance)
-            .passthrough_mode(PassthroughMode::Block)
-            .expected_audiences(vec![String::from("account")])
-            .persist_raw_claims(false)
-            .build(),
     );
 
     let listener = TcpListener::bind("127.0.0.1:9999")
@@ -111,7 +114,7 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
 pub async fn who_am_i(Extension(token): Extension<KeycloakToken<String>>) -> Response {
     #[derive(Debug, Serialize)]
     struct Response {
-        name: String,
+        username: String,
         keycloak_uuid: uuid::Uuid,
         token_valid_for_whole_seconds: i64,
     }
@@ -119,7 +122,7 @@ pub async fn who_am_i(Extension(token): Extension<KeycloakToken<String>>) -> Res
     (
         StatusCode::OK,
         Json(Response {
-            name: token.extra.profile.preferred_username,
+            username: token.extra.profile.preferred_username,
             keycloak_uuid: uuid::Uuid::try_parse(&token.subject).expect("uuid"),
             token_valid_for_whole_seconds: (token.expires_at - time::OffsetDateTime::now_utc())
                 .whole_seconds(),

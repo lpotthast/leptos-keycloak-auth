@@ -189,7 +189,22 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             "leptos_keycloak_auth__jwk_set",
             UseStorageOptions::default().initial_value(None),
         );
-    let handle_jwk_set_wt = Callback::new(move |val| set_jwk_set_wt.set(val));
+    // This callback is called whenever an updated JWK set is available.
+    let handle_jwk_set_wt = Callback::new(move |val: Option<JwkSetWithTimestamp>| {
+        // If we no longer have JWKs, we should probably also forget our current token.
+        if val.is_none() {
+            tracing::debug!("No JWK set available, forgetting current token...");
+            handle_token.run(None);
+        }
+        // If the JWK set changed, the Keycloak changed, and we should probably forget our token
+        // and require re-authentication.
+        // If jwk_set_wt is None, we cannot have a token yet and are safe to set it to None again.
+        if jwk_set_wt.read_untracked() != val {
+            tracing::debug!("JWK set changed, forgetting current token...");
+            handle_token.run(None);
+        }
+        set_jwk_set_wt.set(val)
+    });
 
     let DerivedUrls {
         jwks_endpoint,
@@ -397,7 +412,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         })
     };
 
-    // If either the access or the refresh token is about to expire (although the refresh token *should* always outlive the access token..),
+    // If either the access or the refresh token is about to expire (although the refresh token *should* always outlive the access token...),
     // try to refresh the access token using the refresh token.
     Effect::new(move |_| {
         let access_token_nearly_expired = access_token_nearly_expired.get();
@@ -419,7 +434,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     Effect::new(move |_| {
         match url_state.get() {
             Ok(state) => match state {
-                CallbackResponse::SuccessLogin(login_state) => {
+                CallbackResponse::SuccessfulLogin(login_state) => {
                     let perform_update = match last_used_code.get() {
                         Some(last_used_code) => last_used_code.code != login_state.code,
                         None => true,
@@ -446,9 +461,9 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         })
                     }
                 }
-                CallbackResponse::SuccessLogout(logout_state) => {
+                CallbackResponse::SuccessfulLogout(logout_state) => {
                     if logout_state.destroy_session {
-                        set_token.set(None);
+                        handle_token.run(None);
                         // Even though setting the None value will lead to `None` being written to storage,
                         // we will not completely rely on that side effect and explicitly remove the data from storage.
                         // We cannot only remove the data from storage, as we DEFINITELY WANT to trigger reactive effects

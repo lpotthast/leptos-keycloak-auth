@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 /// authentication process.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum CallbackResponse {
-    SuccessLogin(SuccessCallbackResponse),
-    SuccessLogout(SuccessLogoutResponse),
+    SuccessfulLogin(SuccessCallbackResponse),
+    SuccessfulLogout(SuccessLogoutResponse),
     Error(ErrorResponse),
 }
 
@@ -109,9 +109,9 @@ impl Params for ErrorResponse {
 impl Params for CallbackResponse {
     fn from_map(map: &ParamsMap) -> Result<Self, ParamsError> {
         if let Ok(response) = SuccessCallbackResponse::from_map(map) {
-            return Ok(CallbackResponse::SuccessLogin(response));
+            return Ok(CallbackResponse::SuccessfulLogin(response));
         } else if let Ok(response) = SuccessLogoutResponse::from_map(map) {
-            return Ok(CallbackResponse::SuccessLogout(response));
+            return Ok(CallbackResponse::SuccessfulLogout(response));
         } else if let Ok(response) = ErrorResponse::from_map(map) {
             return Ok(CallbackResponse::Error(response));
         }

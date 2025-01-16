@@ -94,7 +94,7 @@ pub fn Welcome() -> impl IntoView {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct WhoAmIResponse {
-    name: String,
+    username: String,
     keycloak_uuid: String,
     token_valid_for_whole_seconds: i32,
 }
@@ -132,9 +132,9 @@ pub fn MyAccount() -> impl IntoView {
 
         <Suspense fallback=|| view! { "" }>
             { move || who_am_i.get().map(|who_am_i| view! {
-                "Name: " { who_am_i.name.clone() }
-                "UUID: " { who_am_i.keycloak_uuid.clone() }
-                "Token valid for: " { who_am_i.token_valid_for_whole_seconds }
+                <div>"username: " <span id="username">{ who_am_i.username.clone() }</span></div>
+                <div>"keycloak_uuid: " <span id="keycloak_uuid">{ who_am_i.keycloak_uuid.clone() }</span></div>
+                <div>"token_valid_for_whole_seconds: " <span id="token_valid_for_whole_seconds">{ who_am_i.token_valid_for_whole_seconds }</span></div>
             }) }
         </Suspense>
 
