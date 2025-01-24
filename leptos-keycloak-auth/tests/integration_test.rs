@@ -33,23 +33,23 @@ async fn test_integration() {
     let fe = frontend::start_frontend(keycloak_container.port).await;
 
     // Optional long wait-time. Use this if you want to play around with a fully running stack.
-    //tracing::info!("Continue with test? y/n");
-    //let mut buf = String::new();
-    //loop {
-    //    buf.clear();
-    //    let input = std::io::stdin().read_line(&mut buf);
-    //    if let Ok(_) = input {
-    //        match buf.trim() {
-    //            "y" => break,
-    //            "n" => return,
-    //            _ => {}
-    //        }
-    //    }
-    //    if let Err(err) = input {
-    //        tracing::error!("Error reading input: {err:?}");
-    //        return;
-    //    }
-    //}
+    tracing::info!("Continue with test? y/n");
+    let mut buf = String::new();
+    loop {
+        buf.clear();
+        let input = std::io::stdin().read_line(&mut buf);
+        if let Ok(_) = input {
+            match buf.trim() {
+                "y" => break,
+                "n" => return,
+                _ => {}
+            }
+        }
+        if let Err(err) = input {
+            tracing::error!("Error reading input: {err:?}");
+            return;
+        }
+    }
 
     async fn ui_test() -> anyhow::Result<()> {
         let mgr = ChromeForTestingManager::new();

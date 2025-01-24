@@ -1,6 +1,6 @@
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_router::hooks::use_query;
+use leptos_router::hooks::{use_navigate, use_query};
 use leptos_use::{
     storage::{use_storage_with_options, UseStorageOptions},
     use_interval, UseIntervalReturn,
@@ -11,6 +11,7 @@ use response::CallbackResponse;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::ops::Deref;
+use leptos_router::NavigateOptions;
 use time::OffsetDateTime;
 use token::{KeycloakIdTokenClaims, TokenData};
 
@@ -332,13 +333,6 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let last_token_id_error = Signal::derive(move || verified_and_decoded_id_token.get().err());
 
     // Fetch a token from the OIDC provider using an authorization code and an optional session state.
-    let retrieve_oidc_config_action = action::create_retrieve_oidc_config_action(
-        discovery_endpoint.clone(),
-        handle_oidc_config,
-        handle_req_error,
-    );
-
-    // Fetch a token from the OIDC provider using an authorization code and an optional session state.
     let retrieve_jwk_set_action =
         action::create_retrieve_jwk_set_action(handle_jwk_set_wt, handle_req_error);
 
@@ -377,6 +371,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 .unwrap_or(true)
         })
     };
+
+    // Fetch a token from the OIDC provider using an authorization code and an optional session state.
+    let retrieve_oidc_config_action = action::create_retrieve_oidc_config_action(
+        discovery_endpoint.clone(),
+        handle_oidc_config,
+        handle_req_error,
+    );
 
     // Obtain the OIDC configuration. Updating any previously stored config.
     Effect::new(move |_| {
@@ -488,7 +489,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         match url_state.get() {
             Ok(state) => match state {
                 CallbackResponse::SuccessfulLogin(login_state) => {
-                    let perform_update = match last_used_code.get() {
+                    let perform_update = match last_used_code.get_untracked() {
                         Some(last_used_code) => last_used_code.code != login_state.code,
                         None => true,
                     };
@@ -514,6 +515,26 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                             }
                         })
                     }
+
+                    // We provide Keycloak with a `post_login_redirect_url`. When the Keycloak
+                    // performs this redirect, it extends this url with query parameters,
+                    // which we parsed into a `CallbackResponse::SuccessfulLogin`.
+                    // We "consumed" this state now and no longer need it as part of our url state.
+                    // Consider these query parameters more as function parameters and the
+                    // redirect back to us as the function call.
+                    // Leaving the parameters might lead to this branch being entered again.
+                    // But we already "consumed" the code (by exchanging it to a toke) and can no
+                    // longer do something with this data anyway.
+                    // It is also cleaner from the users perspective to not leave remaining traces
+                    // from the authorization process.
+                    // We currently "remove" the query parameters by doing an extra, programmatic
+                    // routing to the `post_login_redirect_url`. That will just be handled by the
+                    // leptos router and performed on the client itself.
+                    let navigate = use_navigate();
+                    navigate(
+                        options.with_value(|params| params.post_login_redirect_url.clone()).as_ref(),
+                        NavigateOptions::default()
+                    );
                 }
                 CallbackResponse::SuccessfulLogout(logout_state) => {
                     if logout_state.destroy_session {
@@ -529,8 +550,18 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         remove_token_from_storage();
 
                         // We should recreate the code_verifier to have a new one for the next login phase.
+                        // TODO: Why has this no effect on SessionStorage???
                         set_code_verifier.set(Some(CodeVerifier::<128>::generate()));
                     }
+
+                    // We currently "remove" the query parameters by doing an extra, programmatic
+                    // routing to the `post_logout_redirect_url`. That will just be handled by the
+                    // leptos router and performed on the client itself.
+                    let navigate = use_navigate();
+                    navigate(
+                        options.with_value(|params| params.post_logout_redirect_url.clone()).as_ref(),
+                        NavigateOptions::default()
+                    );
                 }
                 CallbackResponse::Error(err_state) => {
                     set_auth_error.set(Some(KeycloakAuthError::Request {
