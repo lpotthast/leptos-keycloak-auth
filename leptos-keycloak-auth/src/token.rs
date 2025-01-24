@@ -52,16 +52,19 @@ pub struct KeycloakIdTokenClaims {
     /// Implementers MAY provide for some small leeway, usually no more than a few minutes, to account for clock skew.
     /// Its value is a JSON number representing the number of seconds from 1970-01-01T0:0:0Z as measured in UTC until the date/time.
     /// See RFC 3339 [RFC3339] for details regarding date/times in general and UTC in particular.
+    #[serde(with = "time::serde::rfc3339")]
     pub expires_at: OffsetDateTime,
 
     /// (iat) REQUIRED. Time at which the JWT was issued.
     /// Its value is a JSON number representing the number of seconds from 1970-01-01T0:0:0Z as measured in UTC until the date/time.
+    #[serde(with = "time::serde::rfc3339")]
     pub issued_at: OffsetDateTime,
 
     /// (auth_time) REQUIRED or OPTIONAL. Time when the End-User authentication occurred.
     /// Its value is a JSON number representing the number of seconds from 1970-01-01T0:0:0Z as measured in UTC until the date/time.
     /// When a max_age request is made or when auth_time is requested as an Essential Claim, then this Claim is REQUIRED; otherwise, its inclusion is OPTIONAL.
     /// (The auth_time Claim semantically corresponds to the OpenID 2.0 PAPE [OpenID.PAPE] auth_time response parameter.)
+    #[serde(with = "time::serde::rfc3339::option")]
     pub auth_time: Option<OffsetDateTime>,
 
     /// (nonce) OPTIONAL. String value used to associate a Client session with an ID Token, and to mitigate replay attacks.
@@ -192,18 +195,21 @@ pub struct TokenData {
     pub access_token: String,
 
     /// Point in time when the `access_token` expires.
+    #[serde(with = "time::serde::rfc3339")]
     pub access_token_expires_at: OffsetDateTime,
 
     /// Refresh token. May be used to obtain a new access token without user intervention.
     pub refresh_token: String,
 
     /// Point in time when the `refresh_toke` expires.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub refresh_expires_at: Option<OffsetDateTime>,
 
     /// Point in time this token data was read.
     /// This may be used to calculate an estimated lifetime of the refresh or access token.
     /// If `refresh_expires_at` is after `time_received`, it was valid when the token data was received.
     /// At all later points in time, this may be used to calculate a percentage of the refresh tokens expiration time.
+    #[serde(with = "time::serde::rfc3339")]
     pub time_received: OffsetDateTime,
 }
 

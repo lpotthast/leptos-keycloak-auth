@@ -1,4 +1,4 @@
-use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakTokenSupplier};
+use keycloak::{KeycloakAdmin, KeycloakAdminToken};
 use testcontainers::{
     core::{ContainerPort, WaitFor},
     runners::AsyncRunner,
@@ -84,32 +84,5 @@ impl KeycloakContainer {
         .expect("Correct credentials");
 
         KeycloakAdmin::new(self.url.as_str(), admin_token, client)
-    }
-
-    pub async fn perform_password_login(
-        &self,
-        username: &str,
-        password: &str,
-        realm: &str,
-        client_id: &str,
-    ) -> String {
-        let client = reqwest::Client::new();
-
-        let token = KeycloakAdminToken::acquire_custom_realm(
-            self.url.as_str(),
-            username,
-            password,
-            realm,
-            client_id,
-            "password",
-            &client,
-        )
-        .await
-        .unwrap();
-
-        let access_token = token.get(self.url.as_str()).await.unwrap();
-
-        tracing::info!(access_token, "Login successful.");
-        access_token
     }
 }

@@ -63,18 +63,21 @@ pub(crate) async fn exchange_code_for_token(
     redirect_uri: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
     code: impl AsRef<str>,
+    code_verifier: impl AsRef<str>,
     session_state: Option<impl AsRef<str>>,
 ) -> Result<TokenData, RequestError> {
     fn build_params<'a>(
         client_id: &'a str,
         redirect_uri: &'a str,
         code: &'a str,
+        code_verifier: &'a str,
     ) -> HashMap<&'static str, &'a str> {
         let mut params: HashMap<&str, &str> = HashMap::new();
         params.insert("grant_type", "authorization_code");
         params.insert("client_id", client_id);
         params.insert("redirect_uri", redirect_uri);
         params.insert("code", code);
+        params.insert("code_verifier", code_verifier);
         params
     }
     async fn inner(
@@ -98,7 +101,7 @@ pub(crate) async fn exchange_code_for_token(
             .build()),
         }
     }
-    let mut params = build_params(client_id.as_ref(), redirect_uri.as_ref(), code.as_ref());
+    let mut params = build_params(client_id.as_ref(), redirect_uri.as_ref(), code.as_ref(), code_verifier.as_ref());
     if let Some(state) = &session_state {
         params.insert("state", state.as_ref());
     }

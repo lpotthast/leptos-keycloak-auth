@@ -13,6 +13,9 @@ pub mod routes {
     #[route("/")]
     pub mod root {}
 
+    #[route("/public")]
+    pub mod public {}
+
     #[route("/my-account")]
     pub mod my_account {}
 }
@@ -63,6 +66,7 @@ pub fn App() -> impl IntoView {
                 <Router>
                     <Routes fallback=|| view! { "Page not found." }>
                         <Route path=routes::Root.path() view=Welcome/>
+                        <Route path=routes::Public.path() view=Public/>
                         <Route path=routes::MyAccount.path() view=|| view! { <Protected> <MyAccount/> </Protected> }/>
                     </Routes>
                 </Router>
@@ -78,6 +82,10 @@ pub fn Welcome() -> impl IntoView {
     view! {
         <h2>"Welcome to Leptonic"</h2>
 
+        <LinkButton attr:id="to-public" href=routes::Public.materialize().strip_prefix("/").unwrap().to_string()>
+            "Public2"
+        </LinkButton>
+
         <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
             "My Account"
         </LinkButton>
@@ -92,6 +100,17 @@ pub fn Welcome() -> impl IntoView {
     }
 }
 
+#[component]
+pub fn Public() -> impl IntoView {
+    view! {
+        <h2>"Welcome to Leptonic"</h2>
+
+        <LinkButton attr:id="to-my-account" href=routes::Root.materialize()>
+            "Back"
+        </LinkButton>
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 struct WhoAmIResponse {
     username: String,
@@ -103,20 +122,19 @@ struct WhoAmIResponse {
 pub fn MyAccount() -> impl IntoView {
     let auth = expect_context::<KeycloakAuth>();
 
-    let user_name = Signal::derive(move || {
-        auth.id_token_claims
-            .get()
-            .map(|claims| claims.name.clone())
-            .unwrap_or_default()
-    });
+    let auth_state = auth.state_pretty_printer();
+
+    let authenticated = expect_context::<Authenticated>();
+
+    let user_name = Signal::derive(move || authenticated.id_token_claims.read().name.clone());
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
 
-    let token = auth.token;
+    let token = authenticated.token;
     let who_am_i = LocalResource::new(move || async move {
         reqwest::Client::new()
             .get("http://127.0.0.1:9999/who-am-i")
-            .bearer_auth(token.get().unwrap().access_token.clone())
+            .bearer_auth(token.read().access_token.clone())
             .send()
             .await
             .unwrap()
@@ -137,6 +155,10 @@ pub fn MyAccount() -> impl IntoView {
                 <div>"token_valid_for_whole_seconds: " <span id="token_valid_for_whole_seconds">{ who_am_i.token_valid_for_whole_seconds }</span></div>
             }) }
         </Suspense>
+
+        <pre id="auth-state" style="width: 100%; overflow: auto;">
+            { move || auth_state() }
+        </pre>
 
         <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
             "Logout"
@@ -177,9 +199,9 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     advanced: Default::default(),
                 });
                 view! {
-                    <Authenticated unauthenticated=|| view! { <Login/> }>
+                    <leptos_keycloak_auth::components::Authenticated unauthenticated=|| view! { <Login/> }>
                         { children() }
-                    </Authenticated>
+                    </leptos_keycloak_auth::components::Authenticated>
                 }
             })}
         </Suspense>
@@ -189,6 +211,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
 #[component]
 pub fn Login() -> impl IntoView {
     let auth = expect_context::<KeycloakAuth>();
+
     let login_url_unavailable = Signal::derive(move || auth.login_url.get().is_none());
     let login_url = Signal::derive(move || {
         auth.login_url
@@ -203,7 +226,7 @@ pub fn Login() -> impl IntoView {
                 Some(port) => format!("{port}"),
             },
         );
-    let auth_state = Signal::derive(move || format!("{:#?}", auth.auth_state.get()));
+    let auth_state = auth.state_pretty_printer();
 
     view! {
        <h1 id="unauthenticated">"Unauthenticated"</h1>
@@ -212,9 +235,9 @@ pub fn Login() -> impl IntoView {
             { move || keycloak_port.get() }
         </div>
 
-        <div id="auth-state">
-            { move || auth_state.get() }
-        </div>
+        <pre id="auth-state" style="width: 100%; overflow: auto;">
+            { move || auth_state() }
+        </pre>
 
         <LinkButton
             href=move || login_url.get()
@@ -222,6 +245,10 @@ pub fn Login() -> impl IntoView {
             disabled=login_url_unavailable
         >
             "Log in"
+        </LinkButton>
+
+        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
+            "Back to root"
         </LinkButton>
     }
 }

@@ -2,6 +2,7 @@ use leptos::prelude::*;
 use time::OffsetDateTime;
 use url::Url;
 
+use crate::code_verifier::CodeVerifier;
 use crate::{
     config::UseKeycloakAuthOptions,
     request::{self, RequestError},
@@ -67,17 +68,27 @@ pub(crate) fn create_exchange_code_for_token_action(
     options: StoredValue<UseKeycloakAuthOptions>,
     set_token: Callback<Option<TokenData>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<(TokenEndpoint, AuthorizationCode, Option<SessionState>), ()> {
+) -> Action<
+    (
+        TokenEndpoint,
+        AuthorizationCode,
+        CodeVerifier<128>,
+        Option<SessionState>,
+    ),
+    (),
+> {
     Action::new(
-        move |(token_endpoint, code, session_state): &(
+        move |(token_endpoint, code, verifier, session_state): &(
             TokenEndpoint,
             AuthorizationCode,
+            CodeVerifier<128>,
             Option<SessionState>,
         )| {
             let client_id = options.with_value(|params| params.client_id.clone());
             let redirect_uri = options.with_value(|params| params.post_login_redirect_url.clone());
             let token_endpoint = token_endpoint.clone();
             let code = code.clone();
+            let code_verifier = verifier.code_verifier().to_owned();
             let session_state = session_state.clone();
             async move {
                 leptos::task::spawn_local(async move {
@@ -86,6 +97,7 @@ pub(crate) fn create_exchange_code_for_token_action(
                         redirect_uri,
                         token_endpoint,
                         code,
+                        code_verifier,
                         session_state,
                     )
                     .await;

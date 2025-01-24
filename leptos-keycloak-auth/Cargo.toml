@@ -13,32 +13,35 @@ keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [dependencies]
+base64 = "0.22.1"
 # Must stick to 0.2 until leptos-use is updated.
 codee = { version = "0.2.0", features = ["json_serde"] }
 jsonwebtoken = "9.3.0"
 leptos = "0.7.3"
 leptos-use = "0.15.2"
 leptos_router = "0.7.3"
+rand = "0.8.5"
 reqwest = { version = "0.12.12", features = ["json"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
+sha2 = "0.10.8"
 snafu = "0.8.5"
 time = { version = "0.3.37", features = ["wasm-bindgen", "serde"] }
 tracing = "0.1.41"
 url = "2.5.4"
 
 [dev-dependencies]
-assertr = { git = "https://github.com/lpotthast/assertr", branch = "main" }
 anyhow = "1.0.95"
+assertr = "0.1.0"
 axum = "0.8.1"
 axum-keycloak-auth = "0.7.0"
-chrome-for-testing-manager = { git = "https://github.com/lpotthast/chrome-for-testing-manager", branch = "main", features = ["thirtyfour"] }
+chrome-for-testing-manager = { version = "0.1.0", features = ["thirtyfour"] }
 http = "1.2.0"
 keycloak = "26.0.700"
 testcontainers = "0.23.1"
 thirtyfour = "0.35.0"
 tokio = "1.42.0"
-tokio-process-tools = { git = "https://github.com/lpotthast/tokio-process-tools", branch = "main" }
+tokio-process-tools = "0.3.1"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["full"] }
 tracing-subscriber = "0.3.19"

@@ -1,12 +1,24 @@
 use std::env;
-use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tokio_process_tools::TerminateOnDrop;
+use tokio_process_tools::{Inspector, TerminateOnDrop};
 
-pub async fn start_frontend(keycloak_port: u16) -> TerminateOnDrop {
-    let fe_dir = env::current_dir().unwrap().join("../test-frontend").canonicalize().unwrap();
+pub struct Frontend {
+    #[expect(unused)]
+    cargo_leptos_process: TerminateOnDrop,
+    #[expect(unused)]
+    stdout_replay: Inspector,
+    #[expect(unused)]
+    stderr_replay: Inspector,
+}
+
+pub async fn start_frontend(keycloak_port: u16) -> Frontend {
+    let fe_dir = env::current_dir()
+        .unwrap()
+        .join("../test-frontend")
+        .canonicalize()
+        .unwrap();
 
     let dotenv = fe_dir.join(".env");
     tokio::fs::OpenOptions::new()
@@ -21,26 +33,19 @@ pub async fn start_frontend(keycloak_port: u16) -> TerminateOnDrop {
         .unwrap();
 
     tracing::info!("Starting frontend in {:?}", fe_dir);
-    let fe = Command::new("cargo")
-        .arg("leptos")
+    let mut cmd = Command::new("cargo");
+    cmd.arg("leptos")
         .arg("watch") // serve
-        .current_dir(fe_dir)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+        .current_dir(fe_dir);
 
-    let fe_process =
-        tokio_process_tools::ProcessHandle::new_from_child_with_piped_io("cargo leptos serve", fe);
+    let fe_process = tokio_process_tools::ProcessHandle::spawn("cargo leptos serve", cmd).unwrap();
 
-    let _out_inspector = fe_process
-        .stdout()
-        .inspect(|stdout_line| tracing::info!(stdout_line, "cargo leptos log"));
-    let _err_inspector = fe_process
-        .stderr()
-        .inspect(|stderr_line| tracing::info!(stderr_line, "cargo leptos log"));
+    //let stdout_replay = fe_process.stdout().inspect(|line| tracing::info!(line, "cargo leptos out log"));
+    //let stderr_replay = fe_process.stderr().inspect(|line| tracing::info!(line, "cargo leptos err log"));
+    let stdout_replay = fe_process.stdout().inspect(|line| println!("{line}"));
+    let stderr_replay = fe_process.stderr().inspect(|line| eprintln!("{line}"));
 
-    // TODO: Also wait for stderr_line: "warning: build failed, waiting for other jobs to finish..." and fail it it occurs.
+    // TODO: Also wait for stderr_line: "warning: build failed, waiting for other jobs to finish..." and fail if it occurs.
 
     let fe_start_timeout = Duration::from_secs(60 * 10);
     tracing::info!("Waiting {fe_start_timeout:?} for frontend to start...");
@@ -57,9 +62,12 @@ pub async fn start_frontend(keycloak_port: u16) -> TerminateOnDrop {
             tracing::error!("Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work.");
         }
     };
-    let fe =
-        fe_process.terminate_on_drop(Some(Duration::from_secs(10)), Some(Duration::from_secs(10)));
+    let fe = fe_process.terminate_on_drop(Duration::from_secs(4), Duration::from_secs(10));
 
     tracing::info!("Frontend started!");
-    fe
+    Frontend {
+        cargo_leptos_process: fe,
+        stdout_replay,
+        stderr_replay,
+    }
 }

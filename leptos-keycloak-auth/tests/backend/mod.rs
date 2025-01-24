@@ -15,7 +15,7 @@ use serde::Serialize;
 use std::time::Duration;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
-use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::sensitive_headers::{
     SetSensitiveRequestHeadersLayer, SetSensitiveResponseHeadersLayer,
 };
