@@ -41,6 +41,7 @@ pub struct AdvancedOptions {
     pub storage_type_provider: Callback<(), StorageType>,
 
     pub access_token_expiration_check_interval_milliseconds: u64,
+    pub refresh_token_expiration_check_interval_milliseconds: u64,
 
     pub access_token_nearly_expired_check_interval_milliseconds: u64,
     pub access_token_nearly_expired_having: LifeLeft,
@@ -65,6 +66,7 @@ impl Default for AdvancedOptions {
         Self {
             storage_type_provider: Callback::new(|()| StorageType::Local),
             access_token_expiration_check_interval_milliseconds: 1000,
+            refresh_token_expiration_check_interval_milliseconds: 1000,
             access_token_nearly_expired_check_interval_milliseconds: 1000,
             access_token_nearly_expired_having: LifeLeft::Percentage(0.25),
             refresh_token_nearly_expired_check_interval_milliseconds: 1000,

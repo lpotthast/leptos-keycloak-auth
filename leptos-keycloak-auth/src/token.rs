@@ -7,7 +7,7 @@ use crate::response::SuccessTokenResponse;
 
 /// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct StandardIdTokenClaims {
+pub(crate) struct StandardIdTokenClaims {
     iss: String,
     sub: String,
     aud: RawAudiences,
@@ -24,7 +24,7 @@ pub struct StandardIdTokenClaims {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum RawAudiences {
+pub(crate) enum RawAudiences {
     Single(String),
     Multiple(Vec<String>),
 }
@@ -106,22 +106,22 @@ pub struct KeycloakIdTokenClaims {
     /// KEYCLOAK SPECIFIC. Full name of the user. Expect this to roughly be `format!("{given_name} {family_name}")`.
     pub name: String,
 
-    // KEYCLOAK SPECIFIC. Preferred username. It may be the users email, name or something else entirely.
+    /// KEYCLOAK SPECIFIC. Preferred username. It may be the users email, name or something else entirely.
     pub preferred_username: String,
 
-    // KEYCLOAK SPECIFIC. First name.
+    /// KEYCLOAK SPECIFIC. First name.
     pub given_name: String,
 
-    // KEYCLOAK SPECIFIC. Last name.
+    /// KEYCLOAK SPECIFIC. Last name.
     pub family_name: String,
 
-    // KEYCLOAK SPECIFIC. Email address of the user.
+    /// KEYCLOAK SPECIFIC. Email address of the user.
     pub email: String,
 
-    // KEYCLOAK SPECIFIC. Realm roles. This will be `None` unless roles are explicitly added to ID tokens using the Keycloak Admin UI.
+    /// KEYCLOAK SPECIFIC. Realm roles. This will be `None` unless roles are explicitly added to ID tokens using the Keycloak Admin UI.
     pub realm_access: Option<RealmAccess>,
 
-    // KEYCLOAK SPECIFIC. Realm roles. This will be `None` unless roles are explicitly added to ID tokens using the Keycloak Admin UI.
+    /// KEYCLOAK SPECIFIC. Realm roles. This will be `None` unless roles are explicitly added to ID tokens using the Keycloak Admin UI.
     pub resource_access: Option<ResourceAccess>,
 
     pub additional_claims: HashMap<String, serde_json::Value>,

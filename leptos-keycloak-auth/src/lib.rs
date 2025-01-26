@@ -287,7 +287,7 @@ struct JwkSetManager {
 
 impl JwkSetManager {
     pub(crate) fn new(
-        jwks_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
+        jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
         storage_type_provider: Callback<(), StorageType>,
         options: StoredValue<UseKeycloakAuthOptions>,
         handle_req_error: Callback<Option<RequestError>>,
@@ -302,15 +302,13 @@ impl JwkSetManager {
 
         // This callback is called whenever an updated JWK set is available.
         let handle_jwk_set = Callback::new(move |val: Option<JwkSetWithTimestamp>| {
-            // If we no longer have JWKs, we should probably also forget our current token?
-            // if val.is_none() {
-            //     tracing::debug!("No JWK set available, forgetting current token...");
-            //     handle_token.run(None);
-            // }
-
-            // If the JWK set changed, the Keycloak changed, and we should probably forget our token
-            // and require re-authentication.
-            // If jwk_set_wt is None, we cannot have a token yet and are safe to set it to None again.
+            // If the JWK set changed, the Keycloak realm rolled its keys.
+            // Note that this is done automatically in a certain interval.
+            // New tokens must be validated against the new JWK set.
+            // But old tokens, which may still be relevant because they didn't expire yet,
+            // should still be validatable. We therefore need to also track any `previous`
+            // JWK set.
+            // TODO:
             //if jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
             //    != val.as_ref().map(|it| &it.jwk_set)
             //{
@@ -346,14 +344,14 @@ impl JwkSetManager {
         // Obtain the JWK set. Updating any previously stored config.
         Effect::new(move |_| {
             if jwk_set_too_old.get() {
-                jwks_endpoint.with_untracked(|jwks_endpoint| match jwks_endpoint {
-                    Ok(jwks_endpoint_url) => {
-                        retrieve_jwk_set_action.dispatch(jwks_endpoint_url.clone());
+                match jwk_set_endpoint.read().as_ref() {
+                    Ok(jwk_set_endpoint) => {
+                        retrieve_jwk_set_action.dispatch(jwk_set_endpoint.clone());
                     }
                     Err(err) => {
                         tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...")
                     }
-                })
+                }
             }
         });
 
@@ -415,8 +413,7 @@ struct TokenManager {
     access_token_nearly_expired: Memo<bool>,
     refresh_token_nearly_expired: Memo<bool>,
     access_token_expired: Memo<bool>,
-
-    verified_and_decoded_id_token: Memo<Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>>,
+    refresh_token_expired: Memo<bool>,
 
     exchange_code_for_token_action: Action<
         (
@@ -436,8 +433,6 @@ impl TokenManager {
         storage_type_provider: Callback<(), StorageType>,
         options: StoredValue<UseKeycloakAuthOptions>,
         handle_req_error: Callback<Option<RequestError>>,
-
-        jwk_set: Signal<Option<JwkSetWithTimestamp>>,
         token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     ) -> Self {
         let (token, set_token, remove_token_from_storage) =
@@ -449,19 +444,6 @@ impl TokenManager {
                     .on_error(|err| tracing::error!(?err, "token storage error")),
             );
         let handle_token = Callback::new(move |val| set_token.set(val));
-
-        let verified_and_decoded_id_token: Memo<
-            Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
-        > = Memo::new(move |_| {
-            // TODO: User should be able to overwrite this.
-            let client_id = options.read_value().client_id.clone();
-            let expected_audiences: &[String] = &[client_id];
-            token_validation::validate(
-                token.get(),
-                jwk_set.get().as_ref().map(|it| &it.jwk_set),
-                expected_audiences,
-            )
-        });
 
         // Note: Only call this after OIDC config was loaded. Otherwise, nothing happens and an error is logged!
         // TODO: Use a queuing system, so that no request is lost?
@@ -535,9 +517,8 @@ impl TokenManager {
             })
         };
 
-        // True when a token is present and the access token is not expired.
+        // True when a token is present and the access token is expired.
         // Defaults to `false` if no token data is present.
-        // This default prevent refresh-attempts from happening without any refresh token being present.
         let access_token_expired = {
             let UseIntervalReturn { counter, .. } = use_interval(
                 options
@@ -546,11 +527,34 @@ impl TokenManager {
                     .access_token_expiration_check_interval_milliseconds,
             );
             Memo::new(move |_| {
-                tracing::trace!("Checking if token is expired...");
+                //tracing::trace!("Checking if access token is expired...");
                 let _count = counter.get();
                 token.with(move |token| {
                     if let Some(token) = token {
                         token.access_token_expired()
+                    } else {
+                        false
+                    }
+                })
+            })
+        };
+
+        // True when a token is present and the refresh token is expired.
+        // Defaults to `false` if no token data is present.
+        // Defaults to `false` if token data is present, but no refresh expiration time is set.
+        let refresh_token_expired = {
+            let UseIntervalReturn { counter, .. } = use_interval(
+                options
+                    .read_value()
+                    .advanced
+                    .refresh_token_expiration_check_interval_milliseconds,
+            );
+            Memo::new(move |_| {
+                //tracing::trace!("Checking if refresh token is expired...");
+                let _count = counter.get();
+                token.with(move |token| {
+                    if let Some(token) = token {
+                        token.refresh_token_expired()
                     } else {
                         false
                     }
@@ -564,6 +568,8 @@ impl TokenManager {
         Effect::new(move |_| {
             // TODO: Should we also take into account whether whe were able to decode the id token?
 
+            // Note: These boolean-signals default to false. Therefore, no refresh-attempt
+            // is made without a refresh token being present.
             let access_token_nearly_expired = access_token_nearly_expired.get();
             let refresh_token_nearly_expired = refresh_token_nearly_expired.get();
             let access_token_expired = access_token_expired.get();
@@ -578,13 +584,25 @@ impl TokenManager {
             }
         });
 
+        let token_remove = remove_token_from_storage.clone();
+        Effect::new(move |_| {
+            let access_token_expired = access_token_expired.get();
+            let refresh_token_expired = refresh_token_expired.get();
+
+            if access_token_expired && refresh_token_expired {
+                // The token became unusable and can safely be forgotten.
+                set_token.set(None);
+                token_remove();
+            }
+        });
+
         Self {
             token,
             set_token,
             access_token_nearly_expired,
             refresh_token_nearly_expired,
             access_token_expired,
-            verified_and_decoded_id_token,
+            refresh_token_expired,
             exchange_code_for_token_action: action::create_exchange_code_for_token_action(
                 options,
                 handle_token,
@@ -671,18 +689,10 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         storage_type_provider,
         options,
         handle_req_error,
-        jwk_set_mgr.jwk_set,
         token_endpoint,
     );
 
     let code_mgr = CodeVerifierManager::new();
-
-    let (last_used_code, set_last_used_code, _remove_last_used_code_from_storage) =
-        use_storage_with_options::<Option<LastUsedCode>, JsonSerdeCodec>(
-            storage_type_provider.run(()),
-            "leptos_keycloak_auth__last_used_code",
-            UseStorageOptions::default().initial_value(None),
-        );
 
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();
@@ -695,28 +705,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 CallbackResponse::SuccessfulLogin(login_state) => {
                     tracing::trace!(?login_state, "Login successful");
 
-                    let do_exchange_code_for_token = match last_used_code.read_untracked().deref() {
-                        Some(last_used_code) => {
-                            last_used_code.code != login_state.code
-                                && last_used_code.session_state != login_state.session_state
-                        }
-                        None => true,
-                    };
-
-                    if do_exchange_code_for_token {
-                        // We assume that last_code only changes when we receive a "new" / not-seen-before code.
-                        // This means we can safely call the token exchange here, as we will do this only once per code we see.
-                        token_mgr.exchange_code_for_token(
-                            login_state.code.clone(),
-                            code_mgr.code_verifier.get_untracked().expect("present"),
-                            login_state.session_state.clone(),
-                        );
-
-                        set_last_used_code.set(Some(LastUsedCode {
-                            session_state: login_state.session_state,
-                            code: login_state.code,
-                        }));
-                    }
+                    // We assume that last_code only changes when we receive a "new" / not-seen-before code.
+                    // This means we can safely call the token exchange here, as we will do this only once per code we see.
+                    token_mgr.exchange_code_for_token(
+                        login_state.code.clone(),
+                        code_mgr.code_verifier.get_untracked().expect("present"),
+                        login_state.session_state.clone(),
+                    );
 
                     // We provide Keycloak with a `post_login_redirect_url`. When the Keycloak
                     // performs this redirect, it extends this url with query parameters,
@@ -792,29 +787,44 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
+    let verified_and_decoded_id_token: Memo<
+        Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
+    > = Memo::new(move |_| {
+        // TODO: User should be able to overwrite this.
+        let client_id = options.read_value().client_id.clone();
+        let expected_audiences: &[String] = &[client_id];
+        token_validation::validate(
+            token_mgr.token.get(),
+            jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
+            expected_audiences,
+        )
+    });
+
     // Auth state derived from token data or potential errors.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
         let access_token_nearly_expired = token_mgr.access_token_nearly_expired;
         let refresh_token_nearly_expired = token_mgr.refresh_token_nearly_expired;
-        let id_token = token_mgr.verified_and_decoded_id_token;
 
         // Note: The token might have already been set to None but access_token_expired was not yet updated...
         let has_token = token.read().is_some();
-        let has_verified_and_decoded_id_token = id_token.read().is_ok();
+        let has_verified_and_decoded_id_token = verified_and_decoded_id_token.read().is_ok();
 
         if has_token && has_verified_and_decoded_id_token && !token_mgr.access_token_expired.get() {
             KeycloakAuthState::Authenticated(Authenticated {
                 token: Signal::derive(move || token.get().expect("present")),
                 access_token_nearly_expired: access_token_nearly_expired.into(),
                 refresh_token_nearly_expired: refresh_token_nearly_expired.into(),
-                id_token_claims: Signal::derive(move || id_token.get().expect("present")),
+                id_token_claims: Signal::derive(move || {
+                    verified_and_decoded_id_token.get().expect("present")
+                }),
             })
         } else {
-            let id_token = token_mgr.verified_and_decoded_id_token;
             KeycloakAuthState::NotAuthenticated {
                 last_token_data: token_mgr.token,
-                last_token_id_error: Signal::derive(move || id_token.get().err()),
+                last_token_id_error: Signal::derive(move || {
+                    verified_and_decoded_id_token.get().err()
+                }),
                 last_error: auth_error.into(),
             }
         }
