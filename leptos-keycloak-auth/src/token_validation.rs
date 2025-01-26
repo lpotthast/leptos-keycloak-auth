@@ -63,7 +63,7 @@ fn validate_and_decode_base64_encoded_token(
     let jwt_header =
         jsonwebtoken::decode_header(base64_encoded_token).context(DecodeHeaderSnafu {})?;
 
-    tracing::debug!(?jwt_header, "Decoded JWT header");
+    tracing::trace!(?jwt_header, "Decoded JWT header");
 
     let mut validation = jsonwebtoken::Validation::new(jwt_header.alg);
     validation.set_audience(expected_audiences);
@@ -90,7 +90,7 @@ fn validate_and_decode_base64_encoded_token(
     .context(DecodeSnafu {})?;
 
     let raw_claims: StandardIdTokenClaims = token_data.claims;
-    tracing::debug!(?raw_claims, "Decoded JWT");
+    tracing::trace!(?raw_claims, "Decoded JWT");
 
     Ok(raw_claims)
 }

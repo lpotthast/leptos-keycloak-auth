@@ -1,6 +1,8 @@
+use crate::code_verifier::CodeVerifier;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query};
+use leptos_router::NavigateOptions;
 use leptos_use::{
     storage::{use_storage_with_options, UseStorageOptions},
     use_interval, UseIntervalReturn,
@@ -11,7 +13,6 @@ use response::CallbackResponse;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::ops::Deref;
-use leptos_router::NavigateOptions;
 use time::OffsetDateTime;
 use token::{KeycloakIdTokenClaims, TokenData};
 
@@ -19,13 +20,14 @@ mod action;
 mod code_verifier;
 pub mod components;
 pub mod config;
+mod login;
+mod logout;
 mod oidc;
 mod request;
 mod response;
 pub mod token;
 mod token_validation;
 
-use crate::code_verifier::{CodeChallenge, CodeVerifier};
 pub use components::*;
 pub use config::*;
 pub use leptos_use::storage::StorageType;
@@ -116,7 +118,7 @@ pub enum KeycloakAuthState {
     NotAuthenticated {
         last_token_data: Signal<Option<TokenData>>,
         last_token_id_error: Signal<Option<KeycloakIdTokenClaimsError>>,
-        last_error: Signal<Option<KeycloakAuthError>>, // ODOT: use AuthError directly? Or at least use Error trait object?
+        last_error: Signal<Option<KeycloakAuthError>>,
     },
 }
 
@@ -218,10 +220,147 @@ struct JwkSetWithTimestamp {
     retrieved: OffsetDateTime,
 }
 
+struct OidcManager {
+    oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
+}
+
+impl OidcManager {
+    pub(crate) fn new(
+        discovery_endpoint: DiscoveryEndpoint,
+        storage_type_provider: Callback<(), StorageType>,
+        options: StoredValue<UseKeycloakAuthOptions>,
+        handle_req_error: Callback<Option<RequestError>>,
+    ) -> Self {
+        let (oidc_config, set_oidc_config, _remove_oidc_config_from_storage) =
+            use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonSerdeCodec>(
+                storage_type_provider.run(()),
+                "leptos_keycloak_auth__oidc_config",
+                UseStorageOptions::default().initial_value(None),
+            );
+        let handle_oidc_config = Callback::new(move |val| set_oidc_config.set(val));
+
+        let oidc_config_too_old = {
+            let UseIntervalReturn { counter, .. } = use_interval(
+                options.with_value(|o| o.advanced.oidc_config_age_check_interval_milliseconds),
+            );
+            Memo::new(move |_| {
+                let _count = counter.get();
+                oidc_config
+                    .get()
+                    .map(|it| {
+                        (OffsetDateTime::now_utc() - it.retrieved).whole_seconds()
+                            > options
+                                .with_value(|o| o.advanced.max_oidc_config_age_seconds)
+                                .into()
+                    })
+                    .unwrap_or(true)
+            })
+        };
+
+        // Fetch a token from the OIDC provider using an authorization code and an optional session state.
+        let retrieve_oidc_config_action = action::create_retrieve_oidc_config_action(
+            discovery_endpoint.clone(),
+            handle_oidc_config,
+            handle_req_error,
+        );
+
+        // Obtain the OIDC configuration. Updating any previously stored config.
+        Effect::new(move |_| {
+            if oidc_config_too_old.get() {
+                retrieve_oidc_config_action.dispatch(());
+            }
+        });
+
+        Self { oidc_config }
+    }
+}
+
+struct JwkSetManager {
+    jwk_set: Signal<Option<JwkSetWithTimestamp>>,
+}
+
+impl JwkSetManager {
+    pub(crate) fn new(
+        jwks_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
+        storage_type_provider: Callback<(), StorageType>,
+        options: StoredValue<UseKeycloakAuthOptions>,
+        handle_req_error: Callback<Option<RequestError>>,
+    ) -> Self {
+        // TODO: Store old JWK set alongside newly fetched (changed) keys.
+        let (jwk_set, set_jwk_set, _remove_jwk_set_from_storage) =
+            use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
+                storage_type_provider.run(()),
+                "leptos_keycloak_auth__jwk_set",
+                UseStorageOptions::default().initial_value(None),
+            );
+
+        // This callback is called whenever an updated JWK set is available.
+        let handle_jwk_set = Callback::new(move |val: Option<JwkSetWithTimestamp>| {
+            // If we no longer have JWKs, we should probably also forget our current token?
+            // if val.is_none() {
+            //     tracing::debug!("No JWK set available, forgetting current token...");
+            //     handle_token.run(None);
+            // }
+
+            // If the JWK set changed, the Keycloak changed, and we should probably forget our token
+            // and require re-authentication.
+            // If jwk_set_wt is None, we cannot have a token yet and are safe to set it to None again.
+            //if jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
+            //    != val.as_ref().map(|it| &it.jwk_set)
+            //{
+            //    tracing::debug!("JWK set changed, forgetting current token...");
+            //    handle_token.run(None);
+            //}
+
+            set_jwk_set.set(val)
+        });
+
+        // Fetch a token from the OIDC provider using an authorization code and an optional session state.
+        let retrieve_jwk_set_action =
+            action::create_retrieve_jwk_set_action(handle_jwk_set, handle_req_error);
+
+        let jwk_set_too_old = {
+            let UseIntervalReturn { counter, .. } = use_interval(
+                options.with_value(|o| o.advanced.jwk_set_age_check_interval_milliseconds),
+            );
+            Memo::new(move |_| {
+                let _count = counter.get();
+                jwk_set
+                    .get()
+                    .map(|it| {
+                        (OffsetDateTime::now_utc() - it.retrieved).whole_seconds()
+                            > options
+                                .with_value(|o| o.advanced.max_jwk_set_age_seconds)
+                                .into()
+                    })
+                    .unwrap_or(true)
+            })
+        };
+
+        // Obtain the JWK set. Updating any previously stored config.
+        Effect::new(move |_| {
+            if jwk_set_too_old.get() {
+                jwks_endpoint.with_untracked(|jwks_endpoint| match jwks_endpoint {
+                    Ok(jwks_endpoint_url) => {
+                        retrieve_jwk_set_action.dispatch(jwks_endpoint_url.clone());
+                    }
+                    Err(err) => {
+                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...")
+                    }
+                })
+            }
+        });
+
+        Self { jwk_set }
+    }
+}
+
 /// Initializes a new `Auth` instance with the provided authentication
 /// parameters. This function creates and returns an `Auth` struct
 /// configured for authentication.
 pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+    tracing::trace!("Initializing Keycloak auth...");
+
     let discovery_endpoint: DiscoveryEndpoint = {
         let mut url = options.keycloak_server_url.clone();
         url.path_segments_mut()
@@ -253,13 +392,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     // TODO: Can we provide an "iframe" mode in which the login page is shown in an iframe while our Leptos application stays running in the background?
     let (code_verifier, set_code_verifier, _remove_code_verifier_from_storage) =
         use_storage_with_options::<Option<CodeVerifier<128>>, JsonSerdeCodec>(
-            StorageType::Session,
+            storage_type_provider.run(()),
             "leptos_keycloak_auth__code_verifier",
             // If not found in session storage, we generate our code here!
             UseStorageOptions::default().initial_value(None),
         );
     if code_verifier.get().is_none() {
-        tracing::info!("No code_verifier found in session storage, generating new one...");
+        tracing::trace!("No code_verifier found in session storage, generating new one...");
         set_code_verifier.set(Some(CodeVerifier::<128>::generate()));
     }
 
@@ -278,45 +417,26 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         );
     let handle_token = Callback::new(move |val| set_token.set(val));
 
-    let (oidc_config_wt, set_oidc_config_wt, _remove_oidc_config_from_storage) =
-        use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonSerdeCodec>(
-            storage_type_provider.run(()),
-            "leptos_keycloak_auth__oidc_config",
-            UseStorageOptions::default().initial_value(None),
-        );
-    let handle_oidc_config = Callback::new(move |val| set_oidc_config_wt.set(val));
-
-    let (jwk_set_wt, set_jwk_set_wt, _remove_jwk_set_from_storage) =
-        use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
-            storage_type_provider.run(()),
-            "leptos_keycloak_auth__jwk_set",
-            UseStorageOptions::default().initial_value(None),
-        );
-    // This callback is called whenever an updated JWK set is available.
-    let handle_jwk_set_wt = Callback::new(move |val: Option<JwkSetWithTimestamp>| {
-        // If we no longer have JWKs, we should probably also forget our current token.
-        if val.is_none() {
-            tracing::debug!("No JWK set available, forgetting current token...");
-            handle_token.run(None);
-        }
-        // If the JWK set changed, the Keycloak changed, and we should probably forget our token
-        // and require re-authentication.
-        // If jwk_set_wt is None, we cannot have a token yet and are safe to set it to None again.
-        if jwk_set_wt.read_untracked().as_ref().map(|it| &it.jwk_set)
-            != val.as_ref().map(|it| &it.jwk_set)
-        {
-            tracing::debug!("JWK set changed, forgetting current token...");
-            handle_token.run(None);
-        }
-        set_jwk_set_wt.set(val)
-    });
+    let oidc_mgr = OidcManager::new(
+        discovery_endpoint.clone(),
+        storage_type_provider,
+        options,
+        handle_req_error,
+    );
 
     let DerivedUrls {
         jwks_endpoint,
         authorization_endpoint,
         token_endpoint,
         end_session_endpoint,
-    } = DerivedUrls::new(oidc_config_wt);
+    } = DerivedUrls::new(oidc_mgr.oidc_config);
+
+    let jwk_set_mgr = JwkSetManager::new(
+        jwks_endpoint,
+        storage_type_provider,
+        options,
+        handle_req_error,
+    );
 
     let verified_and_decoded_id_token: Memo<
         Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
@@ -326,79 +446,12 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         let expected_audiences: &[String] = &[client_id];
         token_validation::validate(
             token.get(),
-            jwk_set_wt.get().as_ref().map(|it| &it.jwk_set),
+            jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
             expected_audiences,
         )
     });
+
     let last_token_id_error = Signal::derive(move || verified_and_decoded_id_token.get().err());
-
-    // Fetch a token from the OIDC provider using an authorization code and an optional session state.
-    let retrieve_jwk_set_action =
-        action::create_retrieve_jwk_set_action(handle_jwk_set_wt, handle_req_error);
-
-    let oidc_config_too_old = {
-        let UseIntervalReturn { counter, .. } = use_interval(
-            options.with_value(|o| o.advanced.oidc_config_age_check_interval_milliseconds),
-        );
-        Memo::new(move |_| {
-            let _count = counter.get();
-            oidc_config_wt
-                .get()
-                .map(|it| {
-                    (OffsetDateTime::now_utc() - it.retrieved).whole_seconds()
-                        > options
-                            .with_value(|o| o.advanced.max_oidc_config_age_seconds)
-                            .into()
-                })
-                .unwrap_or(true)
-        })
-    };
-
-    let jwk_set_too_old = {
-        let UseIntervalReturn { counter, .. } = use_interval(
-            options.with_value(|o| o.advanced.jwk_set_age_check_interval_milliseconds),
-        );
-        Memo::new(move |_| {
-            let _count = counter.get();
-            jwk_set_wt
-                .get()
-                .map(|it| {
-                    (OffsetDateTime::now_utc() - it.retrieved).whole_seconds()
-                        > options
-                            .with_value(|o| o.advanced.max_jwk_set_age_seconds)
-                            .into()
-                })
-                .unwrap_or(true)
-        })
-    };
-
-    // Fetch a token from the OIDC provider using an authorization code and an optional session state.
-    let retrieve_oidc_config_action = action::create_retrieve_oidc_config_action(
-        discovery_endpoint.clone(),
-        handle_oidc_config,
-        handle_req_error,
-    );
-
-    // Obtain the OIDC configuration. Updating any previously stored config.
-    Effect::new(move |_| {
-        if oidc_config_too_old.get() {
-            retrieve_oidc_config_action.dispatch(());
-        }
-    });
-
-    // Obtain the JWK set. Updating any previously stored config.
-    Effect::new(move |_| {
-        if jwk_set_too_old.get() {
-            jwks_endpoint.with_untracked(|jwks_endpoint| match jwks_endpoint {
-                Ok(jwks_endpoint_url) => {
-                    retrieve_jwk_set_action.dispatch(jwks_endpoint_url.clone());
-                }
-                Err(err) => {
-                    tracing::debug!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...")
-                }
-            })
-        }
-    });
 
     // Fetch a token from the OIDC provider using an authorization code and an optional session state.
     let exchange_code_for_token_action: Action<
@@ -466,17 +519,44 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         })
     };
 
-    // If either the access or the refresh token is about to expire (although the refresh token *should* always outlive the access token...),
-    // try to refresh the access token using the refresh token.
+    // True when a token is present and the access token is not expired.
+    // Defaults to `false` if no token data is present.
+    // This default prevent refresh-attempts from happening without any refresh token being present.
+    let access_token_expired = {
+        let UseIntervalReturn { counter, .. } = use_interval(options.with_value(|o| {
+            o.advanced
+                .access_token_expiration_check_interval_milliseconds
+        }));
+        Memo::new(move |_| {
+            tracing::trace!("Checking if token is expired...");
+            let _count = counter.get();
+            token.with(move |token| {
+                if let Some(token) = token {
+                    token.access_token_expired()
+                } else {
+                    false
+                }
+            })
+        })
+    };
+
+    // TODO: id_id_token_valid?
+
+    // If either the access or the refresh token is about to expire
+    // (although the refresh token *should* always outlive the access token...),
+    // or the access token already expired, try to refresh the access token using the refresh token.
     Effect::new(move |_| {
         let access_token_nearly_expired = access_token_nearly_expired.get();
         let refresh_token_nearly_expired = refresh_token_nearly_expired.get();
-        if let Some(token) = token.get() {
-            if !token.refresh_token_expired()
-                && (access_token_nearly_expired || refresh_token_nearly_expired)
-            {
-                trigger_refresh.run(());
-            }
+        let access_token_expired = access_token_expired.get();
+        if access_token_nearly_expired || refresh_token_nearly_expired || access_token_expired {
+            tracing::trace!(
+                access_token_nearly_expired,
+                refresh_token_nearly_expired,
+                access_token_expired,
+                "Refreshing token..."
+            );
+            trigger_refresh.run(());
         }
     });
 
@@ -489,12 +569,18 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         match url_state.get() {
             Ok(state) => match state {
                 CallbackResponse::SuccessfulLogin(login_state) => {
-                    let perform_update = match last_used_code.get_untracked() {
-                        Some(last_used_code) => last_used_code.code != login_state.code,
+                    tracing::trace!(?login_state, "Login successful");
+
+                    let do_exchange_code_for_token = match last_used_code.read_untracked().deref() {
+                        Some(last_used_code) => {
+                            last_used_code.code != login_state.code
+                                && last_used_code.session_state != login_state.session_state
+                        }
                         None => true,
                     };
-                    if perform_update {
-                        token_endpoint.with(|token_endpoint| match token_endpoint {
+
+                    if do_exchange_code_for_token {
+                        match token_endpoint.read_untracked().deref() {
                             Ok(token_endpoint) => {
                                 // We assume that last_code only changes when we receive a "new" / not-seen-before code.
                                 // This means we can safely call the token exchange here, as we will do this only once per code we see.
@@ -511,9 +597,9 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                                 }));
                             }
                             Err(err) => {
-                                tracing::debug!(reason = ?err, "Could not execute exchange_code_for_token_action, as not token_endpoint is known jet...")
+                                tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known jet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.")
                             }
-                        })
+                        }
                     }
 
                     // We provide Keycloak with a `post_login_redirect_url`. When the Keycloak
@@ -532,11 +618,15 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // leptos router and performed on the client itself.
                     let navigate = use_navigate();
                     navigate(
-                        options.with_value(|params| params.post_login_redirect_url.clone()).as_ref(),
-                        NavigateOptions::default()
+                        options
+                            .with_value(|params| params.post_login_redirect_url.clone())
+                            .as_ref(),
+                        NavigateOptions::default(),
                     );
                 }
                 CallbackResponse::SuccessfulLogout(logout_state) => {
+                    tracing::trace!(?logout_state, "Logout successful");
+
                     if logout_state.destroy_session {
                         // Note: We should not update the token here.
                         // This would lead to an execution of all reactive primitives depending on this.
@@ -550,7 +640,8 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         remove_token_from_storage();
 
                         // We should recreate the code_verifier to have a new one for the next login phase.
-                        // TODO: Why has this no effect on SessionStorage???
+                        // TODO: Why has this no effect on Local/SessionStorage???
+                        set_code_verifier.set(None);
                         set_code_verifier.set(Some(CodeVerifier::<128>::generate()));
                     }
 
@@ -559,8 +650,10 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // leptos router and performed on the client itself.
                     let navigate = use_navigate();
                     navigate(
-                        options.with_value(|params| params.post_logout_redirect_url.clone()).as_ref(),
-                        NavigateOptions::default()
+                        options
+                            .with_value(|params| params.post_logout_redirect_url.clone())
+                            .as_ref(),
+                        NavigateOptions::default(),
                     );
                 }
                 CallbackResponse::Error(err_state) => {
@@ -579,32 +672,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    // True when a token is present and the access token is not expired. // TODO: add: When Id token is valid.
-    let token_not_expired = {
-        let UseIntervalReturn { counter, .. } = use_interval(options.with_value(|o| {
-            o.advanced
-                .access_token_expiration_check_interval_milliseconds
-        }));
-        Memo::new(move |_| {
-            tracing::trace!("Checking if token is expired...");
-            let _count = counter.get();
-            token.with(move |token| {
-                if let Some(token) = token {
-                    !token.access_token_expired()
-                } else {
-                    false
-                }
-            })
-        })
-    };
-
     // Auth state derived from token data or potential errors.
     let state = Memo::new(move |_| {
-        // Note: The token might have already been set to None but token_not_expired was not yet updated...
+        // Note: The token might have already been set to None but access_token_expired was not yet updated...
         let has_token = token.read().is_some();
         let has_verified_and_decoded_id_token = verified_and_decoded_id_token.read().is_ok();
 
-        if has_token && has_verified_and_decoded_id_token && token_not_expired.get() {
+        if has_token && has_verified_and_decoded_id_token && !access_token_expired.get() {
             let authenticated = Authenticated {
                 token: Signal::derive(move || token.get().expect("present")),
                 access_token_nearly_expired: access_token_nearly_expired.into(),
@@ -647,16 +721,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    let code_challenge =
-        Memo::new(move |_| code_verifier.get().expect("present").to_code_challenge());
-
-    let login_url = create_login_url_signal(authorization_endpoint, options, code_challenge);
-    let logout_url = create_logout_url_signal(end_session_endpoint, token, options);
+    let code_challenge = Memo::new(move |_| code_verifier.get().map(|it| it.to_code_challenge()));
 
     let auth = KeycloakAuth {
         options,
-        login_url,
-        logout_url,
+        login_url: login::create_login_url_signal(authorization_endpoint, options, code_challenge)
+            .into(),
+        logout_url: logout::create_logout_url_signal(end_session_endpoint, token, options).into(),
         state: state.into(),
         is_authenticated: Signal::derive(move || match state.read().deref() {
             KeycloakAuthState::Authenticated(_) => true,
@@ -668,80 +739,4 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     provide_context(auth);
 
     auth
-}
-
-fn create_login_url_signal(
-    authorization_endpoint_url: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
-    options: StoredValue<UseKeycloakAuthOptions>,
-    code_challenge: Memo<CodeChallenge>,
-) -> Signal<Option<Url>> {
-    Memo::new(move |_| {
-        authorization_endpoint_url.with(|authorization_endpoint_url| {
-            if let Ok(url) = authorization_endpoint_url {
-                let mut url = url.clone();
-                let code_challenge = code_challenge.get();
-                url.query_pairs_mut()
-                    .append_pair("response_type", "code")
-                    .append_pair("code_challenge", code_challenge.code_challenge())
-                    .append_pair(
-                        "code_challenge_method",
-                        code_challenge.code_challenge_method().as_str(),
-                    )
-                    .append_pair(
-                        "client_id",
-                        &options.with_value(|params| params.client_id.clone()),
-                    )
-                    .append_pair(
-                        "redirect_uri",
-                        options
-                            .with_value(|params| params.post_login_redirect_url.clone())
-                            .as_str(),
-                    )
-                    .append_pair(
-                        "scope",
-                        &options.with_value(|params| {
-                            params.scope.clone().unwrap_or("openid".to_owned())
-                        }),
-                    );
-                Some(url)
-            } else {
-                Option::<Url>::None
-            }
-        })
-    })
-    .into()
-}
-
-fn create_logout_url_signal(
-    end_session_endpoint_url: Signal<Result<EndSessionEndpoint, DerivedUrlError>>,
-    token: Signal<Option<TokenData>>,
-    options: StoredValue<UseKeycloakAuthOptions>,
-) -> Signal<Option<Url>> {
-    Memo::new(move |_| {
-        end_session_endpoint_url.with(|end_session_endpoint| {
-            if let Ok(end_session_endpoint) = end_session_endpoint {
-                let mut end_session_endpoint = end_session_endpoint.clone();
-                let mut post_logout_redirect_uri =
-                    options.with_value(|o| o.post_logout_redirect_url.clone());
-                post_logout_redirect_uri
-                    .query_pairs_mut()
-                    .append_pair("destroy_session", "true");
-
-                end_session_endpoint.query_pairs_mut().append_pair(
-                    "post_logout_redirect_uri",
-                    post_logout_redirect_uri.as_str(),
-                );
-                if let Some(token_data) = token.get() {
-                    // TODO: Only access verified ID tokens?
-                    end_session_endpoint
-                        .query_pairs_mut()
-                        .append_pair("id_token_hint", &token_data.id_token);
-                }
-                Some(end_session_endpoint)
-            } else {
-                Option::<Url>::None
-            }
-        })
-    })
-    .into()
 }

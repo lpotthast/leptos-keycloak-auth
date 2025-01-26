@@ -84,21 +84,21 @@ pub(crate) fn create_exchange_code_for_token_action(
             CodeVerifier<128>,
             Option<SessionState>,
         )| {
-            let client_id = options.with_value(|params| params.client_id.clone());
-            let redirect_uri = options.with_value(|params| params.post_login_redirect_url.clone());
             let token_endpoint = token_endpoint.clone();
+            let client_id = options.read_value().client_id.clone();
+            let redirect_uri = options.read_value().post_login_redirect_url.clone();
             let code = code.clone();
             let code_verifier = verifier.code_verifier().to_owned();
             let session_state = session_state.clone();
             async move {
                 leptos::task::spawn_local(async move {
                     let result = request::exchange_code_for_token(
-                        client_id,
-                        redirect_uri,
                         token_endpoint,
-                        code,
-                        code_verifier,
-                        session_state,
+                        &client_id,
+                        redirect_uri.as_str(),
+                        &code,
+                        &code_verifier,
+                        session_state.as_ref().map(|s| s.as_str()),
                     )
                     .await;
                     match result {
@@ -122,12 +122,12 @@ pub(crate) fn create_refresh_token_action(
 ) -> Action<(TokenEndpoint, RefreshToken), ()> {
     Action::new(
         move |(token_endpoint, refresh_token): &(TokenEndpoint, RefreshToken)| {
-            let client_id = options.with_value(|params| params.client_id.clone());
             let token_endpoint = token_endpoint.clone();
+            let client_id = options.read_value().client_id.clone();
             let refresh_token = refresh_token.clone();
             async move {
                 leptos::task::spawn_local(async move {
-                    match request::refresh_token(client_id, token_endpoint, refresh_token).await {
+                    match request::refresh_token(token_endpoint, &client_id, &refresh_token).await {
                         Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
                         Err(err) => set_req_error.run(Some(err)),
                     }

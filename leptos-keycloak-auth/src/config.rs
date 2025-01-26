@@ -48,8 +48,7 @@ pub struct AdvancedOptions {
     pub refresh_token_nearly_expired_check_interval_milliseconds: u64,
     pub refresh_token_nearly_expired_having: LifeLeft,
 
-    /// Intervall in milliseconds after which the oidc configuration should be checked for its age.
-    /// A
+    /// Interval in milliseconds after which the oidc configuration should be checked for its age.
     pub oidc_config_age_check_interval_milliseconds: u64,
 
     pub jwk_set_age_check_interval_milliseconds: u64,
@@ -65,10 +64,10 @@ impl Default for AdvancedOptions {
     fn default() -> Self {
         Self {
             storage_type_provider: Callback::new(|()| StorageType::Local),
-            access_token_expiration_check_interval_milliseconds: 2000,
-            access_token_nearly_expired_check_interval_milliseconds: 2000,
+            access_token_expiration_check_interval_milliseconds: 1000,
+            access_token_nearly_expired_check_interval_milliseconds: 1000,
             access_token_nearly_expired_having: LifeLeft::Percentage(0.25),
-            refresh_token_nearly_expired_check_interval_milliseconds: 2000,
+            refresh_token_nearly_expired_check_interval_milliseconds: 1000,
             refresh_token_nearly_expired_having: LifeLeft::Percentage(0.25),
             oidc_config_age_check_interval_milliseconds: 2000,
             jwk_set_age_check_interval_milliseconds: 2000,

@@ -4,7 +4,7 @@ use crate::{
     token::TokenData,
 };
 use reqwest::IntoUrl;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 
@@ -59,86 +59,56 @@ pub(crate) async fn retrieve_oidc_config(
 }
 
 pub(crate) async fn exchange_code_for_token(
-    client_id: impl AsRef<str>,
-    redirect_uri: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
-    code: impl AsRef<str>,
-    code_verifier: impl AsRef<str>,
-    session_state: Option<impl AsRef<str>>,
+    client_id: &str,
+    redirect_uri: &str,
+    code: &str,
+    code_verifier: &str,
+    session_state: Option<&str>,
 ) -> Result<TokenData, RequestError> {
-    fn build_params<'a>(
-        client_id: &'a str,
-        redirect_uri: &'a str,
-        code: &'a str,
-        code_verifier: &'a str,
-    ) -> HashMap<&'static str, &'a str> {
-        let mut params: HashMap<&str, &str> = HashMap::new();
-        params.insert("grant_type", "authorization_code");
-        params.insert("client_id", client_id);
-        params.insert("redirect_uri", redirect_uri);
-        params.insert("code", code);
-        params.insert("code_verifier", code_verifier);
-        params
+    let mut params: HashMap<&str, &str> = HashMap::new();
+    params.insert("grant_type", "authorization_code");
+    params.insert("client_id", client_id);
+    params.insert("redirect_uri", redirect_uri);
+    params.insert("code", code);
+    params.insert("code_verifier", code_verifier);
+    if let Some(state) = session_state {
+        params.insert("state", state);
     }
-    async fn inner(
-        params: HashMap<&str, &str>,
-        token_endpoint: impl IntoUrl,
-    ) -> Result<TokenData, RequestError> {
-        match reqwest::Client::new()
-            .post(token_endpoint)
-            .form(&params)
-            .send()
-            .await
-            .context(SendSnafu {})?
-            .json::<TokenResponse>()
-            .await
-            .context(DecodeSnafu {})?
-        {
-            TokenResponse::Success(success) => Ok(success.into()),
-            TokenResponse::Error(error) => Err(ErrResponseSnafu {
-                error_response: error,
-            }
-            .build()),
-        }
-    }
-    let mut params = build_params(client_id.as_ref(), redirect_uri.as_ref(), code.as_ref(), code_verifier.as_ref());
-    if let Some(state) = &session_state {
-        params.insert("state", state.as_ref());
-    }
-    inner(params, token_endpoint).await
+    request_token(token_endpoint, &params).await
 }
 
 pub(crate) async fn refresh_token(
-    client_id: impl AsRef<str>,
     token_endpoint: impl IntoUrl,
-    refresh_token: impl AsRef<str>,
+    client_id: &str,
+    refresh_token: &str,
 ) -> Result<TokenData, RequestError> {
-    async fn inner(
-        client_id: &str,
-        token_endpoint: impl IntoUrl,
-        refresh_token: &str,
-    ) -> Result<TokenData, RequestError> {
-        let params = [
-            ("grant_type", "refresh_token"),
-            ("client_id", client_id),
-            ("refresh_token", refresh_token),
-        ];
-        match reqwest::Client::new()
-            .post(token_endpoint)
-            .form(&params)
-            .send()
-            .await
-            .context(SendSnafu {})?
-            .json::<TokenResponse>()
-            .await
-            .context(DecodeSnafu {})?
-        {
-            TokenResponse::Success(success) => Ok(success.into()),
-            TokenResponse::Error(error) => Err(ErrResponseSnafu {
-                error_response: error,
-            }
-            .build()),
+    let params = [
+        ("grant_type", "refresh_token"),
+        ("client_id", client_id),
+        ("refresh_token", refresh_token),
+    ];
+    request_token(token_endpoint, &params).await
+}
+
+async fn request_token<T: Serialize + ?Sized>(
+    token_endpoint: impl IntoUrl + Sized,
+    params: &T,
+) -> Result<TokenData, RequestError> {
+    match reqwest::Client::new()
+        .post(token_endpoint)
+        .form(&params)
+        .send()
+        .await
+        .context(SendSnafu {})?
+        .json::<TokenResponse>()
+        .await
+        .context(DecodeSnafu {})?
+    {
+        TokenResponse::Success(success) => Ok(success.into()),
+        TokenResponse::Error(error) => Err(ErrResponseSnafu {
+            error_response: error,
         }
+        .build()),
     }
-    inner(client_id.as_ref(), token_endpoint, refresh_token.as_ref()).await
 }
