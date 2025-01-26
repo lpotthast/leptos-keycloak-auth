@@ -11,6 +11,7 @@ use crate::{
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
 /// client ID, and other related data.
+#[derive(Debug)]
 pub struct UseKeycloakAuthOptions {
     /// Url of your keycloak instance, E.g. "https://localhost:8443/"
     pub keycloak_server_url: Url,
@@ -32,6 +33,7 @@ pub struct UseKeycloakAuthOptions {
     pub advanced: AdvancedOptions,
 }
 
+#[derive(Debug)]
 pub struct AdvancedOptions {
     /// This library persists information in order to regain knowledge after cold app startup.
     /// The storage pin the storage provided here.
