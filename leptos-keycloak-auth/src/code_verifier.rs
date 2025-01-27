@@ -48,13 +48,13 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
         }
     }
 
-    pub(crate) fn code_verifier(&self) -> &str {
+    pub fn code_verifier(&self) -> &str {
         self.code_verifier.as_str()
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CodeChallengeMethod {
+pub enum CodeChallengeMethod {
     S256,
 }
 
@@ -73,11 +73,11 @@ pub struct CodeChallenge {
 }
 
 impl CodeChallenge {
-    pub(crate) fn code_challenge(&self) -> &str {
+    pub fn code_challenge(&self) -> &str {
         self.code_challenge.as_str()
     }
 
-    pub(crate) fn code_challenge_method(&self) -> CodeChallengeMethod {
+    pub fn code_challenge_method(&self) -> CodeChallengeMethod {
         self.code_challenge_method
     }
 }

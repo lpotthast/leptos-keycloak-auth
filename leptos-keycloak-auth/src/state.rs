@@ -42,16 +42,16 @@ pub struct KeycloakAuth {
     pub is_authenticated: Signal<bool>,
 
     #[cfg(feature = "internals")]
-    pub oidc_config_manager: crate::OidcConfigManager,
+    pub oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager,
 
     #[cfg(feature = "internals")]
-    pub jwk_set_manager: crate::JwkSetManager,
+    pub jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager,
 
     #[cfg(feature = "internals")]
-    pub code_verifier_manager: crate::CodeVerifierManager,
+    pub code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager,
 
     #[cfg(feature = "internals")]
-    pub token_manager: crate::TokenManager,
+    pub token_manager: crate::internal::token_manager::TokenManager,
 }
 
 impl KeycloakAuth {
