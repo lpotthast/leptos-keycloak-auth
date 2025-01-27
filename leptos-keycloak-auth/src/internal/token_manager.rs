@@ -89,7 +89,7 @@ impl TokenManager {
             let token_endpoint = match token_endpoint.read_untracked().as_ref() {
                 Ok(it) => it.clone(),
                 Err(err) => {
-                    tracing::info!(
+                    tracing::debug!(
                         ?err,
                         "Requested token refresh has no effect, as no token_endpoint is known yet."
                     );
@@ -100,7 +100,7 @@ impl TokenManager {
             let refresh_token = match token.read_untracked().as_ref() {
                 Some(token) => token.refresh_token.clone(),
                 None => {
-                    tracing::info!(
+                    tracing::debug!(
                         "Requested token refresh has no effect, as no token is known yet."
                     );
                     return;
