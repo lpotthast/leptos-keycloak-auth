@@ -1,11 +1,12 @@
 use crate::error::KeycloakAuthError;
+use crate::internal::derived_urls::DerivedUrls;
 use crate::request::RequestError;
 use crate::response::CallbackResponse;
 use crate::token::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::{
-    code_verifier, internal, login, logout, token_validation, Authenticated, DiscoveryEndpoint,
-    KeycloakAuth, KeycloakAuthState, UseKeycloakAuthOptions,
+    code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
+    KeycloakAuthState, UseKeycloakAuthOptions,
 };
 use leptos::callback::Callback;
 use leptos::context::provide_context;
@@ -13,26 +14,12 @@ use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query};
 use leptos_router::NavigateOptions;
 use std::ops::Deref;
-use crate::internal::derived_urls::DerivedUrls;
 
 /// Initializes a new `Auth` instance with the provided authentication
 /// parameters. This function creates and returns an `Auth` struct
 /// configured for authentication.
 pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
-
-    let discovery_endpoint: DiscoveryEndpoint = {
-        let mut url = options.keycloak_server_url.clone();
-        url.path_segments_mut()
-            .expect("to allow path segments on Keycloak server url")
-            .extend(&[
-                "realms",
-                &options.realm,
-                ".well-known",
-                "openid-configuration",
-            ]);
-        url
-    };
 
     let options = StoredValue::new(options);
 
@@ -41,18 +28,14 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         set_auth_error.set(request_error.map(|err| KeycloakAuthError::Request { source: err }))
     });
 
-    let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(
-        options,
-        discovery_endpoint.clone(),
-        handle_req_error,
-    );
+    let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(options, handle_req_error);
 
     let DerivedUrls {
         jwks_endpoint,
         authorization_endpoint,
         token_endpoint,
         end_session_endpoint,
-    } = DerivedUrls::new(oidc_mgr.oidc_config);
+    } = oidc_mgr.derive_urls();
 
     let jwk_set_mgr =
         internal::jwk_set_manager::JwkSetManager::new(options, jwks_endpoint, handle_req_error);

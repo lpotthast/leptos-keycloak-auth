@@ -1,4 +1,5 @@
 use crate::token::LifeLeft;
+use crate::DiscoveryEndpoint;
 use std::time::Duration;
 use url::Url;
 
@@ -25,6 +26,16 @@ pub struct UseKeycloakAuthOptions {
     pub scope: Option<String>,
 
     pub advanced: AdvancedOptions,
+}
+
+impl UseKeycloakAuthOptions {
+    pub(crate) fn discovery_endpoint(&self) -> DiscoveryEndpoint {
+        let mut url = self.keycloak_server_url.clone();
+        url.path_segments_mut()
+            .expect("no cannot-be-a-base url")
+            .extend(&["realms", &self.realm, ".well-known", "openid-configuration"]);
+        url
+    }
 }
 
 #[derive(Debug)]
