@@ -1,10 +1,9 @@
 use crate::code_verifier::CodeVerifier;
+use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
-use crate::{
-    action, AuthorizationCode, DerivedUrlError, SessionState, TokenEndpoint, UseKeycloakAuthOptions,
-};
+use crate::{action, AuthorizationCode, SessionState, TokenEndpoint, UseKeycloakAuthOptions};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};

@@ -1,5 +1,6 @@
+use crate::internal::derived_urls::DerivedUrlError;
 use crate::token::TokenData;
-use crate::{DerivedUrlError, EndSessionEndpoint, UseKeycloakAuthOptions};
+use crate::{EndSessionEndpoint, UseKeycloakAuthOptions};
 use leptos::prelude::*;
 use url::Url;
 

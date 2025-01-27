@@ -1,4 +1,3 @@
-use crate::config::DerivedUrls;
 use crate::error::KeycloakAuthError;
 use crate::request::RequestError;
 use crate::response::CallbackResponse;
@@ -14,6 +13,7 @@ use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query};
 use leptos_router::NavigateOptions;
 use std::ops::Deref;
+use crate::internal::derived_urls::DerivedUrls;
 
 /// Initializes a new `Auth` instance with the provided authentication
 /// parameters. This function creates and returns an `Auth` struct

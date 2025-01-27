@@ -1,5 +1,6 @@
 use crate::code_verifier::CodeChallenge;
-use crate::{AuthorizationEndpoint, DerivedUrlError, UseKeycloakAuthOptions};
+use crate::internal::derived_urls::DerivedUrlError;
+use crate::{AuthorizationEndpoint, UseKeycloakAuthOptions};
 use leptos::prelude::*;
 use url::Url;
 

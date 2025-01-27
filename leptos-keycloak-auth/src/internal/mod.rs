@@ -1,8 +1,9 @@
+use crate::oidc::OidcConfig;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use crate::oidc::OidcConfig;
 
 pub(crate) mod code_verifier_manager;
+pub(crate) mod derived_urls;
 pub(crate) mod jwk_set_manager;
 pub(crate) mod oidc_config_manager;
 pub(crate) mod token_manager;
