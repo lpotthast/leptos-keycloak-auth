@@ -1,12 +1,11 @@
+use crate::{
+    internal::OidcConfigWithTimestamp, token::LifeLeft, AuthorizationEndpoint, EndSessionEndpoint,
+    JwkSetEndpoint, TokenEndpoint,
+};
 use leptos::prelude::*;
 use snafu::{ResultExt, Snafu};
 use std::time::Duration;
 use url::Url;
-
-use crate::{
-    token::LifeLeft, AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint,
-    OidcConfigWithTimestamp, TokenEndpoint,
-};
 
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,

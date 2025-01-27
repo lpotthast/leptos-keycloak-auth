@@ -7,9 +7,9 @@ use crate::{
     config::UseKeycloakAuthOptions,
     request::{self, RequestError},
     token::TokenData,
-    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, JwkSetWithTimestamp,
-    OidcConfigWithTimestamp, RefreshToken, SessionState, TokenEndpoint,
+    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint,    RefreshToken, SessionState, TokenEndpoint,
 };
+use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 
 pub(crate) fn create_retrieve_oidc_config_action(
     discovery_endpoint_url: DiscoveryEndpoint,

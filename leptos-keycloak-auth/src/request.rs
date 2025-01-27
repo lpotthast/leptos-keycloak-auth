@@ -92,7 +92,7 @@ pub(crate) async fn refresh_token(
 }
 
 async fn request_token<T: Serialize + ?Sized>(
-    token_endpoint: impl IntoUrl + Sized,
+    token_endpoint: impl IntoUrl,
     params: &T,
 ) -> Result<TokenData, RequestError> {
     match reqwest::Client::new()
