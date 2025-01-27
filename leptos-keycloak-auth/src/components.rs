@@ -20,7 +20,7 @@ where
 
     move || match auth.state.get() {
         KeycloakAuthState::Authenticated(authenticated) => {
-            provide_context(authenticated.clone());
+            provide_context(authenticated);
             Either::Left(children())
         }
         KeycloakAuthState::NotAuthenticated {

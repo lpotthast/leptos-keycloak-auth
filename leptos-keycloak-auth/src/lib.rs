@@ -45,14 +45,14 @@ type AccessToken = String;
 type RefreshToken = String;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct OidcConfigWithTimestamp {
+pub struct OidcConfigWithTimestamp {
     oidc_config: OidcConfig,
     #[serde(with = "time::serde::rfc3339")]
     retrieved: OffsetDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct JwkSetWithTimestamp {
+pub struct JwkSetWithTimestamp {
     jwk_set: jsonwebtoken::jwk::JwkSet,
     #[serde(with = "time::serde::rfc3339")]
     retrieved: OffsetDateTime,
@@ -79,8 +79,11 @@ mod internal {
     #[derive(Debug, Clone, Copy)]
     pub struct OidcConfigManager {
         pub oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
+        #[allow(unused)]
         pub oidc_config_age: Signal<Duration>,
+        #[allow(unused)]
         pub oidc_config_expires_in: Signal<Duration>,
+        #[allow(unused)]
         pub oidc_config_too_old: Signal<bool>,
     }
     impl OidcConfigManager {
@@ -154,8 +157,11 @@ mod internal {
     #[derive(Debug, Clone, Copy)]
     pub struct JwkSetManager {
         pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
+        #[allow(unused)]
         pub jwk_set_age: Signal<Duration>,
+        #[allow(unused)]
         pub jwk_set_expires_in: Signal<Duration>,
+        #[allow(unused)]
         pub jwk_set_too_old: Signal<bool>,
     }
 
@@ -440,11 +446,10 @@ mod internal {
                 token
                     .read()
                     .as_ref()
-                    .map(|it| {
+                    .and_then(|it| {
                         it.estimated_refresh_token_lifetime()
                             .map(|it| it.to_std_duration())
                     })
-                    .flatten()
                     .unwrap_or(Duration::ZERO)
             });
 
@@ -463,8 +468,7 @@ mod internal {
                     token
                         .read()
                         .as_ref()
-                        .map(|it| it.refresh_token_time_left().map(|it| it.to_std_duration()))
-                        .flatten()
+                        .and_then(|it| it.refresh_token_time_left().map(|it| it.to_std_duration()))
                         .unwrap_or(Duration::ZERO)
                 })
             };
@@ -623,7 +627,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     #[allow(unused_qualifications)]
     let code_mgr = internal::CodeVerifierManager::new();
-    
+
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();
 

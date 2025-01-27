@@ -40,7 +40,7 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
         hasher.update(self.code_verifier.as_bytes());
         let digest = hasher.finalize();
 
-        let code_challenge = URL_SAFE_NO_PAD.encode(&digest);
+        let code_challenge = URL_SAFE_NO_PAD.encode(digest);
 
         CodeChallenge {
             code_challenge,

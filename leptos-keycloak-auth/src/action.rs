@@ -98,7 +98,7 @@ pub(crate) fn create_exchange_code_for_token_action(
                         redirect_uri.as_str(),
                         &code,
                         &code_verifier,
-                        session_state.as_ref().map(|s| s.as_str()),
+                        session_state.as_deref(),
                     )
                     .await;
                     match result {
