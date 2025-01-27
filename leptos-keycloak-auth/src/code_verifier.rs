@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) struct CodeVerifier<const LENGTH: usize> {
+pub struct CodeVerifier<const LENGTH: usize> {
     code_verifier: String,
 }
 
@@ -67,7 +67,7 @@ impl CodeChallengeMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CodeChallenge {
+pub struct CodeChallenge {
     code_challenge: String,
     code_challenge_method: CodeChallengeMethod,
 }

@@ -24,7 +24,7 @@ console_error_panic_hook = "0.1.7"
 dotenvy = "0.15.7"
 leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to-leptos-0.7" }
 leptos = { version = "0.7.3", features = [] }
-leptos-keycloak-auth = { path = "../leptos-keycloak-auth" }
+leptos-keycloak-auth = { path = "../leptos-keycloak-auth", features = ["internals"] }
 leptos-routes = { git = "https://github.com/lpotthast/leptos-routes", branch = "main" }
 leptos_axum = { version = "0.7.3", optional = true }
 leptos_meta = { version = "0.7.3", features = [] }

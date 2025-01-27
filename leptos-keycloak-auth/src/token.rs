@@ -222,11 +222,11 @@ impl TokenData {
         self.access_token_expires_at - self.time_received
     }
 
-    pub fn access_token_to_be_expired(&self, life_left: LifeLeft) -> bool {
-        let lifetime = self.estimated_access_token_lifetime();
-        let left = self.access_token_time_left();
-        life_left.nearly_expired(lifetime, left)
-    }
+    //pub fn access_token_to_be_expired(&self, life_left: LifeLeft) -> bool {
+    //    let lifetime = self.estimated_access_token_lifetime();
+    //    let left = self.access_token_time_left();
+    //    life_left.nearly_expired(lifetime, left)
+    //}
 
     pub fn access_token_expired(&self) -> bool {
         self.access_token_expires_at < OffsetDateTime::now_utc()
@@ -244,16 +244,16 @@ impl TokenData {
             .map(|expires_in| *expires_in - self.time_received)
     }
 
-    pub fn refresh_token_to_be_expired(&self, life_left: LifeLeft) -> bool {
-        self.refresh_expires_at
-            .as_ref()
-            .map(|_expires_in| {
-                let lifetime = self.estimated_refresh_token_lifetime().unwrap();
-                let left = self.refresh_token_time_left().unwrap();
-                life_left.nearly_expired(lifetime, left)
-            })
-            .unwrap_or_default()
-    }
+    //pub fn refresh_token_to_be_expired(&self, life_left: LifeLeft) -> bool {
+    //    self.refresh_expires_at
+    //        .as_ref()
+    //        .map(|_expires_in| {
+    //            let lifetime = self.estimated_refresh_token_lifetime().unwrap();
+    //            let left = self.refresh_token_time_left().unwrap();
+    //            life_left.nearly_expired(lifetime, left)
+    //        })
+    //        .unwrap_or_default()
+    //}
 
     pub fn refresh_token_expired(&self) -> bool {
         self.refresh_expires_at
@@ -270,10 +270,11 @@ pub enum LifeLeft {
 }
 
 impl LifeLeft {
-    pub fn nearly_expired(self, lifetime: Duration, left: Duration) -> bool {
+    // TODO: Use time::Duration everywhere...
+    pub fn nearly_expired(self, lifetime: std::time::Duration, left: std::time::Duration) -> bool {
         match self {
-            LifeLeft::Percentage(p) => (left / lifetime) <= p,
-            LifeLeft::Seconds(s) => left.whole_seconds() <= s as i64,
+            LifeLeft::Percentage(p) => (left.as_millis() as f64 / lifetime.as_millis() as f64) <= p,
+            LifeLeft::Seconds(s) => left.as_secs() <= s as u64,
         }
     }
 }

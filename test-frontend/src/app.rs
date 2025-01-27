@@ -130,11 +130,11 @@ pub fn MyAccount() -> impl IntoView {
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
 
-    let token = authenticated.token;
+    let token = authenticated.access_token;
     let who_am_i = LocalResource::new(move || async move {
         reqwest::Client::new()
             .get("http://127.0.0.1:9999/who-am-i")
-            .bearer_auth(token.read().access_token.clone())
+            .bearer_auth(token.get())
             .send()
             .await
             .unwrap()
@@ -189,7 +189,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let p = keycloak_port.await;
-                let _ = use_keycloak_auth(UseKeycloakAuthOptions {
+                let auth = use_keycloak_auth(UseKeycloakAuthOptions {
                     keycloak_server_url: Url::parse(&format!("http://localhost:{}/", p)).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
@@ -202,6 +202,73 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     <leptos_keycloak_auth::components::Authenticated unauthenticated=|| view! { <Login/> }>
                         { children() }
                     </leptos_keycloak_auth::components::Authenticated>
+
+                    <div style="width: 100%;">
+                        <h3>"Internal data: oidc_config_manager"</h3>
+                        <div>
+                            "oidc_config_age: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_age.get())}
+                        </div>
+                        <div>
+                            "oidc_config_expires_in: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_expires_in.get())}
+                        </div>
+                        <div>
+                            "oidc_config_too_old: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_too_old.get())}
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <h3>"Internal data: jwk_set_manager"</h3>
+                        <div>
+                            "oidc_config_age: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_age.get())}
+                        </div>
+                        <div>
+                            "oidc_config_expires_in: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_expires_in.get())}
+                        </div>
+                        <div>
+                            "oidc_config_too_old: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_too_old.get())}
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <h3>"Internal data: code_verifier_manager"</h3>
+                        <div>
+                            "code_verifier: " {move || format!("{:?}", auth.code_verifier_manager.code_verifier.get())}
+                        </div>
+                        <div>
+                            "code_challenge: " {move || format!("{:?}", auth.code_verifier_manager.code_challenge.get())}
+                        </div>
+                    </div>
+
+                    <div style="width: 100%;">
+                        <h3>"Internal data: token_manager"</h3>
+                        <div>
+                            "access_token_lifetime: " {move || format!("{:?}", auth.token_manager.access_token_lifetime.get())}
+                        </div>
+                        <div>
+                            "access_token_expires_in: " {move || format!("{:?}", auth.token_manager.access_token_expires_in.get())}
+                        </div>
+                        <div>
+                            "access_token_nearly_expired: " {move || format!("{:?}", auth.token_manager.access_token_nearly_expired.get())}
+                        </div>
+                        <div>
+                            "access_token_expired: " {move || format!("{:?}", auth.token_manager.access_token_expired.get())}
+                        </div>
+                        <div>
+                            "refresh_token_lifetime: " {move || format!("{:?}", auth.token_manager.refresh_token_lifetime.get())}
+                        </div>
+                        <div>
+                            "refresh_token_expires_in: " {move || format!("{:?}", auth.token_manager.refresh_token_expires_in.get())}
+                        </div>
+                        <div>
+                            "refresh_token_nearly_expired: " {move || format!("{:?}", auth.token_manager.refresh_token_nearly_expired.get())}
+                        </div>
+                        <div>
+                            "refresh_token_expired: " {move || format!("{:?}", auth.token_manager.refresh_token_expired.get())}
+                        </div>
+                        <div>
+                            "token_endpoint: " {move || format!("{:?}", auth.token_manager.token_endpoint.get())}
+                        </div>
+                    </div>
                 }
             })}
         </Suspense>
