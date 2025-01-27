@@ -3,13 +3,14 @@ use time::OffsetDateTime;
 use url::Url;
 
 use crate::code_verifier::CodeVerifier;
+use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 use crate::{
     config::UseKeycloakAuthOptions,
     request::{self, RequestError},
     token::TokenData,
-    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint,    RefreshToken, SessionState, TokenEndpoint,
+    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
+    TokenEndpoint,
 };
-use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 
 pub(crate) fn create_retrieve_oidc_config_action(
     discovery_endpoint_url: DiscoveryEndpoint,
@@ -119,17 +120,25 @@ pub(crate) fn create_refresh_token_action(
     options: StoredValue<UseKeycloakAuthOptions>,
     set_token: Callback<Option<TokenData>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<(TokenEndpoint, RefreshToken), ()> {
+) -> Action<(TokenEndpoint, RefreshToken, Callback<()>), ()> {
     Action::new(
-        move |(token_endpoint, refresh_token): &(TokenEndpoint, RefreshToken)| {
+        move |(token_endpoint, refresh_token, on_refresh_error): &(
+            TokenEndpoint,
+            RefreshToken,
+            Callback<()>,
+        )| {
             let token_endpoint = token_endpoint.clone();
             let client_id = options.read_value().client_id.clone();
             let refresh_token = refresh_token.clone();
+            let on_refresh_error = on_refresh_error.clone();
             async move {
                 leptos::task::spawn_local(async move {
                     match request::refresh_token(token_endpoint, &client_id, &refresh_token).await {
                         Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
-                        Err(err) => set_req_error.run(Some(err)),
+                        Err(err) => {
+                            on_refresh_error.run(());
+                            set_req_error.run(Some(err))
+                        }
                     }
                 });
             }

@@ -1,3 +1,4 @@
+use crate::authenticated_client::AuthenticatedClient;
 use crate::error::KeycloakAuthError;
 use crate::token::{KeycloakIdTokenClaims, TokenData};
 use crate::token_validation::KeycloakIdTokenClaimsError;
@@ -74,7 +75,7 @@ impl KeycloakAuth {
 /// Prefer using this to determine if a user is already authenticated.
 /// Will be of AuthState::Undetermined variant if neither a token nor any error were received.
 /// Will be of AuthState::NotAuthenticated variant if the token data contains an expired access token or an error was received.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeycloakAuthState {
     /// The Authenticated state is only used when there is a valid token which did not jet expire.
     /// If you encounter this state, be ensured that the token can be used to access your api.
@@ -97,6 +98,7 @@ impl KeycloakAuthState {
             KeycloakAuthState::Authenticated(Authenticated {
                 access_token,
                 id_token_claims,
+                auth_error_reporter: _,
             }) => {
                 #[derive(Debug)]
                 #[expect(unused)]
@@ -137,9 +139,12 @@ impl KeycloakAuthState {
     }
 }
 
-/// Authentication handler responsible for handling user authentication and
-/// token management.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// State only accessible when the user is authenticated.
+///
+/// You can call `client` to receive an `AuthenticatedClient` (using a `reqwest::Client` in
+/// the background) that automatically (and reactively) attaches the access_token to your requests
+/// and handles potential failure codes by performing a retry of the request if applicable.
+#[derive(Debug, Clone, Copy)]
 pub struct Authenticated {
     /// Claims from the verified and decoded ID token.
     /// Contains user information like name, email and roles.
@@ -151,4 +156,37 @@ pub struct Authenticated {
     /// Guaranteed to not be expired.
     /// This is a signal, as we refresh the token regularly and automatically in the background.
     pub access_token: Signal<AccessToken>,
+
+    pub(crate) auth_error_reporter: Callback<http::StatusCode, RequestAction>,
+}
+
+impl PartialEq for Authenticated {
+    fn eq(&self, other: &Self) -> bool {
+        // Only excluding auth_error_reporter.
+        self.id_token_claims == other.id_token_claims && self.access_token == other.access_token
+    }
+}
+
+impl Eq for Authenticated {}
+
+pub enum RequestAction {
+    /// Indicates that the request should be retried as updated tokens are now available.
+    Retry,
+
+    /// Indicates that the request should be marked as ultimately failed.
+    Fail,
+}
+
+impl Authenticated {
+    pub fn client(&self) -> AuthenticatedClient {
+        AuthenticatedClient::new(reqwest::Client::new(), self.clone())
+    }
+
+    pub fn client_from(&self, client: reqwest::Client) -> AuthenticatedClient {
+        AuthenticatedClient::new(client, self.clone())
+    }
+
+    pub fn report_failed_http_request(&self, status_code: http::StatusCode) -> RequestAction {
+        self.auth_error_reporter.run(status_code)
+    }
 }

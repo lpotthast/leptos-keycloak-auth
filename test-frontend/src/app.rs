@@ -1,8 +1,9 @@
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
 use leptos::prelude::*;
+use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    use_keycloak_auth, Authenticated, KeycloakAuth, Url, UseKeycloakAuthOptions,
+    use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions,
 };
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
@@ -130,17 +131,17 @@ pub fn MyAccount() -> impl IntoView {
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
 
-    let token = authenticated.access_token;
-    let who_am_i = LocalResource::new(move || async move {
-        reqwest::Client::new()
-            .get("http://127.0.0.1:9999/who-am-i")
-            .bearer_auth(token.get())
-            .send()
-            .await
-            .unwrap()
-            .json::<WhoAmIResponse>()
-            .await
-            .unwrap()
+    let who_am_i = LocalResource::new(move || {
+        let client = authenticated.client();
+        async move {
+            client
+                .get("http://127.0.0.1:9999/who-am-i")
+                .await
+                .unwrap()
+                .json::<WhoAmIResponse>()
+                .await
+                .unwrap()
+        }
     });
 
     view! {

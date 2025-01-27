@@ -1,12 +1,13 @@
 use crate::error::KeycloakAuthError;
 use crate::internal::derived_urls::DerivedUrls;
+use crate::internal::token_manager::OnRefreshError;
 use crate::request::RequestError;
 use crate::response::CallbackResponse;
 use crate::token::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::{
     code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
-    KeycloakAuthState, UseKeycloakAuthOptions,
+    KeycloakAuthState, RequestAction, UseKeycloakAuthOptions,
 };
 use leptos::callback::Callback;
 use leptos::context::provide_context;
@@ -14,10 +15,10 @@ use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query};
 use leptos_router::NavigateOptions;
 use std::ops::Deref;
+use time::OffsetDateTime;
 
-/// Initializes a new `Auth` instance with the provided authentication
-/// parameters. This function creates and returns an `Auth` struct
-/// configured for authentication.
+/// Initializes a new `KeycloakAuth` instance, the authentication handler responsible for handling
+/// user authentication and token management, with the provided authentication parameters.
 pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
 
@@ -166,6 +167,32 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         second_try
     });
 
+    let (last_refresh_from_error, set_last_refresh_from_error) =
+        signal::<Option<OffsetDateTime>>(None);
+    let auth_error_reporter = Callback::new(move |status_code: http::StatusCode| {
+        // Should the user report that a request using the current access token failed,
+        // this may mean that the token was revoked.
+        // We can try to refresh the token.
+        match status_code {
+            // NOTE: This MUST NOT lead to an infinite loop of refreshed and failed requests.
+            // Which may happen if
+            // - the refresh succeeds but
+            // - the 401 error cannot be resolved with the refresh.
+            http::StatusCode::UNAUTHORIZED => {
+                if last_refresh_from_error
+                    .get_untracked()
+                    .filter(|it| (OffsetDateTime::now_utc() - *it).whole_seconds() > 1)
+                    .is_some()
+                {
+                    token_mgr.refresh_token(OnRefreshError::DropToken);
+                    set_last_refresh_from_error.set(Some(OffsetDateTime::now_utc()));
+                }
+                RequestAction::Fail
+            }
+            _ => RequestAction::Fail,
+        }
+    });
+
     // Auth state derived from token data or potential errors.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
@@ -180,6 +207,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 id_token_claims: Signal::derive(move || {
                     verified_and_decoded_id_token.get().expect("present")
                 }),
+                auth_error_reporter,
             })
         } else {
             KeycloakAuthState::NotAuthenticated {

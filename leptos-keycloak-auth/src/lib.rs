@@ -14,14 +14,21 @@ mod state;
 mod time_ext;
 mod token;
 mod token_validation;
+mod authenticated_client;
 
 // Library exports (additional to pub modules).
+pub use authenticated_client::*;
 pub use config::*;
 pub use hooks::*;
 pub use leptos_use::storage::StorageType;
 pub use state::*;
 pub use token::*;
-pub use url::Url;
+pub mod url {
+    pub use url::Url;
+}
+pub mod reqwest {
+    pub use reqwest::*;
+}
 
 #[cfg(feature = "internals")]
 pub mod internals {
@@ -33,11 +40,11 @@ pub mod internals {
     pub use crate::internal::token_manager::TokenManager;
 }
 
-type DiscoveryEndpoint = Url;
-type JwkSetEndpoint = Url;
-type AuthorizationEndpoint = Url;
-type TokenEndpoint = Url;
-type EndSessionEndpoint = Url;
+type DiscoveryEndpoint = url::Url;
+type JwkSetEndpoint = url::Url;
+type AuthorizationEndpoint = url::Url;
+type TokenEndpoint = url::Url;
+type EndSessionEndpoint = url::Url;
 
 type AuthorizationCode = String;
 type SessionState = String;

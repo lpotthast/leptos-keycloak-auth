@@ -11,6 +11,12 @@ use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum OnRefreshError {
+    DoNothing,
+    DropToken,
+}
+
 #[derive(Clone, Copy)]
 pub struct TokenManager {
     /// Last known token data. Single source of truth of token information.
@@ -36,6 +42,7 @@ pub struct TokenManager {
     >,
     pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     pub remove_token_from_storage: StoredValue<Box<dyn Fn() + Send + Sync>>,
+    pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
 }
 
 impl Debug for TokenManager {
@@ -85,7 +92,8 @@ impl TokenManager {
         let refresh_token_action =
             action::create_refresh_token_action(options, handle_token, handle_req_error);
 
-        let trigger_refresh = Callback::new(move |()| {
+        let remover = remove_token_from_storage.clone();
+        let trigger_refresh = Callback::new(move |(on_refresh_error,)| {
             let token_endpoint = match token_endpoint.read_untracked().as_ref() {
                 Ok(it) => it.clone(),
                 Err(err) => {
@@ -107,7 +115,16 @@ impl TokenManager {
                 }
             };
 
-            refresh_token_action.dispatch((token_endpoint, refresh_token));
+            let remover_clone = remover.clone();
+            let on_refresh_error = Callback::new(move |()| match on_refresh_error {
+                OnRefreshError::DoNothing => {}
+                OnRefreshError::DropToken => {
+                    set_token.set(None);
+                    remover_clone();
+                }
+            });
+
+            refresh_token_action.dispatch((token_endpoint, refresh_token, on_refresh_error));
         });
 
         let access_token_lifetime = Memo::new(move |_| {
@@ -207,7 +224,7 @@ impl TokenManager {
                     access_token_expired,
                     "Refreshing token..."
                 );
-                trigger_refresh.run(());
+                trigger_refresh.run((OnRefreshError::DoNothing,));
             }
         });
 
@@ -241,6 +258,7 @@ impl TokenManager {
             ),
             token_endpoint,
             remove_token_from_storage: StoredValue::new(Box::new(remove_token_from_storage)),
+            trigger_refresh,
         }
     }
 
@@ -265,5 +283,9 @@ impl TokenManager {
             code_verifier,
             session_state,
         ));
+    }
+
+    pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
+        self.trigger_refresh.run((on_refresh_error,));
     }
 }
