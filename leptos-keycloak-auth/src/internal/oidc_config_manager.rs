@@ -1,3 +1,4 @@
+use crate::internal::derived_urls::DerivedUrls;
 use crate::internal::OidcConfigWithTimestamp;
 use crate::request::RequestError;
 use crate::time_ext::TimeDurationExt;
@@ -8,7 +9,6 @@ use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptio
 use leptos_use::{use_interval, UseIntervalReturn};
 use std::time::Duration;
 use time::OffsetDateTime;
-use crate::internal::derived_urls::DerivedUrls;
 
 #[derive(Debug, Clone, Copy)]
 pub struct OidcConfigManager {
@@ -86,7 +86,7 @@ impl OidcConfigManager {
             oidc_config_too_old: oidc_config_too_old.into(),
         }
     }
-    
+
     pub(crate) fn derive_urls(&self) -> DerivedUrls {
         DerivedUrls::new(self.oidc_config)
     }
