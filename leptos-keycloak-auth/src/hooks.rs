@@ -146,11 +146,24 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         // TODO: User should be able to overwrite this.
         let client_id = options.read_value().client_id.clone();
         let expected_audiences: &[String] = &[client_id];
-        token_validation::validate(
+
+        let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
             expected_audiences,
-        )
+        );
+
+        if first_try.is_ok() {
+            return first_try;
+        }
+
+        let second_try = token_validation::validate(
+            token_mgr.token.get(),
+            jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
+            expected_audiences,
+        );
+
+        second_try
     });
 
     // Auth state derived from token data or potential errors.

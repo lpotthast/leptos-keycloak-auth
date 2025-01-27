@@ -219,13 +219,13 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     <div style="width: 100%;">
                         <h3>"Internal data: jwk_set_manager"</h3>
                         <div>
-                            "oidc_config_age: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_age.get())}
+                            "jwk_set_age: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_age.get())}
                         </div>
                         <div>
-                            "oidc_config_expires_in: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_expires_in.get())}
+                            "jwk_set_expires_in: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_expires_in.get())}
                         </div>
                         <div>
-                            "oidc_config_too_old: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_too_old.get())}
+                            "jwk_set_too_old: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_too_old.get())}
                         </div>
                     </div>
 

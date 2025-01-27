@@ -13,6 +13,7 @@ use time::OffsetDateTime;
 #[derive(Debug, Clone, Copy)]
 pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
+    pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
     #[allow(unused)]
     pub jwk_set_age: Signal<Duration>,
     #[allow(unused)]
@@ -27,7 +28,13 @@ impl JwkSetManager {
         jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
         handle_req_error: Callback<Option<RequestError>>,
     ) -> Self {
-        // TODO: Store old JWK set alongside newly fetched (changed) keys.
+        let (jwk_set_old, set_jwk_set_old, _remove_jwk_set_old_from_storage) =
+            use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
+                StorageType::Local,
+                "leptos_keycloak_auth__jwk_set_old",
+                UseStorageOptions::default().initial_value(None),
+            );
+
         let (jwk_set, set_jwk_set, _remove_jwk_set_from_storage) =
             use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
                 StorageType::Local,
@@ -76,15 +83,25 @@ impl JwkSetManager {
             // But old tokens, which may still be relevant because they didn't expire yet,
             // should still be validatable. We therefore need to also track any `previous`
             // JWK set.
-            // TODO:
-            //if jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
-            //    != val.as_ref().map(|it| &it.jwk_set)
-            //{
-            //    tracing::debug!("JWK set changed, forgetting current token...");
-            //    handle_token.run(None);
-            //}
 
-            set_jwk_set.set(val)
+            if val.as_ref().map(|it| &it.jwk_set)
+                != jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
+            {
+                tracing::trace!("JWK set changed");
+
+                // Rotate currently known JWK set to `jwk_set_old`.
+                // Because we only do this if the new JWK set is different, old and current
+                // should always be different sets.
+                set_jwk_set_old.set(
+                    set_jwk_set
+                        .try_update(|it| {
+                            let old = it.take();
+                            *it = val;
+                            old
+                        })
+                        .flatten(),
+                );
+            }
         });
 
         // Fetch a token from the OIDC provider using an authorization code and an optional session state.
@@ -107,6 +124,7 @@ impl JwkSetManager {
 
         Self {
             jwk_set,
+            jwk_set_old,
             jwk_set_age: jwk_set_age.into(),
             jwk_set_expires_in: jwk_set_expires_in.into(),
             jwk_set_too_old: jwk_set_too_old.into(),
