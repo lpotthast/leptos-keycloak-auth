@@ -87,8 +87,7 @@ impl TokenManager {
             );
         let handle_token = Callback::new(move |val| set_token.set(val));
 
-        // Note: Only call this after OIDC config was loaded. Otherwise, nothing happens and an error is logged!
-        // TODO: Use a queuing system, so that no request is lost?
+        // Note: Only call this after the OIDC config was loaded. Otherwise, no refresh can happen!
         let refresh_token_action =
             action::create_refresh_token_action(options, handle_token, handle_req_error);
 
