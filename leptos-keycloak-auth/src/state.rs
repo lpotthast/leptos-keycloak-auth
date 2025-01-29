@@ -1,12 +1,12 @@
 use crate::authenticated_client::AuthenticatedClient;
+use crate::config::Options;
 use crate::error::KeycloakAuthError;
-use crate::token::{KeycloakIdTokenClaims, TokenData};
+use crate::token::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::AccessToken;
 use leptos::prelude::*;
 use std::ops::Deref;
 use url::Url;
-use crate::config::Options;
 
 /// The global state this library tracks for you. Gives access to `login_url` and `logout_url`
 /// as well as the current authentication `state`.
@@ -61,14 +61,16 @@ impl KeycloakAuth {
     ///
     /// This will lead to a reactive change in the `login_url` signal.
     pub fn set_post_login_redirect_url(&mut self, url: Url) {
-        self.options.with_value(|it| it.post_login_redirect_url.set(url));
+        self.options
+            .with_value(|it| it.post_login_redirect_url.set(url));
     }
 
     /// Update the URL to which you want to be redirected after a successful logout.
     ///
     /// This will lead to a reactive change in the `logout_url` signal.
     pub fn set_post_logout_redirect_url(&mut self, url: Url) {
-        self.options.with_value(|it| it.post_logout_redirect_url.set(url));
+        self.options
+            .with_value(|it| it.post_logout_redirect_url.set(url));
     }
 
     /// Returns a reactive function that pretty prints the current authentication state.
@@ -96,11 +98,7 @@ pub enum KeycloakAuthState {
     /// If you encounter this state, be ensured that the token can be used to access your api.
     Authenticated(Authenticated),
 
-    NotAuthenticated {
-        last_token_data: Signal<Option<TokenData>>,
-        last_token_id_error: Signal<Option<KeycloakIdTokenClaimsError>>,
-        last_error: Signal<Option<KeycloakAuthError>>,
-    },
+    NotAuthenticated(NotAuthenticated),
 }
 
 impl KeycloakAuthState {
@@ -129,23 +127,26 @@ impl KeycloakAuthState {
                     }
                 )
             }
-            KeycloakAuthState::NotAuthenticated {
-                last_token_data,
-                last_token_id_error,
+            KeycloakAuthState::NotAuthenticated(NotAuthenticated {
+                has_token_data,
+                last_id_token_error,
                 last_error,
-            } => {
+            }) => {
                 #[derive(Debug)]
                 #[expect(unused)]
-                struct Pretty<'a> {
-                    last_token_data: Option<&'a TokenData>,
-                    last_token_id_error: Option<&'a KeycloakIdTokenClaimsError>,
+                struct Pretty {
+                    has_token_data: bool,
+                    last_id_token_error: Option<String>,
                     last_error: Option<String>,
                 }
                 format!(
                     "KeycloakAuthState::NotAuthenticated {:#?}",
                     Pretty {
-                        last_token_data: last_token_data.read().deref().as_ref(),
-                        last_token_id_error: last_token_id_error.read().deref().as_ref(),
+                        has_token_data: has_token_data.get(),
+                        last_id_token_error: last_id_token_error
+                            .read()
+                            .as_ref()
+                            .map(|err| format!("{:?}", err)),
                         last_error: last_error.read().as_ref().map(|err| format!("{:?}", err)),
                     }
                 )
@@ -204,4 +205,11 @@ impl Authenticated {
     pub fn report_failed_http_request(&self, status_code: http::StatusCode) -> RequestAction {
         self.auth_error_reporter.run(status_code)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotAuthenticated {
+    pub has_token_data: Signal<bool>,
+    pub last_id_token_error: Signal<Option<KeycloakIdTokenClaimsError>>,
+    pub last_error: Signal<Option<KeycloakAuthError>>,
 }

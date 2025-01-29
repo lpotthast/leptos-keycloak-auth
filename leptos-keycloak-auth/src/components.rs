@@ -23,13 +23,9 @@ where
             provide_context(authenticated);
             Either::Left(children())
         }
-        KeycloakAuthState::NotAuthenticated {
-            last_token_data: _,
-            last_token_id_error: _,
-            last_error: _,
-        } => {
+        KeycloakAuthState::NotAuthenticated(_not_authenticated) => {
             let _ = take_context::<crate::Authenticated>();
             Either::Right(unauthenticated.run())
-        },
+        }
     }
 }

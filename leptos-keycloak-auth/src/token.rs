@@ -186,39 +186,39 @@ pub struct ResourceAccess(pub HashMap<String, Access>);
 
 /// A structure representing the storage of authentication tokens.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct TokenData {
+pub(crate) struct TokenData {
     /// The ID Token is a security token that contains Claims about the Authentication of an End-User by an Authorization Server when using a Client, and potentially other requested Claims.
-    pub id_token: String,
+    pub(crate) id_token: String,
 
     // pub id_token_decoded: IdToken,
     /// Access token. Allows access to resources requiring authentication unless expired.
-    pub access_token: String,
+    pub(crate) access_token: String,
 
     /// Point in time when the `access_token` expires.
     #[serde(with = "time::serde::rfc3339")]
-    pub access_token_expires_at: OffsetDateTime,
+    pub(crate) access_token_expires_at: OffsetDateTime,
 
     /// Refresh token. May be used to obtain a new access token without user intervention.
-    pub refresh_token: String,
+    pub(crate) refresh_token: String,
 
     /// Point in time when the `refresh_toke` expires.
     #[serde(with = "time::serde::rfc3339::option")]
-    pub refresh_expires_at: Option<OffsetDateTime>,
+    pub(crate) refresh_expires_at: Option<OffsetDateTime>,
 
     /// Point in time this token data was read.
     /// This may be used to calculate an estimated lifetime of the refresh or access token.
     /// If `refresh_expires_at` is after `time_received`, it was valid when the token data was received.
     /// At all later points in time, this may be used to calculate a percentage of the refresh tokens expiration time.
     #[serde(with = "time::serde::rfc3339")]
-    pub time_received: OffsetDateTime,
+    pub(crate) time_received: OffsetDateTime,
 }
 
 impl TokenData {
-    pub fn access_token_time_left(&self) -> Duration {
+    pub(crate) fn access_token_time_left(&self) -> Duration {
         self.access_token_expires_at - OffsetDateTime::now_utc()
     }
 
-    pub fn estimated_access_token_lifetime(&self) -> Duration {
+    pub(crate) fn estimated_access_token_lifetime(&self) -> Duration {
         self.access_token_expires_at - self.time_received
     }
 
@@ -228,17 +228,17 @@ impl TokenData {
     //    life_left.nearly_expired(lifetime, left)
     //}
 
-    pub fn access_token_expired(&self) -> bool {
-        self.access_token_expires_at < OffsetDateTime::now_utc()
-    }
+    //pub(crate) fn access_token_expired(&self) -> bool {
+    //    self.access_token_expires_at < OffsetDateTime::now_utc()
+    //}
 
-    pub fn refresh_token_time_left(&self) -> Option<Duration> {
+    pub(crate) fn refresh_token_time_left(&self) -> Option<Duration> {
         self.refresh_expires_at
             .as_ref()
             .map(|expires_in| *expires_in - OffsetDateTime::now_utc())
     }
 
-    pub fn estimated_refresh_token_lifetime(&self) -> Option<Duration> {
+    pub(crate) fn estimated_refresh_token_lifetime(&self) -> Option<Duration> {
         self.refresh_expires_at
             .as_ref()
             .map(|expires_in| *expires_in - self.time_received)
@@ -255,12 +255,12 @@ impl TokenData {
     //        .unwrap_or_default()
     //}
 
-    pub fn refresh_token_expired(&self) -> bool {
-        self.refresh_expires_at
-            .as_ref()
-            .map(|expires_in| *expires_in < OffsetDateTime::now_utc())
-            .unwrap_or_default()
-    }
+    //pub(crate) fn refresh_token_expired(&self) -> bool {
+    //    self.refresh_expires_at
+    //        .as_ref()
+    //        .map(|expires_in| *expires_in < OffsetDateTime::now_utc())
+    //        .unwrap_or_default()
+    //}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -290,7 +290,7 @@ impl From<SuccessTokenResponse> for TokenData {
             refresh_expires_at: value
                 .refresh_expires_in
                 .map(|refresh_expires_in| now + Duration::seconds(refresh_expires_in)),
-            time_received: OffsetDateTime::now_utc(),
+            time_received: now,
         }
     }
 }

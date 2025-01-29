@@ -8,7 +8,7 @@ use crate::token::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::{
     code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
-    KeycloakAuthState, RequestAction, UseKeycloakAuthOptions,
+    KeycloakAuthState, NotAuthenticated, RequestAction, UseKeycloakAuthOptions,
 };
 use leptos::callback::Callback;
 use leptos::context::provide_context;
@@ -220,13 +220,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 auth_error_reporter,
             })
         } else {
-            KeycloakAuthState::NotAuthenticated {
-                last_token_data: token_mgr.token,
-                last_token_id_error: Signal::derive(move || {
+            KeycloakAuthState::NotAuthenticated(NotAuthenticated {
+                has_token_data: Signal::derive(move || token.get().is_some()),
+                last_id_token_error: Signal::derive(move || {
                     verified_and_decoded_id_token.get().err()
                 }),
                 last_error: auth_error.into(),
-            }
+            })
         }
     });
 
