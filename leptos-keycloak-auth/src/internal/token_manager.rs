@@ -236,10 +236,6 @@ impl TokenManager {
         // (although the refresh token *should* always outlive the access token...),
         // or the access token already expired, try to refresh the access token using the refresh token.
         Effect::new(move |_| {
-            // TODO: Should we also take into account whether whe were able to decode the id token?
-
-            // Note: These boolean-signals default to false. Therefore, no refresh-attempt
-            // is made without a refresh token being present.
             let has_token = token.read().is_some();
             let access_token_expired = access_token_expired.get();
             let access_token_nearly_expired = access_token_nearly_expired.get();
