@@ -16,7 +16,7 @@ pub(crate) struct StandardIdTokenClaims {
     amr: Option<Vec<String>>,
     azp: Option<String>,
     #[serde(flatten)]
-    remaining: HashMap<String, serde_json::Value>, // TODO: Could use serde-value crate instead of relying on serde_json, but as we work with JWTs, nothing other than JSON is expected anyway...
+    remaining: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
