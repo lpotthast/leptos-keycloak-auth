@@ -8,7 +8,7 @@ use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
 use leptos_use::{use_interval, UseIntervalReturn};
-use std::time::Duration;
+use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
 
 #[derive(Debug, Clone, Copy)]
@@ -16,9 +16,9 @@ pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
     pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
     #[allow(unused)]
-    pub jwk_set_age: Signal<Duration>,
+    pub jwk_set_age: Signal<StdDuration>,
     #[allow(unused)]
-    pub jwk_set_expires_in: Signal<Duration>,
+    pub jwk_set_expires_in: Signal<StdDuration>,
     #[allow(unused)]
     pub jwk_set_too_old: Signal<bool>,
 }
@@ -61,7 +61,7 @@ impl JwkSetManager {
                     .read()
                     .as_ref()
                     .map(|it| (OffsetDateTime::now_utc() - it.retrieved).to_std_duration())
-                    .unwrap_or(Duration::MAX)
+                    .unwrap_or(StdDuration::MAX)
             })
         };
 

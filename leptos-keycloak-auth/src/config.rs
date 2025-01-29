@@ -10,7 +10,6 @@ pub enum LifeLeft {
 }
 
 impl LifeLeft {
-    // TODO: Use time::Duration everywhere...
     pub fn nearly_expired(self, lifetime: StdDuration, left: StdDuration) -> bool {
         match self {
             LifeLeft::Percentage(p) => (left.as_millis() as f64 / lifetime.as_millis() as f64) <= p,

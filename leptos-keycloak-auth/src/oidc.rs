@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 
 /// See: https://openid.net/specs/openid-connect-discovery-1_0.html#WellKnownContents
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OidcConfig {
+pub struct OidcConfig {
     #[serde(flatten)]
     pub(crate) standard_claims: OpenIDConnectStandardDiscoveryClaims,
 
@@ -41,7 +41,7 @@ pub(crate) struct OidcConfig {
 
 /// See: https://www.rfc-editor.org/rfc/rfc8414.html#section-2
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OAuthDiscoveryClaims {
+pub struct OAuthDiscoveryClaims {
     /// OPTIONAL. URL of the authorization server's OAuth 2.0
     /// introspection endpoint [RFC7662].
     introspection_endpoint: Option<String>,
@@ -71,7 +71,7 @@ pub(crate) struct OAuthDiscoveryClaims {
 
 /// See: https://openid.net/specs/openid-connect-frontchannel-1_0.html#OPLogout
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OpenIDConnectFrontChannelLogoutDiscoveryClaims {
+pub struct OpenIDConnectFrontChannelLogoutDiscoveryClaims {
     /// OPTIONAL. Boolean value specifying whether the OP supports HTTP-based logout, with true indicating support.
     /// If omitted, the default value is false.
     /// It SHOULD also register this related metadata value:
@@ -87,7 +87,7 @@ pub(crate) struct OpenIDConnectFrontChannelLogoutDiscoveryClaims {
 
 /// See: https://openid.net/specs/openid-connect-backchannel-1_0.html#BCSupport
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OpenIDConnectBackChannelLogoutDiscoveryClaims {
+pub struct OpenIDConnectBackChannelLogoutDiscoveryClaims {
     /// OPTIONAL. Boolean value specifying whether the OP supports back-channel logout, with true indicating support.
     /// If omitted, the default value is false.
     pub(crate) backchannel_logout_supported: Option<bool>,
@@ -101,7 +101,7 @@ pub(crate) struct OpenIDConnectBackChannelLogoutDiscoveryClaims {
 
 /// See: https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OpenIDConnectRPInitiatedLogoutClaims {
+pub struct OpenIDConnectRPInitiatedLogoutClaims {
     /// REQUIRED. URL at the OP to which an RP can perform a redirect to request that the End-User be logged out at the OP.
     /// This URL MUST use the https scheme and MAY contain port, path, and query parameter components.
     pub(crate) end_session_endpoint: Option<String>, // Note: Required, but we do not now if the extension is even used...
@@ -109,7 +109,7 @@ pub(crate) struct OpenIDConnectRPInitiatedLogoutClaims {
 
 /// See: https://openid.net/specs/oauth-v2-jarm.html#name-authorization-server-metada
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OpenIDConnectJARMDiscoveryClaims {
+pub struct OpenIDConnectJARMDiscoveryClaims {
     /// OPTIONAL. A JSON array containing a list of the JWS [RFC7515] signing algorithms (alg values) supported by the authorization endpoint to sign the response.
     pub(crate) authorization_signing_alg_values_supported: Option<Vec<String>>,
 
@@ -122,7 +122,7 @@ pub(crate) struct OpenIDConnectJARMDiscoveryClaims {
 
 /// See: https://openid.net/specs/openid-connect-session-1_0.html#OPMetadata
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OidcDiscoverySessionDiscoveryClaims {
+pub struct OidcDiscoverySessionDiscoveryClaims {
     /// REQUIRED. URL of an OP iframe that supports cross-origin communications for session state information with the RP Client, using the HTML5 postMessage API.
     /// This URL MUST use the https scheme and MAY contain port, path, and query parameter components.
     /// The page is loaded from an invisible iframe embedded in an RP page so that it can run in the OP's security context.
@@ -132,7 +132,7 @@ pub(crate) struct OidcDiscoverySessionDiscoveryClaims {
 
 /// See: https://openid.net/specs/openid-connect-discovery-1_0.html#WellKnownContents
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct OpenIDConnectStandardDiscoveryClaims {
+pub struct OpenIDConnectStandardDiscoveryClaims {
     /// REQUIRED. URL using the https scheme with no query or fragment component that the OP asserts as its Issuer Identifier.
     /// If Issuer discovery is supported (see Section 2), this value MUST be identical to the issuer value returned by WebFinger.
     /// This also MUST be identical to the iss Claim value in ID Tokens issued from this Issuer.

@@ -10,7 +10,7 @@ use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
 use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::{Debug, Formatter};
-use std::time::Duration;
+use std::time::Duration as StdDuration;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum OnRefreshError {
@@ -24,12 +24,12 @@ pub struct TokenManager {
     /// May contain an expired access and / or refresh token.
     pub token: Signal<Option<TokenData>>,
     pub set_token: WriteSignal<Option<TokenData>>,
-    pub access_token_lifetime: Signal<Duration>,
-    pub access_token_expires_in: Signal<Duration>,
+    pub access_token_lifetime: Signal<StdDuration>,
+    pub access_token_expires_in: Signal<StdDuration>,
     pub access_token_nearly_expired: Signal<bool>,
     pub access_token_expired: Signal<bool>,
-    pub refresh_token_lifetime: Signal<Duration>,
-    pub refresh_token_expires_in: Signal<Duration>,
+    pub refresh_token_lifetime: Signal<StdDuration>,
+    pub refresh_token_expires_in: Signal<StdDuration>,
     pub refresh_token_nearly_expired: Signal<bool>,
     pub refresh_token_expired: Signal<bool>,
     pub exchange_code_for_token_action: Action<
@@ -160,7 +160,7 @@ impl TokenManager {
                 .read()
                 .as_ref()
                 .map(|it| it.estimated_access_token_lifetime().to_std_duration())
-                .unwrap_or(Duration::ZERO)
+                .unwrap_or(StdDuration::ZERO)
         });
 
         let access_token_expires_in = {
@@ -179,7 +179,7 @@ impl TokenManager {
                     .read()
                     .as_ref()
                     .map(|it| it.access_token_time_left().to_std_duration())
-                    .unwrap_or(Duration::ZERO)
+                    .unwrap_or(StdDuration::ZERO)
             })
         };
 
@@ -200,7 +200,7 @@ impl TokenManager {
                     it.estimated_refresh_token_lifetime()
                         .map(|it| it.to_std_duration())
                 })
-                .unwrap_or(Duration::ZERO)
+                .unwrap_or(StdDuration::ZERO)
         });
 
         let refresh_token_expires_in = {
@@ -219,7 +219,7 @@ impl TokenManager {
                     .read()
                     .as_ref()
                     .and_then(|it| it.refresh_token_time_left().map(|it| it.to_std_duration()))
-                    .unwrap_or(Duration::ZERO)
+                    .unwrap_or(StdDuration::ZERO)
             })
         };
 

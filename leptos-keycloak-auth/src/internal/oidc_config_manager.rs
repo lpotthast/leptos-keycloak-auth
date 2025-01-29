@@ -7,16 +7,16 @@ use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
 use leptos_use::{use_interval, UseIntervalReturn};
-use std::time::Duration;
+use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
 
 #[derive(Debug, Clone, Copy)]
 pub struct OidcConfigManager {
     pub oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
     #[allow(unused)]
-    pub oidc_config_age: Signal<Duration>,
+    pub oidc_config_age: Signal<StdDuration>,
     #[allow(unused)]
-    pub oidc_config_expires_in: Signal<Duration>,
+    pub oidc_config_expires_in: Signal<StdDuration>,
     #[allow(unused)]
     pub oidc_config_too_old: Signal<bool>,
 }
@@ -51,7 +51,7 @@ impl OidcConfigManager {
                     .read()
                     .as_ref()
                     .map(|it| (OffsetDateTime::now_utc() - it.retrieved).to_std_duration())
-                    .unwrap_or(Duration::MAX)
+                    .unwrap_or(StdDuration::MAX)
             })
         };
 
