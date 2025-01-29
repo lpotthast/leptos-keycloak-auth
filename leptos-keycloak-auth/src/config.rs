@@ -1,8 +1,23 @@
-use crate::token::LifeLeft;
 use crate::DiscoveryEndpoint;
 use leptos::prelude::RwSignal;
-use std::time::Duration;
+use std::time::Duration as StdDuration;
 use url::Url;
+
+#[derive(Debug, Clone, Copy)]
+pub enum LifeLeft {
+    Percentage(f64),
+    Duration(StdDuration),
+}
+
+impl LifeLeft {
+    // TODO: Use time::Duration everywhere...
+    pub fn nearly_expired(self, lifetime: StdDuration, left: StdDuration) -> bool {
+        match self {
+            LifeLeft::Percentage(p) => (left.as_millis() as f64 / lifetime.as_millis() as f64) <= p,
+            LifeLeft::Duration(d) => left <= d,
+        }
+    }
+}
 
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
@@ -34,12 +49,12 @@ pub struct AdvancedOptions {
     /// Interval after which the access token should be checked for its age.
     /// This has to happen frequently in order to detect an access token becoming expired.
     /// Defaults to `Duration::from_millis(500)`.
-    pub access_token_age_check_interval: Duration,
+    pub access_token_age_check_interval: StdDuration,
 
     /// Interval after which the refresh token should be checked for its age.
     /// This has to happen frequently in order to detect a refresh token becoming expired.
     /// Defaults to `Duration::from_millis(500)`.
-    pub refresh_token_age_check_interval: Duration,
+    pub refresh_token_age_check_interval: StdDuration,
 
     /// Describes how much time must be left for the access token to not count as "nearly expired".
     /// If any token is nearly expired, a refresh is triggered.
@@ -53,34 +68,34 @@ pub struct AdvancedOptions {
 
     /// Interval after which the oidc configuration should be checked for its age.
     /// Defaults to `Duration::from_secs(3)`.
-    pub oidc_config_age_check_interval: Duration,
+    pub oidc_config_age_check_interval: StdDuration,
 
     /// Interval after which the jwk set should be checked for its age.
     /// Defaults to `Duration::from_secs(3)`.
-    pub jwk_set_age_check_interval: Duration,
+    pub jwk_set_age_check_interval: StdDuration,
 
     /// Time after which a discovered OIDC config is considered too old.
     /// Defaults to `Duration::from_secs(60 * 5)`.
-    pub max_oidc_config_age: Duration,
+    pub max_oidc_config_age: StdDuration,
 
     /// Time after which the loaded JWK set is considered too old.
     /// After this age is reached, a new set of JWKs is queried for.
     /// If it didn't change, nothing will happen.
     /// Defaults to `Duration::from_secs(60 * 5)`.
-    pub max_jwk_set_age: Duration,
+    pub max_jwk_set_age: StdDuration,
 }
 
 impl Default for AdvancedOptions {
     fn default() -> Self {
         Self {
-            access_token_age_check_interval: Duration::from_millis(500),
-            refresh_token_age_check_interval: Duration::from_millis(500),
+            access_token_age_check_interval: StdDuration::from_millis(500),
+            refresh_token_age_check_interval: StdDuration::from_millis(500),
             access_token_nearly_expired_having: LifeLeft::Percentage(0.25),
             refresh_token_nearly_expired_having: LifeLeft::Percentage(0.25),
-            oidc_config_age_check_interval: Duration::from_secs(3),
-            jwk_set_age_check_interval: Duration::from_secs(3),
-            max_oidc_config_age: Duration::from_secs(60 * 5),
-            max_jwk_set_age: Duration::from_secs(60 * 5),
+            oidc_config_age_check_interval: StdDuration::from_secs(3),
+            jwk_set_age_check_interval: StdDuration::from_secs(3),
+            max_oidc_config_age: StdDuration::from_secs(60 * 5),
+            max_jwk_set_age: StdDuration::from_secs(60 * 5),
         }
     }
 }

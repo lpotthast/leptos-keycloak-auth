@@ -1,6 +1,6 @@
+use crate::token::TokenData;
+use crate::token_claims::{KeycloakIdTokenClaims, StandardIdTokenClaims};
 use snafu::{OptionExt, ResultExt, Snafu};
-
-use crate::token::{KeycloakIdTokenClaims, StandardIdTokenClaims, TokenData};
 
 #[derive(Debug, Clone, PartialEq, Snafu)]
 pub enum JwtValidationError {
@@ -35,29 +35,26 @@ pub enum KeycloakIdTokenClaimsError {
 pub(crate) fn validate(
     token: Option<TokenData>,
     jwk_set: Option<&jsonwebtoken::jwk::JwkSet>,
-    expected_audiences: &[String],
+    expected_audiences: Option<&[String]>,
+    expected_issuers: Option<&[String]>,
 ) -> Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError> {
     let token = token.context(NoTokenSnafu {})?;
     let jwk_set = jwk_set.context(NoJwkSetSnafu {})?;
 
-    to_keycloak_claims_opt(validate_and_decode_base64_encoded_token(
+    let standard_claims = validate_and_decode_base64_encoded_token(
         &token.id_token,
         expected_audiences,
+        expected_issuers,
         jwk_set,
-    ))
-}
+    ).context(NoClaimsSnafu {})?;
 
-fn to_keycloak_claims_opt(
-    standard_claims: Result<StandardIdTokenClaims, JwtValidationError>,
-) -> Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError> {
-    standard_claims
-        .map(|it| it.into())
-        .context(NoClaimsSnafu {})
+    Ok(KeycloakIdTokenClaims::from(standard_claims))
 }
 
 fn validate_and_decode_base64_encoded_token(
     base64_encoded_token: &str,
-    expected_audiences: &[String],
+    expected_audiences: Option<&[String]>,
+    expected_issuers: Option<&[String]>,
     jwk_set: &jsonwebtoken::jwk::JwkSet,
 ) -> Result<StandardIdTokenClaims, JwtValidationError> {
     let jwt_header =
@@ -66,7 +63,12 @@ fn validate_and_decode_base64_encoded_token(
     tracing::trace!(?jwt_header, "Decoded JWT header");
 
     let mut validation = jsonwebtoken::Validation::new(jwt_header.alg);
-    validation.set_audience(expected_audiences);
+    if let Some(expected_audiences) = expected_audiences {
+        validation.set_audience(&expected_audiences);
+    }
+    if let Some(expected_issuers) = expected_issuers {
+        validation.set_issuer(&expected_issuers);
+    }
 
     let jwk = jwk_set
         .keys
@@ -82,6 +84,7 @@ fn validate_and_decode_base64_encoded_token(
     let jwt_decoding_key =
         jsonwebtoken::DecodingKey::from_jwk(jwk).context(JwkToDecodingKeySnafu {})?;
 
+    tracing::trace!("Trying decode");
     let token_data = jsonwebtoken::decode::<StandardIdTokenClaims>(
         base64_encoded_token,
         &jwt_decoding_key,

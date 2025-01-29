@@ -16,7 +16,7 @@ mod common;
 mod frontend;
 mod keycloak_container;
 
-const DELAY_TEST_EXECUTION: bool = false;
+const DELAY_TEST_EXECUTION: bool = true;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_integration() {

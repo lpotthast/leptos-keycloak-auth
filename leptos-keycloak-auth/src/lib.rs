@@ -1,4 +1,5 @@
 mod action;
+mod authenticated_client;
 mod code_verifier;
 pub mod components;
 mod config;
@@ -13,8 +14,8 @@ mod response;
 mod state;
 mod time_ext;
 mod token;
+mod token_claims;
 mod token_validation;
-mod authenticated_client;
 
 // Library exports (additional to pub modules).
 pub use authenticated_client::*;
@@ -22,7 +23,6 @@ pub use config::*;
 pub use hooks::*;
 pub use leptos_use::storage::StorageType;
 pub use state::*;
-pub use token::*;
 pub mod url {
     pub use url::Url;
 }
@@ -38,6 +38,7 @@ pub mod internals {
     pub use crate::internal::jwk_set_manager::JwkSetManager;
     pub use crate::internal::oidc_config_manager::OidcConfigManager;
     pub use crate::internal::token_manager::TokenManager;
+    pub use crate::token::TokenData;
 }
 
 type DiscoveryEndpoint = url::Url;

@@ -119,12 +119,12 @@ pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
     set_token: Callback<Option<TokenData>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<(TokenEndpoint, RefreshToken, Callback<()>), ()> {
+) -> Action<(TokenEndpoint, RefreshToken, Callback<(RequestError,), RequestError>), ()> {
     Action::new(
         move |(token_endpoint, refresh_token, on_refresh_error): &(
             TokenEndpoint,
             RefreshToken,
-            Callback<()>,
+            Callback<(RequestError,), RequestError>,
         )| {
             let token_endpoint = token_endpoint.clone();
             let client_id = options.read_value().client_id.clone();
@@ -135,7 +135,7 @@ pub(crate) fn create_refresh_token_action(
                     match request::refresh_token(token_endpoint, &client_id, &refresh_token).await {
                         Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
                         Err(err) => {
-                            on_refresh_error.run(());
+                            let err = on_refresh_error.run((err,));
                             set_req_error.run(Some(err))
                         }
                     }

@@ -4,7 +4,7 @@ use crate::internal::derived_urls::DerivedUrls;
 use crate::internal::token_manager::OnRefreshError;
 use crate::request::RequestError;
 use crate::response::CallbackResponse;
-use crate::token::KeycloakIdTokenClaims;
+use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::{
     code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
@@ -155,26 +155,38 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
     > = Memo::new(move |_| {
         // TODO: User should be able to overwrite this.
-        let client_id = options.read_value().client_id.clone();
-        let expected_audiences: &[String] = &[client_id];
+        let expected_audiences = Some(vec![options.read_value().client_id.clone()]);
+        let expected_issuers = Some(vec![format!(
+            "{}realms/{}",
+            options.read_value().keycloak_server_url,
+            options.read_value().realm
+        )]);
 
         let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
-            expected_audiences,
+            expected_audiences.as_ref().map(|it| it.as_slice()),
+            expected_issuers.as_ref().map(|it| it.as_slice()),
         );
 
         if first_try.is_ok() {
             return first_try;
         }
 
-        let second_try = token_validation::validate(
-            token_mgr.token.get(),
-            jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
-            expected_audiences,
-        );
+        // If validation with the current JWK set fails, we should not try to validate with a
+        // missing old set. This would just lest to a `NoJwkSet` error being ultimately stored,
+        // hiding the real reason why validation failed in the first place.
+        if jwk_set_mgr.jwk_set_old.read().is_some() {
+            let second_try = token_validation::validate(
+                token_mgr.token.get(),
+                jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
+                expected_audiences.as_ref().map(|it| it.as_slice()),
+                expected_issuers.as_ref().map(|it| it.as_slice()),
+            );
+            return second_try;
+        }
 
-        second_try
+        first_try
     });
 
     let (last_refresh_from_error, set_last_refresh_from_error) =

@@ -116,12 +116,40 @@ impl TokenManager {
             };
 
             let remover_clone = remover.clone();
-            let on_refresh_error = Callback::new(move |()| match on_refresh_error {
-                OnRefreshError::DoNothing => {}
-                OnRefreshError::DropToken => {
-                    set_token.set(None);
-                    remover_clone();
+            let on_refresh_error = Callback::new(move |(err,)| {
+                match on_refresh_error {
+                    OnRefreshError::DoNothing => {
+                        // Even if we haven't gotten an external request to always drop the token
+                        // when an error was received, we may still want to drop the taken,
+                        // based on the error that we got.
+                        // If Keycloak answers with a `BAD_REQUEST` response of
+                        // `{"error":"invalid_grant","error_description":"Invalid refresh token"}`,
+                        // we should still drop the token.
+                        // AND: We do so immediately, without checking if the token is fully expired.
+                        // This means that even if the token is only about to expire, we will drop it now,
+                        // as the refresh could have been triggered from us not being able to use
+                        // the access token. Not dropping it because it is not fully expired would
+                        // let us get stuck in a loop. We therefore deem the access token to also
+                        // be unusable.
+                        match &err {
+                            RequestError::Send { .. } => {}
+                            RequestError::Decode { .. } => {}
+                            RequestError::ErrResponse { error_response } => {
+                                if error_response.error == "invalid_grant"
+                                    && error_response.error_description == "Invalid refresh token"
+                                {
+                                    set_token.set(None);
+                                    remover_clone();
+                                }
+                            }
+                        }
+                    }
+                    OnRefreshError::DropToken => {
+                        set_token.set(None);
+                        remover_clone();
+                    }
                 }
+                err
             });
 
             refresh_token_action.dispatch((token_endpoint, refresh_token, on_refresh_error));
@@ -212,16 +240,20 @@ impl TokenManager {
 
             // Note: These boolean-signals default to false. Therefore, no refresh-attempt
             // is made without a refresh token being present.
+            let has_token = token.read().is_some();
+            let access_token_expired = access_token_expired.get();
             let access_token_nearly_expired = access_token_nearly_expired.get();
             let refresh_token_nearly_expired = refresh_token_nearly_expired.get();
-            let access_token_expired = access_token_expired.get();
-            if (access_token_nearly_expired || refresh_token_nearly_expired || access_token_expired)
-                && token.read().is_some()
+
+            if has_token
+                && (access_token_expired
+                    || access_token_nearly_expired
+                    || refresh_token_nearly_expired)
             {
                 tracing::trace!(
+                    access_token_expired,
                     access_token_nearly_expired,
                     refresh_token_nearly_expired,
-                    access_token_expired,
                     "Refreshing token..."
                 );
                 trigger_refresh.run((OnRefreshError::DoNothing,));
