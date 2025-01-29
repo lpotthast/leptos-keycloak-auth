@@ -1,9 +1,10 @@
 use crate::code_verifier::CodeVerifier;
+use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
-use crate::{action, AuthorizationCode, SessionState, TokenEndpoint, UseKeycloakAuthOptions};
+use crate::{action, AuthorizationCode, SessionState, TokenEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
@@ -73,7 +74,7 @@ impl Debug for TokenManager {
 
 impl TokenManager {
     pub(crate) fn new(
-        options: StoredValue<UseKeycloakAuthOptions>,
+        options: StoredValue<Options>,
         handle_req_error: Callback<Option<RequestError>>,
         token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     ) -> Self {
@@ -271,7 +272,7 @@ impl TokenManager {
         let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
             Ok(token_endpoint) => token_endpoint.clone(),
             Err(err) => {
-                tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known jet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.");
+                tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.");
                 return;
             }
         };

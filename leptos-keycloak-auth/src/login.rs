@@ -1,12 +1,13 @@
 use crate::code_verifier::CodeChallenge;
+use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
-use crate::{AuthorizationEndpoint, UseKeycloakAuthOptions};
+use crate::AuthorizationEndpoint;
 use leptos::prelude::*;
 use url::Url;
 
 pub(crate) fn create_login_url_signal(
     authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
-    options: StoredValue<UseKeycloakAuthOptions>,
+    options: StoredValue<Options>,
     code_challenge: Memo<Option<CodeChallenge>>,
 ) -> Memo<Option<Url>> {
     Memo::new(move |_| {
@@ -35,7 +36,7 @@ pub(crate) fn create_login_url_signal(
             .append_pair(
                 "redirect_uri",
                 options
-                    .with_value(|params| params.post_login_redirect_url.clone())
+                    .with_value(|params| params.post_login_redirect_url.read())
                     .as_str(),
             )
             .append_pair(

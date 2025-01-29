@@ -2,10 +2,11 @@ use crate::authenticated_client::AuthenticatedClient;
 use crate::error::KeycloakAuthError;
 use crate::token::{KeycloakIdTokenClaims, TokenData};
 use crate::token_validation::KeycloakIdTokenClaimsError;
-use crate::{AccessToken, UseKeycloakAuthOptions};
+use crate::AccessToken;
 use leptos::prelude::*;
 use std::ops::Deref;
 use url::Url;
+use crate::config::Options;
 
 /// The global state this library tracks for you. Gives access to `login_url` and `logout_url`
 /// as well as the current authentication `state`.
@@ -26,7 +27,7 @@ use url::Url;
 #[derive(Debug, Clone, Copy)]
 pub struct KeycloakAuth {
     /// Configuration used to initialize this Keycloak auth provider.
-    pub options: StoredValue<UseKeycloakAuthOptions>,
+    pub(crate) options: StoredValue<Options>,
 
     /// URL for initiating the authentication process,
     /// directing the user to the authentication provider's login page.
@@ -56,15 +57,22 @@ pub struct KeycloakAuth {
 }
 
 impl KeycloakAuth {
-    /// This can be used to set the `post_login_redirect_url` dynamically. It's helpful if
-    /// you would like to be redirected to the current page.
-    // TODO: Decide whether this should be a signal and if this should be in our options... Or should this overwrite a signal internally?!!
+    /// Update the URL to which you want to be redirected after a successful login.
+    ///
+    /// This will lead to a reactive change in the `login_url` signal.
     pub fn set_post_login_redirect_url(&mut self, url: Url) {
-        self.options
-            .update_value(|parameters| parameters.post_login_redirect_url = url);
+        self.options.with_value(|it| it.post_login_redirect_url.set(url));
+    }
+
+    /// Update the URL to which you want to be redirected after a successful logout.
+    ///
+    /// This will lead to a reactive change in the `logout_url` signal.
+    pub fn set_post_logout_redirect_url(&mut self, url: Url) {
+        self.options.with_value(|it| it.post_logout_redirect_url.set(url));
     }
 
     /// Returns a reactive function that pretty prints the current authentication state.
+    ///
     /// Useful for debugging purposes.
     pub fn state_pretty_printer(&self) -> impl Fn() -> String {
         self.state.read().deref().pretty_printer()
@@ -72,12 +80,19 @@ impl KeycloakAuth {
 }
 
 /// The current state of authentication.
-/// Prefer using this to determine if a user is already authenticated.
-/// Will be of AuthState::Undetermined variant if neither a token nor any error were received.
-/// Will be of AuthState::NotAuthenticated variant if the token data contains an expired access token or an error was received.
+///
+/// - Will be of variant `KeycloakAuthState::Authenticated` if the user was deemed authenticated
+///   (which implies him having a validated, non-expired token).
+/// - Will be of variant `KeycloakAuthState::NotAuthenticated` if the user was deemed not authenticated.
+///   This can be of several reasons:
+///      - the library did not receive the OIDC config and JWK set yet.
+///      - there is no token, the user did not go through the authentication flow.
+///      - the token data contains an expired access token.
+///      - the token data contains a non-validatable id token.
+///      - ...
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeycloakAuthState {
-    /// The Authenticated state is only used when there is a valid token which did not jet expire.
+    /// The Authenticated state is only used when there is a valid token which did not yet expire.
     /// If you encounter this state, be ensured that the token can be used to access your api.
     Authenticated(Authenticated),
 

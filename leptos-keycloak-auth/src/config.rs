@@ -1,5 +1,6 @@
 use crate::token::LifeLeft;
 use crate::DiscoveryEndpoint;
+use leptos::prelude::RwSignal;
 use std::time::Duration;
 use url::Url;
 
@@ -28,17 +29,7 @@ pub struct UseKeycloakAuthOptions {
     pub advanced: AdvancedOptions,
 }
 
-impl UseKeycloakAuthOptions {
-    pub(crate) fn discovery_endpoint(&self) -> DiscoveryEndpoint {
-        let mut url = self.keycloak_server_url.clone();
-        url.path_segments_mut()
-            .expect("no cannot-be-a-base url")
-            .extend(&["realms", &self.realm, ".well-known", "openid-configuration"]);
-        url
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AdvancedOptions {
     /// Interval after which the access token should be checked for its age.
     /// This has to happen frequently in order to detect an access token becoming expired.
@@ -91,5 +82,52 @@ impl Default for AdvancedOptions {
             max_oidc_config_age: Duration::from_secs(60 * 5),
             max_jwk_set_age: Duration::from_secs(60 * 5),
         }
+    }
+}
+
+/// Represents authentication parameters required for initializing the `Auth`
+/// structure. These parameters include authentication and token endpoints,
+/// client ID, and other related data.
+#[derive(Debug, Clone)]
+pub(crate) struct Options {
+    /// Url of your keycloak instance, E.g. "https://localhost:8443/"
+    pub(crate) keycloak_server_url: Url,
+
+    /// The keycloak realm you want to use.
+    pub(crate) realm: String,
+
+    /// The name of this client as configured inside your Keycloak admin area.
+    pub(crate) client_id: String,
+
+    /// Url to which you want to be redirected after a successful login.
+    pub(crate) post_login_redirect_url: RwSignal<Url>,
+
+    /// Url to which you want to be redirected after a successful logout.
+    pub(crate) post_logout_redirect_url: RwSignal<Url>,
+
+    pub(crate) scope: Option<String>,
+
+    pub(crate) advanced: AdvancedOptions,
+}
+
+impl Options {
+    pub(crate) fn new(options: UseKeycloakAuthOptions) -> Self {
+        Self {
+            keycloak_server_url: options.keycloak_server_url,
+            realm: options.realm,
+            client_id: options.client_id,
+            post_login_redirect_url: RwSignal::new(options.post_login_redirect_url),
+            post_logout_redirect_url: RwSignal::new(options.post_logout_redirect_url),
+            scope: options.scope,
+            advanced: options.advanced,
+        }
+    }
+
+    pub(crate) fn discovery_endpoint(&self) -> DiscoveryEndpoint {
+        let mut url = self.keycloak_server_url.clone();
+        url.path_segments_mut()
+            .expect("no cannot-be-a-base url")
+            .extend(&["realms", &self.realm, ".well-known", "openid-configuration"]);
+        url
     }
 }

@@ -1,8 +1,8 @@
+use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrls;
 use crate::internal::OidcConfigWithTimestamp;
 use crate::request::RequestError;
 use crate::time_ext::TimeDurationExt;
-use crate::UseKeycloakAuthOptions;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
@@ -23,7 +23,7 @@ pub struct OidcConfigManager {
 
 impl OidcConfigManager {
     pub(crate) fn new(
-        options: StoredValue<UseKeycloakAuthOptions>,
+        options: StoredValue<Options>,
         handle_req_error: Callback<Option<RequestError>>,
     ) -> Self {
         let (oidc_config, set_oidc_config, _remove_oidc_config_from_storage) =
@@ -68,14 +68,14 @@ impl OidcConfigManager {
         });
 
         let retrieve_oidc_config_action = crate::action::create_retrieve_oidc_config_action(
-            options.read_value().discovery_endpoint(),
             Callback::new(move |val| set_oidc_config.set(val)),
             handle_req_error,
         );
 
         Effect::new(move |_| {
             if oidc_config_too_old.get() {
-                retrieve_oidc_config_action.dispatch(());
+                let discovery_endpoint = options.read_value().discovery_endpoint();
+                retrieve_oidc_config_action.dispatch((discovery_endpoint,));
             }
         });
 

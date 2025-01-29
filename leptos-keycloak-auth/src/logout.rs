@@ -1,13 +1,14 @@
+use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::token::TokenData;
-use crate::{EndSessionEndpoint, UseKeycloakAuthOptions};
+use crate::EndSessionEndpoint;
 use leptos::prelude::*;
 use url::Url;
 
 pub(crate) fn create_logout_url_signal(
     end_session_endpoint: Signal<Result<EndSessionEndpoint, DerivedUrlError>>,
     token: Signal<Option<TokenData>>,
-    options: StoredValue<UseKeycloakAuthOptions>,
+    options: StoredValue<Options>,
 ) -> Memo<Option<Url>> {
     Memo::new(move |_| {
         let end_session_endpoint = match end_session_endpoint.read().as_ref() {
@@ -15,7 +16,7 @@ pub(crate) fn create_logout_url_signal(
             Err(_) => return Option::<Url>::None,
         };
 
-        let mut post_logout_redirect_url = options.read_value().post_logout_redirect_url.clone();
+        let mut post_logout_redirect_url = options.read_value().post_logout_redirect_url.get();
         post_logout_redirect_url
             .query_pairs_mut()
             .append_pair("destroy_session", "true");

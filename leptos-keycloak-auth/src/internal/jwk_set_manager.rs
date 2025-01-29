@@ -1,8 +1,9 @@
+use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::internal::JwkSetWithTimestamp;
 use crate::request::RequestError;
 use crate::time_ext::TimeDurationExt;
-use crate::{action, JwkSetEndpoint, UseKeycloakAuthOptions};
+use crate::{action, JwkSetEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
@@ -24,7 +25,7 @@ pub struct JwkSetManager {
 
 impl JwkSetManager {
     pub(crate) fn new(
-        options: StoredValue<UseKeycloakAuthOptions>,
+        options: StoredValue<Options>,
         jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
         handle_req_error: Callback<Option<RequestError>>,
     ) -> Self {

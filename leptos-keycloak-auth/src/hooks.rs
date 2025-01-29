@@ -1,3 +1,4 @@
+use crate::config::Options;
 use crate::error::KeycloakAuthError;
 use crate::internal::derived_urls::DerivedUrls;
 use crate::internal::token_manager::OnRefreshError;
@@ -22,6 +23,7 @@ use time::OffsetDateTime;
 pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
 
+    let options = Options::new(options);
     let options = StoredValue::new(options);
 
     let (auth_error, set_auth_error) = signal::<Option<KeycloakAuthError>>(None);
@@ -81,7 +83,11 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // leptos router and performed on the client itself.
                     let navigate = use_navigate();
                     navigate(
-                        options.read_value().post_login_redirect_url.as_ref(),
+                        options
+                            .read_value()
+                            .post_login_redirect_url
+                            .read_untracked()
+                            .as_ref(),
                         NavigateOptions::default(),
                     );
                 }
@@ -121,7 +127,11 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // leptos router and performed on the client itself.
                     let navigate = use_navigate();
                     navigate(
-                        options.read_value().post_logout_redirect_url.as_ref(),
+                        options
+                            .read_value()
+                            .post_logout_redirect_url
+                            .read_untracked()
+                            .as_ref(),
                         NavigateOptions::default(),
                     );
                 }
