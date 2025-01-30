@@ -3,7 +3,7 @@ use leptonic::components::prelude::*;
 use leptos::prelude::*;
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions,
+    use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions,
 };
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
@@ -189,14 +189,19 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
     view! {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
-                let p = keycloak_port.await;
+                let port = keycloak_port.await;
+                let keycloak_server_url = format!("http://localhost:{port}/");
                 let auth = use_keycloak_auth(UseKeycloakAuthOptions {
-                    keycloak_server_url: Url::parse(&format!("http://localhost:{}/", p)).unwrap(),
+                    keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
                     post_login_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
                     post_logout_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
                     scope: Some("openid".to_string()),
+                    id_token_validation: ValidationOptions {
+                        expected_audiences: Some(vec!["test-client".to_owned()]),
+                        expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
+                    },
                     advanced: Default::default(),
                 });
                 view! {

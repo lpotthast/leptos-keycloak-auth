@@ -18,6 +18,12 @@ impl LifeLeft {
     }
 }
 
+#[derive(Debug)]
+pub struct ValidationOptions {
+    pub expected_audiences: Option<Vec<String>>,
+    pub expected_issuers: Option<Vec<String>>,
+}
+
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
 /// client ID, and other related data.
@@ -40,6 +46,9 @@ pub struct UseKeycloakAuthOptions {
 
     pub scope: Option<String>,
 
+    pub id_token_validation: ValidationOptions,
+
+    /// It is recommended to just use `Default::default()` here.
     pub advanced: AdvancedOptions,
 }
 
@@ -99,6 +108,12 @@ impl Default for AdvancedOptions {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ValidationOptionsInternal {
+    pub(crate) expected_audiences: RwSignal<Option<Vec<String>>>,
+    pub(crate) expected_issuers: RwSignal<Option<Vec<String>>>,
+}
+
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
 /// client ID, and other related data.
@@ -121,6 +136,8 @@ pub(crate) struct Options {
 
     pub(crate) scope: Option<String>,
 
+    pub(crate) id_token_validation: ValidationOptionsInternal,
+
     pub(crate) advanced: AdvancedOptions,
 }
 
@@ -133,6 +150,10 @@ impl Options {
             post_login_redirect_url: RwSignal::new(options.post_login_redirect_url),
             post_logout_redirect_url: RwSignal::new(options.post_logout_redirect_url),
             scope: options.scope,
+            id_token_validation: ValidationOptionsInternal {
+                expected_audiences: RwSignal::new(options.id_token_validation.expected_audiences),
+                expected_issuers: RwSignal::new(options.id_token_validation.expected_issuers),
+            },
             advanced: options.advanced,
         }
     }

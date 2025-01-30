@@ -154,14 +154,9 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let verified_and_decoded_id_token: Memo<
         Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
     > = Memo::new(move |_| {
-        // TODO: User should be able to overwrite this.
-        let expected_audiences = Some(vec![options.read_value().client_id.clone()]);
-        let expected_issuers = Some(vec![format!(
-            "{}realms/{}",
-            options.read_value().keycloak_server_url,
-            options.read_value().realm
-        )]);
-
+        let expected_audiences = options.read_value().id_token_validation.expected_audiences.get();
+        let expected_issuers = options.read_value().id_token_validation.expected_issuers.get();
+        
         let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),

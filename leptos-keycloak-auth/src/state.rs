@@ -73,6 +73,34 @@ impl KeycloakAuth {
             .with_value(|it| it.post_logout_redirect_url.set(url));
     }
 
+    /// Update the `expected_audiences` used when validating the ID token.
+    ///
+    /// This will lead to a reactive re-validation of the ID token.
+    pub fn set_expected_audiences_for_id_token_validation(
+        &mut self,
+        expected_audiences: Option<Vec<String>>,
+    ) {
+        self.options.with_value(|it| {
+            it.id_token_validation
+                .expected_audiences
+                .set(expected_audiences)
+        });
+    }
+
+    /// Update the `expected_issuers` used when validating the ID token.
+    ///
+    /// This will lead to a reactive re-validation of the ID token.
+    pub fn set_expected_issuers_for_id_token_validation(
+        &mut self,
+        expected_issuers: Option<Vec<String>>,
+    ) {
+        self.options.with_value(|it| {
+            it.id_token_validation
+                .expected_issuers
+                .set(expected_issuers)
+        });
+    }
+
     /// Returns a reactive function that pretty prints the current authentication state.
     ///
     /// Useful for debugging purposes.
