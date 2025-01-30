@@ -39,9 +39,13 @@ pub struct UseKeycloakAuthOptions {
     pub client_id: String,
 
     /// Url to which you want to be redirected after a successful login.
+    ///
+    /// It is MANDATORY that this redirects to a URL where `use_keycloak_auth` is active.
     pub post_login_redirect_url: Url,
 
     /// Url to which you want to be redirected after a successful logout.
+    ///
+    /// It is MANDATORY that this redirects to a URL where `use_keycloak_auth` is active.
     pub post_logout_redirect_url: Url,
 
     /// The additional scopes (permissions / access-levels) requested from Keycloak.
