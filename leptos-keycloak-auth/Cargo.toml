@@ -2,10 +2,10 @@
 name = "leptos-keycloak-auth"
 version = "0.3.0"
 edition = "2021"
-rust-version = "1.76.0"
+rust-version = "1.81.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
 license = "MIT OR Apache-2.0"
-readme = "README.md"
+readme = "../README.md"
 repository = "https://github.com/lpotthast/leptos-keycloak-auth"
 description = "Secure Leptos applications using Keycloak."
 categories = ["web-programming", "api-bindings", "network-programming"]

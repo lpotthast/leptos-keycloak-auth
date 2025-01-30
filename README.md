@@ -5,10 +5,11 @@ Secure Leptos applications using Keycloak.
 ## Features
 
 - OpenID Connect discovery
-- Authorization code flow
+- Authorization code flow wik PKCE
 - ID token verification
 - ID token introspection
 - Automatic refresh token renewal
+- Automatic access token usage and 401 response handling when using the provided `reqwest`-based `AuthenticatedClient`
 
 ## Usage
 
@@ -100,7 +101,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 
 ## MSRV
 
-The minimum supported rust version is `1.76.0`
+The minimum supported rust version is `1.81.0`
 
 ## Troubleshooting
 
