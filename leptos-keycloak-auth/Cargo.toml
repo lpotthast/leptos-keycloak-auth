@@ -1,0 +1,53 @@
+[package]
+name = "leptos-keycloak-auth"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.81.0"
+authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/lpotthast/leptos-keycloak-auth"
+description = "Secure Leptos applications using Keycloak."
+categories = ["web-programming", "api-bindings", "network-programming"]
+keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
+include = ["src/**/*", "LICENSE-*", "README.md"]
+
+[features]
+internals = []
+
+[dependencies]
+base64 = "0.22.1"
+# Must stick to 0.2 until leptos-use is updated.
+codee = { version = "0.2.0", features = ["json_serde"] }
+http = "1.2.0"
+itertools = "0.14.0"
+jsonwebtoken = "9.3.0"
+leptos = "0.7.4"
+leptos-use = "0.15.5"
+leptos_router = "0.7.4"
+rand = "0.8.5"
+reqwest = { version = "0.12.12", features = ["json"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+sha2 = "0.10.8"
+snafu = "0.8.5"
+time = { version = "0.3.37", features = ["wasm-bindgen", "serde"] }
+tracing = "0.1.41"
+url = "2.5.4"
+
+[dev-dependencies]
+anyhow = "1.0.95"
+assertr = "0.1.0"
+axum = "0.8.1"
+axum-keycloak-auth = "0.7.0"
+chrome-for-testing-manager = { version = "0.1.0", features = ["thirtyfour"] }
+http = "1.2.0"
+keycloak = "26.1.0"
+testcontainers = "0.23.1"
+thirtyfour = "0.35.0"
+tokio = "1.43.0"
+tokio-process-tools = "0.3.1"
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["full"] }
+tracing-subscriber = "0.3.19"
+uuid = { version = "1.12.1", features = ["v7", "serde"] }
