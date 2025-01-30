@@ -4,6 +4,7 @@ use testcontainers::{
     runners::AsyncRunner,
     GenericImage, ImageExt,
 };
+use testcontainers::core::logs::LogFrame;
 use url::Url;
 
 /// The contained testcontainer instance implements a custom Drop function, cleaning up the running
@@ -26,23 +27,29 @@ impl KeycloakContainer {
         let admin_password = "admin".to_owned();
 
         // This setup is roughly equivalent to the following cli command:
-        // `docker run -p 8080:8080 -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:25.0.0 start-dev`
+        // `docker run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.1.0 start-dev`
 
-        let keycloak_image = GenericImage::new("quay.io/keycloak/keycloak", "25.0.0")
+        let keycloak_image = GenericImage::new("quay.io/keycloak/keycloak", "26.1.0")
             .with_exposed_port(ContainerPort::Tcp(8080))
             .with_wait_for(WaitFor::message_on_stdout(
-                "Keycloak 25.0.0 on JVM (powered by Quarkus 3.8.5) started",
+                "Keycloak 26.1.0 on JVM (powered by Quarkus 3.15.2) started",
             ))
             .with_wait_for(WaitFor::message_on_stdout(
                 "Listening on: http://0.0.0.0:8080",
             ))
-            .with_wait_for(WaitFor::message_on_stdout(
-                "Management interface listening on http://0.0.0.0:9000",
-            ));
+            //.with_wait_for(WaitFor::message_on_stdout(
+            //    "Management interface listening on http://0.0.0.0:9000",
+            //))
+            .with_log_consumer(|frame: &LogFrame| {
+                println!("{}", match frame {
+                    LogFrame::StdOut(bytes) => String::from_utf8_lossy(&bytes),
+                    LogFrame::StdErr(bytes) => String::from_utf8_lossy(&bytes),
+                });
+            });
 
         let container_request = keycloak_image
-            .with_env_var("KEYCLOAK_ADMIN", admin_user.as_str())
-            .with_env_var("KEYCLOAK_ADMIN_PASSWORD", admin_password.as_str())
+            .with_env_var("KC_BOOTSTRAP_ADMIN_USERNAME", admin_user.as_str())
+            .with_env_var("KC_BOOTSTRAP_ADMIN_PASSWORD", admin_password.as_str())
             .with_env_var("KC_HTTP_ENABLED", "true")
             .with_env_var("KC_HOSTNAME_STRICT_HTTPS", "false")
             .with_cmd(["start-dev"]);
