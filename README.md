@@ -74,6 +74,17 @@ s
 }
 ```
 
+## Test
+
+Start the tests (including the integration test) with
+
+      cargo test -- --nocapture
+
+This allows you to see the output from `Keycloak` as well as our `test-frontend` build when running the integration test.
+
+You can set `DELAY_TEST_EXECUTION` to `true` in `integration_test.rs` to play around with the test application.
+You can than still run the UI test by entering `y` and pressing enter or canceling the test with `n`.
+
 ## Leptos compatibility
 
 | Crate version | Compatible Leptos version |

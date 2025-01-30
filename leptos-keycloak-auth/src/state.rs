@@ -5,6 +5,7 @@ use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::AccessToken;
 use leptos::prelude::*;
+use leptos_router::hooks::use_url;
 use std::ops::Deref;
 use url::Url;
 
@@ -56,11 +57,19 @@ pub struct KeycloakAuth {
     pub token_manager: crate::internal::token_manager::TokenManager,
 }
 
+pub fn to_current_url() -> Url {
+    let current = use_url().get();
+    let current = format!("{}{}", current.origin(), current.path());
+    Url::parse(&current).unwrap()
+}
+
 impl KeycloakAuth {
     /// Update the URL to which you want to be redirected after a successful login.
     ///
     /// This will lead to a reactive change in the `login_url` signal.
-    pub fn set_post_login_redirect_url(&mut self, url: Url) {
+    /// 
+    /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
+    pub fn set_post_login_redirect_url(&self, url: Url) {
         self.options
             .with_value(|it| it.post_login_redirect_url.set(url));
     }
@@ -68,7 +77,9 @@ impl KeycloakAuth {
     /// Update the URL to which you want to be redirected after a successful logout.
     ///
     /// This will lead to a reactive change in the `logout_url` signal.
-    pub fn set_post_logout_redirect_url(&mut self, url: Url) {
+    /// 
+    /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
+    pub fn set_post_logout_redirect_url(&self, url: Url) {
         self.options
             .with_value(|it| it.post_logout_redirect_url.set(url));
     }
@@ -77,7 +88,7 @@ impl KeycloakAuth {
     ///
     /// This will lead to a reactive re-validation of the ID token.
     pub fn set_expected_audiences_for_id_token_validation(
-        &mut self,
+        &self,
         expected_audiences: Option<Vec<String>>,
     ) {
         self.options.with_value(|it| {
@@ -91,7 +102,7 @@ impl KeycloakAuth {
     ///
     /// This will lead to a reactive re-validation of the ID token.
     pub fn set_expected_issuers_for_id_token_validation(
-        &mut self,
+        &self,
         expected_issuers: Option<Vec<String>>,
     ) {
         self.options.with_value(|it| {

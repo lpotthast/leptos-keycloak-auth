@@ -20,6 +20,9 @@ use time::OffsetDateTime;
 
 /// Initializes a new `KeycloakAuth` instance, the authentication handler responsible for handling
 /// user authentication and token management, with the provided authentication parameters.
+///
+/// This HAS TO BE called from inside a `<Router>` component, as `use_keycloak_auth` requires
+/// reactive access to the current url of the page.
 pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
 

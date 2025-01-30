@@ -102,6 +102,11 @@ impl JwkSetManager {
                         })
                         .flatten(),
                 );
+            } else {
+                // If the JWK set itself is still the same, we still have to store the new
+                // timestamp stored in our newly received `val`!
+                // We would otherwise always have an "outdated" JWK set once it became too old.
+                set_jwk_set.set(val);
             }
         });
 

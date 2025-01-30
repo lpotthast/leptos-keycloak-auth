@@ -3,9 +3,7 @@ use leptonic::components::prelude::*;
 use leptos::prelude::*;
 use leptos_keycloak_auth::components::ShowWhenAuthenticated;
 use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::{
-    use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions,
-};
+use leptos_keycloak_auth::{to_current_url, use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
 use leptos_routes::routes;
@@ -196,8 +194,8 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
-                    post_login_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
-                    post_logout_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
+                    post_login_redirect_url: to_current_url(),
+                    post_logout_redirect_url: to_current_url(),
                     scope: vec![],
                     id_token_validation: ValidationOptions {
                         expected_audiences: Some(vec!["test-client".to_owned()]),

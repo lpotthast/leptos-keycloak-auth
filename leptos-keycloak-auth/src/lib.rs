@@ -28,7 +28,7 @@
 //!     // Note: Redirect URLs should match the route path at which you render this component.
 //!     //       If this component is rendered at `/admin`, the redirects should also go to that route,
 //!     //       or we end up in a place where `use_keycloak_auth` is not rendered/active
-//!     //       and any login attempt can never be completed. 
+//!     //       and any login attempt can never be completed.
 //!     let keycloak_server_url = "http://localhost:8443".to_owned();
 //!     let auth = use_keycloak_auth(UseKeycloakAuthOptions {
 //!         keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
@@ -85,13 +85,13 @@ mod token;
 mod token_claims;
 mod token_validation;
 
-use leptos::{component, view, IntoView};
 // Library exports (additional to pub modules).
 pub use authenticated_client::*;
 pub use config::*;
 pub use hooks::*;
 pub use leptos_use::storage::StorageType;
 pub use state::*;
+pub use state::to_current_url;
 pub mod url {
     pub use url::Url;
 }
