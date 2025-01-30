@@ -197,7 +197,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     client_id: "test-client".to_owned(),
                     post_login_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
                     post_logout_redirect_url: Url::parse("http://127.0.0.1:3000/my-account").unwrap(),
-                    scope: Some("openid".to_string()),
+                    scope: vec![],
                     id_token_validation: ValidationOptions {
                         expected_audiences: Some(vec!["test-client".to_owned()]),
                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
