@@ -45,8 +45,8 @@
 //!     });
 //!
 //!     view! {
-//!         <ShowWhenAuthenticated fallback=move || view! { <a href={ auth.login_url.get().unwrap_or_default() }>"Login"</a> }>
-//!             { children }
+//!         <ShowWhenAuthenticated fallback=move || view! { <a href={ auth.login_url.get().map(|url| url.to_string()).unwrap_or_default() }>"Login"</a> }>
+//!             { children() }
 //!         </ShowWhenAuthenticated>
 //!     }
 //! }
@@ -59,7 +59,7 @@
 //!
 //!     view! {
 //!         <div>
-//!             "Hello, " { move || auth.id_token_claims.read().name }
+//!             "Hello, " { move || auth.id_token_claims.read().name.clone() }
 //!         </div>
 //!     }
 //! }
