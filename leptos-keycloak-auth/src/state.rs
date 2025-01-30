@@ -67,7 +67,7 @@ impl KeycloakAuth {
     /// Update the URL to which you want to be redirected after a successful login.
     ///
     /// This will lead to a reactive change in the `login_url` signal.
-    /// 
+    ///
     /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
     pub fn set_post_login_redirect_url(&self, url: Url) {
         self.options
@@ -77,7 +77,7 @@ impl KeycloakAuth {
     /// Update the URL to which you want to be redirected after a successful logout.
     ///
     /// This will lead to a reactive change in the `logout_url` signal.
-    /// 
+    ///
     /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
     pub fn set_post_logout_redirect_url(&self, url: Url) {
         self.options
@@ -144,7 +144,7 @@ impl KeycloakAuthState {
     /// Returns a reactive function that pretty prints the current authentication state.
     /// Useful for debugging purposes.
     pub fn pretty_printer(&self) -> impl Fn() -> String {
-        let this = self.clone();
+        let this = *self;
 
         move || match this {
             KeycloakAuthState::Authenticated(Authenticated {
@@ -234,11 +234,11 @@ pub enum RequestAction {
 
 impl Authenticated {
     pub fn client(&self) -> AuthenticatedClient {
-        AuthenticatedClient::new(reqwest::Client::new(), self.clone())
+        AuthenticatedClient::new(reqwest::Client::new(), *self)
     }
 
     pub fn client_from(&self, client: reqwest::Client) -> AuthenticatedClient {
-        AuthenticatedClient::new(client, self.clone())
+        AuthenticatedClient::new(client, *self)
     }
 
     pub fn report_failed_http_request(&self, status_code: http::StatusCode) -> RequestAction {

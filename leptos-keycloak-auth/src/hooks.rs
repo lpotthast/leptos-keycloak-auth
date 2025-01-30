@@ -163,8 +163,8 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
-            expected_audiences.as_ref().map(|it| it.as_slice()),
-            expected_issuers.as_ref().map(|it| it.as_slice()),
+            expected_audiences.as_deref(),
+            expected_issuers.as_deref(),
         );
 
         if first_try.is_ok() {
@@ -178,8 +178,8 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             let second_try = token_validation::validate(
                 token_mgr.token.get(),
                 jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
-                expected_audiences.as_ref().map(|it| it.as_slice()),
-                expected_issuers.as_ref().map(|it| it.as_slice()),
+                expected_audiences.as_deref(),
+                expected_issuers.as_deref(),
             );
             return second_try;
         }

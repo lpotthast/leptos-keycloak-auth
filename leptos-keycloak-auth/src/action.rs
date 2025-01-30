@@ -115,6 +115,7 @@ pub(crate) fn create_exchange_code_for_token_action(
     )
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
     set_token: Callback<Option<TokenData>>,
@@ -129,7 +130,7 @@ pub(crate) fn create_refresh_token_action(
             let token_endpoint = token_endpoint.clone();
             let client_id = options.read_value().client_id.clone();
             let refresh_token = refresh_token.clone();
-            let on_refresh_error = on_refresh_error.clone();
+            let on_refresh_error = *on_refresh_error;
             async move {
                 leptos::task::spawn_local(async move {
                     match request::refresh_token(token_endpoint, &client_id, &refresh_token).await {

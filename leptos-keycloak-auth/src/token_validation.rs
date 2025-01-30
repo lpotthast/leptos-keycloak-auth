@@ -64,10 +64,10 @@ fn validate_and_decode_base64_encoded_token(
 
     let mut validation = jsonwebtoken::Validation::new(jwt_header.alg);
     if let Some(expected_audiences) = expected_audiences {
-        validation.set_audience(&expected_audiences);
+        validation.set_audience(expected_audiences);
     }
     if let Some(expected_issuers) = expected_issuers {
-        validation.set_issuer(&expected_issuers);
+        validation.set_issuer(expected_issuers);
     }
 
     let jwk = jwk_set
