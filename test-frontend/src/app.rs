@@ -200,7 +200,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     scope: vec![],
                     id_token_validation: ValidationOptions {
                         expected_audiences: Some(vec!["test-client".to_owned()]),
-                        expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
+                        expected_issuers: Some(vec![format!("{keycloak_server_url}realms/test-realm")]),
                     },
                     advanced: Default::default(),
                 });
