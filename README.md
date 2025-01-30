@@ -79,7 +79,7 @@ s
 
 ## MSRV
 
-The minimum supported rust version is `1.70.0`
+The minimum supported rust version is `1.76.0`
 
 ## Troubleshooting
 
