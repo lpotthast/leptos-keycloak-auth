@@ -1,6 +1,7 @@
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
 use leptos::prelude::*;
+use leptos_keycloak_auth::components::ShowWhenAuthenticated;
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
     use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions,
@@ -190,7 +191,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let port = keycloak_port.await;
-                let keycloak_server_url = format!("http://localhost:{port}/");
+                let keycloak_server_url = format!("http://localhost:{port}");
                 let auth = use_keycloak_auth(UseKeycloakAuthOptions {
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
@@ -200,14 +201,14 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     scope: vec![],
                     id_token_validation: ValidationOptions {
                         expected_audiences: Some(vec!["test-client".to_owned()]),
-                        expected_issuers: Some(vec![format!("{keycloak_server_url}realms/test-realm")]),
+                        expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
                     },
                     advanced: Default::default(),
                 });
                 view! {
-                    <leptos_keycloak_auth::components::Authenticated unauthenticated=|| view! { <Login/> }>
+                    <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
                         { children() }
-                    </leptos_keycloak_auth::components::Authenticated>
+                    </ShowWhenAuthenticated>
 
                     <div style="width: 100%;">
                         <h3>"Internal data: oidc_config_manager"</h3>

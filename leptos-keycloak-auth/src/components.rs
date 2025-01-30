@@ -6,8 +6,8 @@ use leptos::prelude::*;
 /// It provides a way to conditionally render its children based on the user's authentication status.
 /// If the user is authenticated, it renders the children; otherwise, it falls back to the provided loading or unauthenticated view.
 #[component(transparent)]
-pub fn Authenticated<C>(
-    #[prop(into, optional)] unauthenticated: ViewFn,
+pub fn ShowWhenAuthenticated<C>(
+    #[prop(into, optional)] fallback: ViewFn,
 
     children: TypedChildrenFn<C>,
 ) -> impl IntoView
@@ -25,7 +25,7 @@ where
         }
         KeycloakAuthState::NotAuthenticated(_not_authenticated) => {
             let _ = take_context::<crate::Authenticated>();
-            Either::Right(unauthenticated.run())
+            Either::Right(fallback.run())
         }
     }
 }

@@ -19,13 +19,18 @@ use leptos_keycloak_auth::{use_keycloak_auth, Authenticated, Url, UseKeycloakAut
 #[component]
 pub fn Protected(children: ChildrenFn) -> impl IntoView {
     // Note: These values should be served from environment variables to be overwritten in production.
+    let keycloak_server_url = "http://localhost:8443".to_owned();
     let _auth = use_keycloak_auth(UseKeycloakAuthOptions {
-        keycloak_server_url: "http://localhost:8443/",
-        realm: "your-realm-name".to_owned(),
-        client_id: "your-client-name".to_owned(),
-        post_login_redirect_url: "http://127.0.0.1:4000/".to_owned(),
-        post_logout_redirect_url: "http://127.0.0.1:4000/".to_owned(),
-        scope: Some("openid".to_string()),
+        keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
+        realm: "test-realm".to_owned(),
+        client_id: "test-client".to_owned(),
+        post_login_redirect_url: Url::parse("http://127.0.0.1:3000").unwrap(),
+        post_logout_redirect_url: Url::parse("http://127.0.0.1:3000").unwrap(),
+        scope: vec![],
+        id_token_validation: ValidationOptions {
+           expected_audiences: Some(vec!["test-client".to_owned()]),
+           expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
+        },
         advanced: Default::default(),
     });
 
