@@ -44,8 +44,13 @@ pub struct UseKeycloakAuthOptions {
     /// Url to which you want to be redirected after a successful logout.
     pub post_logout_redirect_url: Url,
 
-    pub scope: Option<String>,
+    /// The additional scopes (permissions / access-levels) requested from Keycloak.
+    ///
+    /// We will always make sure that the mandatory `openid` scope is present,
+    /// so you can use an empty Vec as a starting point.
+    pub scope: Vec<String>,
 
+    /// Configuration for the validation of the ID token.
     pub id_token_validation: ValidationOptions,
 
     /// It is recommended to just use `Default::default()` here.
@@ -119,25 +124,13 @@ pub(crate) struct ValidationOptionsInternal {
 /// client ID, and other related data.
 #[derive(Debug, Clone)]
 pub(crate) struct Options {
-    /// Url of your keycloak instance, E.g. "https://localhost:8443/"
     pub(crate) keycloak_server_url: Url,
-
-    /// The keycloak realm you want to use.
     pub(crate) realm: String,
-
-    /// The name of this client as configured inside your Keycloak admin area.
     pub(crate) client_id: String,
-
-    /// Url to which you want to be redirected after a successful login.
     pub(crate) post_login_redirect_url: RwSignal<Url>,
-
-    /// Url to which you want to be redirected after a successful logout.
     pub(crate) post_logout_redirect_url: RwSignal<Url>,
-
-    pub(crate) scope: Option<String>,
-
+    pub(crate) scope: Vec<String>,
     pub(crate) id_token_validation: ValidationOptionsInternal,
-
     pub(crate) advanced: AdvancedOptions,
 }
 

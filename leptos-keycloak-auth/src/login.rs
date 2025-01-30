@@ -2,7 +2,9 @@ use crate::code_verifier::CodeChallenge;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::AuthorizationEndpoint;
+use itertools::Itertools;
 use leptos::prelude::*;
+use std::borrow::Cow;
 use url::Url;
 
 pub(crate) fn create_login_url_signal(
@@ -31,17 +33,29 @@ pub(crate) fn create_login_url_signal(
             )
             .append_pair(
                 "client_id",
-                &options.with_value(|params| params.client_id.clone()),
+                &options.with_value(|options| options.client_id.clone()),
             )
             .append_pair(
                 "redirect_uri",
                 options
-                    .with_value(|params| params.post_login_redirect_url.read())
+                    .with_value(|options| options.post_login_redirect_url.read())
                     .as_str(),
             )
             .append_pair(
                 "scope",
-                &options.with_value(|params| params.scope.clone().unwrap_or("openid".to_owned())),
+                options
+                    .with_value(|options| match options.scope.len() {
+                        0 => Cow::Borrowed("openid"),
+                        _ => Cow::Owned(
+                            options
+                                .scope
+                                .iter()
+                                .map(|it| it.trim())
+                                .chain(["openid"])
+                                .join(" "),
+                        ),
+                    })
+                    .as_ref(),
             );
         Some(login_url)
     })
