@@ -1,8 +1,14 @@
-//!
+//! Protect parts of your Leptos application using Keycloak.
+//! 
+//! ## Example
+//! 
 //! ```
 //! use leptos::prelude::*;
-//! use leptos_router::{path, components::{Route, Router, Routes}};
-//! use leptos_keycloak_auth::{components::ShowWhenAuthenticated, url::Url, use_keycloak_auth, Authenticated, UseKeycloakAuthOptions, ValidationOptions};
+//! use leptos_router::path;
+//! use leptos_router::components::*;
+//! use leptos_keycloak_auth::{use_keycloak_auth, Authenticated, UseKeycloakAuthOptions, ValidationOptions};
+//! use leptos_keycloak_auth::components::*;
+//! use leptos_keycloak_auth::url::Url;
 //!
 //! #[component]
 //! pub fn App() -> impl IntoView {
@@ -64,7 +70,6 @@
 //!     }
 //! }
 //! ```
-//!
 
 mod action;
 mod authenticated_client;
@@ -91,7 +96,6 @@ pub use config::*;
 pub use hooks::*;
 pub use leptos_use::storage::StorageType;
 pub use state::*;
-pub use state::to_current_url;
 pub mod url {
     pub use url::Url;
 }
