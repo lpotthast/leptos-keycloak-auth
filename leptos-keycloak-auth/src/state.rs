@@ -63,6 +63,12 @@ pub fn to_current_url() -> Url {
     Url::parse(&current).unwrap()
 }
 
+pub fn to_current_url_untracked() -> Url {
+    let current = use_url().get_untracked();
+    let current = format!("{}{}", current.origin(), current.path());
+    Url::parse(&current).unwrap()
+}
+
 impl KeycloakAuth {
     /// Update the URL to which you want to be redirected after a successful login.
     ///
