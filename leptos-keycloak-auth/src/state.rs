@@ -122,7 +122,8 @@ impl KeycloakAuth {
     ///
     /// Useful for debugging purposes.
     pub fn state_pretty_printer(&self) -> impl Fn() -> String {
-        self.state.read().deref().pretty_printer()
+        let state = self.state;
+        move || state.read().deref().pretty_printer()()
     }
 }
 
