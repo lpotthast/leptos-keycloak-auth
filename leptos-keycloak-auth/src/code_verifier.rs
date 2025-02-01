@@ -15,14 +15,14 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
 
         const CHARSET: &[u8] =
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Leveraging the base64 encoding ratio of encoding 3 bytes into 4 characters
         // with the fact that we use the NO_PAD config.
         let bytes_needed = (LENGTH * 3) / 4;
 
         let result = (0..bytes_needed)
-            .map(|_i| CHARSET[rng.gen_range(0..CHARSET.len())] as char)
+            .map(|_i| CHARSET[rng.random_range(0..CHARSET.len())] as char)
             .collect::<String>();
 
         let code_verifier = URL_SAFE_NO_PAD.encode(&result);

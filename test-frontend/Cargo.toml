@@ -38,10 +38,12 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", optional = true }
 tracing-wasm = { version = "0.2.1", optional = true }
 wasm-bindgen = "0.2.100"
+getrandom = { version = "0.3", features = ["wasm_js"], optional = true }
 
 [features]
 hydrate = [
     "dep:tracing-wasm",
+    "dep:getrandom",
     "leptos/hydrate",
     "leptonic/hydrate"
 ]
