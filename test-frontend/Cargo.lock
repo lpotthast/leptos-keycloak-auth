@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "leptos-keycloak-auth"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "base64 0.22.1",
  "codee 0.2.0",
