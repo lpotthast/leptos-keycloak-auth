@@ -1,9 +1,12 @@
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
 use leptos::prelude::*;
-use leptos_keycloak_auth::components::ShowWhenAuthenticated;
+use leptos_keycloak_auth::components::{DebugState, EndSession, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::{to_current_url, use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
+use leptos_keycloak_auth::{
+    to_current_url, use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions,
+    ValidationOptions,
+};
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
 use leptos_routes::routes;
@@ -18,6 +21,11 @@ pub mod routes {
 
     #[route("/my-account")]
     pub mod my_account {}
+
+    /// A route that, when reached, programmatically logs out the current user (if authenticated)
+    /// and redirects to `"/"`.
+    #[route("/logout")]
+    pub mod logout {}
 }
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
@@ -68,6 +76,7 @@ pub fn App() -> impl IntoView {
                         <Route path=routes::Root.path() view=Welcome/>
                         <Route path=routes::Public.path() view=Public/>
                         <Route path=routes::MyAccount.path() view=|| view! { <Protected> <MyAccount/> </Protected> }/>
+                        <Route path=routes::Logout.path() view=|| view! { <Protected> <EndSession and_route_to="http://127.0.0.1:3000"/> </Protected> }/>
                     </Routes>
                 </Router>
             </main>
@@ -83,7 +92,7 @@ pub fn Welcome() -> impl IntoView {
         <h2>"Welcome to Leptonic"</h2>
 
         <LinkButton attr:id="to-public" href=routes::Public.materialize().strip_prefix("/").unwrap().to_string()>
-            "Public2"
+            "Public area"
         </LinkButton>
 
         <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
@@ -164,6 +173,10 @@ pub fn MyAccount() -> impl IntoView {
             "Logout"
         </LinkButton>
 
+        <Button attr:id="programmatic-logout" on_press=move |_| auth.end_session()>
+            "Programmatic Logout"
+        </Button>
+
         <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
             "Back to root"
         </LinkButton>
@@ -181,16 +194,20 @@ async fn get_keycloak_port() -> Result<u16, ServerFnError> {
 
 #[component]
 pub fn Protected(children: ChildrenFn) -> impl IntoView {
-    // Our test-setup starts Keycloak with randomized ports, so we cannot hardcode "8443" here!
-    let keycloak_port =
-        LocalResource::new(|| async move { get_keycloak_port().await.unwrap_or(8443) });
+    // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected are
+    // client-side only. We should also not execute `use_keycloak_auth` on the server, as it has
+    // no support for SSR yet.
+    //
+    // Our test-setup starts Keycloak with randomized ports, so we cannot hardcode "8443" here,
+    // but can actually make use of the enforced resource to asynchronously retrieve the port.
+    let keycloak_port = LocalResource::new(|| async move { get_keycloak_port().await.unwrap() });
 
     view! {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let port = keycloak_port.await;
                 let keycloak_server_url = format!("http://localhost:{port}");
-                let auth = use_keycloak_auth(UseKeycloakAuthOptions {
+                let _auth = use_keycloak_auth(UseKeycloakAuthOptions {
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
@@ -208,72 +225,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                         { children() }
                     </ShowWhenAuthenticated>
 
-                    <div style="width: 100%;">
-                        <h3>"Internal data: oidc_config_manager"</h3>
-                        <div>
-                            "oidc_config_age: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_age.get())}
-                        </div>
-                        <div>
-                            "oidc_config_expires_in: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_expires_in.get())}
-                        </div>
-                        <div>
-                            "oidc_config_too_old: " {move || format!("{:?}", auth.oidc_config_manager.oidc_config_too_old.get())}
-                        </div>
-                    </div>
-
-                    <div style="width: 100%;">
-                        <h3>"Internal data: jwk_set_manager"</h3>
-                        <div>
-                            "jwk_set_age: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_age.get())}
-                        </div>
-                        <div>
-                            "jwk_set_expires_in: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_expires_in.get())}
-                        </div>
-                        <div>
-                            "jwk_set_too_old: " {move || format!("{:?}", auth.jwk_set_manager.jwk_set_too_old.get())}
-                        </div>
-                    </div>
-
-                    <div style="width: 100%;">
-                        <h3>"Internal data: code_verifier_manager"</h3>
-                        <div>
-                            "code_verifier: " {move || format!("{:?}", auth.code_verifier_manager.code_verifier.get())}
-                        </div>
-                        <div>
-                            "code_challenge: " {move || format!("{:?}", auth.code_verifier_manager.code_challenge.get())}
-                        </div>
-                    </div>
-
-                    <div style="width: 100%;">
-                        <h3>"Internal data: token_manager"</h3>
-                        <div>
-                            "access_token_lifetime: " {move || format!("{:?}", auth.token_manager.access_token_lifetime.get())}
-                        </div>
-                        <div>
-                            "access_token_expires_in: " {move || format!("{:?}", auth.token_manager.access_token_expires_in.get())}
-                        </div>
-                        <div>
-                            "access_token_nearly_expired: " {move || format!("{:?}", auth.token_manager.access_token_nearly_expired.get())}
-                        </div>
-                        <div>
-                            "access_token_expired: " {move || format!("{:?}", auth.token_manager.access_token_expired.get())}
-                        </div>
-                        <div>
-                            "refresh_token_lifetime: " {move || format!("{:?}", auth.token_manager.refresh_token_lifetime.get())}
-                        </div>
-                        <div>
-                            "refresh_token_expires_in: " {move || format!("{:?}", auth.token_manager.refresh_token_expires_in.get())}
-                        </div>
-                        <div>
-                            "refresh_token_nearly_expired: " {move || format!("{:?}", auth.token_manager.refresh_token_nearly_expired.get())}
-                        </div>
-                        <div>
-                            "refresh_token_expired: " {move || format!("{:?}", auth.token_manager.refresh_token_expired.get())}
-                        </div>
-                        <div>
-                            "token_endpoint: " {move || format!("{:?}", auth.token_manager.token_endpoint.get())}
-                        </div>
-                    </div>
+                    <DebugState/>
                 }
             })}
         </Suspense>

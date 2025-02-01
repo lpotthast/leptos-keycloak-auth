@@ -18,6 +18,9 @@ mod keycloak_container;
 
 const DELAY_TEST_EXECUTION: bool = false;
 
+const USERNAME: &str = "bob@foo.bar";
+const PASSWORD: &str = "password";
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_integration() {
     common::tracing::init_subscriber();
@@ -194,7 +197,9 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
                 ClientRepresentation {
                     enabled: Some(true),
                     public_client: Some(true),
-                    direct_access_grants_enabled: Some(true),
+                    standard_flow_enabled: Some(true),
+                    direct_access_grants_enabled: Some(false),
+                    web_origins: Some(vec!["http://127.0.0.1:3000".to_owned()]),
                     redirect_uris: Some(vec!["http://127.0.0.1:3000/*".to_owned()]),
                     id: Some("test-client".to_owned()),
                     ..Default::default()
@@ -213,15 +218,15 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
                 UserRepresentation {
                     id: Some("a7060488-c80b-40c5-83e2-d7000bf9738e".to_owned()),
                     enabled: Some(true),
-                    username: Some("test-user-mail@foo.bar".to_owned()),
-                    email: Some("test-user-mail@foo.bar".to_owned()),
+                    username: Some(USERNAME.to_owned()),
+                    email: Some(USERNAME.to_owned()),
                     email_verified: Some(true),
                     first_name: Some("firstName".to_owned()),
                     last_name: Some("lastName".to_owned()),
                     realm_roles: Some(vec!["developer".to_owned()]),
                     credentials: Some(vec![CredentialRepresentation {
                         type_: Some("password".to_owned()),
-                        value: Some("password".to_owned()),
+                        value: Some(PASSWORD.to_owned()),
                         temporary: Some(false),
                         ..Default::default()
                     }]),

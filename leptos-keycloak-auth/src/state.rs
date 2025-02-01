@@ -5,7 +5,7 @@ use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::AccessToken;
 use leptos::prelude::*;
-use leptos_router::hooks::use_url;
+use leptos_router::hooks::{use_navigate, use_url};
 use std::ops::Deref;
 use url::Url;
 
@@ -44,17 +44,18 @@ pub struct KeycloakAuth {
     /// Derived signal stating `true` when `state` is of the `Authenticated` variant.
     pub is_authenticated: Signal<bool>,
 
-    #[cfg(feature = "internals")]
-    pub oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager,
+    pub(crate) derived_urls: crate::internal::derived_urls::DerivedUrls,
 
-    #[cfg(feature = "internals")]
-    pub jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager,
+    #[allow(unused)]
+    pub(crate) oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager,
 
-    #[cfg(feature = "internals")]
-    pub code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager,
+    #[allow(unused)]
+    pub(crate) jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager,
 
-    #[cfg(feature = "internals")]
-    pub token_manager: crate::internal::token_manager::TokenManager,
+    #[allow(unused)]
+    pub(crate) code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager,
+
+    pub(crate) token_manager: crate::internal::token_manager::TokenManager,
 }
 
 pub fn to_current_url() -> Url {
@@ -124,6 +125,59 @@ impl KeycloakAuth {
     pub fn state_pretty_printer(&self) -> impl Fn() -> String {
         let state = self.state;
         move || state.read().deref().pretty_printer()()
+    }
+
+    pub fn end_session(&self) {
+        self.end_session_and_go_to(to_current_url_untracked().as_str());
+    }
+
+    pub fn end_session_and_go_to(&self, path: &str) {
+        match (
+            self.derived_urls.end_session_endpoint.get_untracked(),
+            // We MUST clone here, as the `token_manager.forget()` will later clear the token data!
+            self.token_manager.token.get_untracked(),
+        ) {
+            (Ok(mut end_session_endpoint), Some(token)) => {
+                self.token_manager.forget();
+                end_session_endpoint
+                    .query_pairs_mut()
+                    .append_pair("post_logout_redirect_uri", path)
+                    .append_pair("destroy_session", "true")
+                    .append_pair("id_token_hint", token.id_token.as_str());
+
+                let navigate = use_navigate();
+                navigate(end_session_endpoint.as_ref(), Default::default());
+            }
+            _ => {
+                let navigate = use_navigate();
+                navigate(path, Default::default());
+            }
+        }
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn derived_urls(&self) -> &crate::internal::derived_urls::DerivedUrls {
+        &self.derived_urls
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn oidc_config_manager(&self) -> &crate::internal::oidc_config_manager::OidcConfigManager {
+        &self.oidc_config_manager
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn jwk_set_manager(&self) -> &crate::internal::jwk_set_manager::JwkSetManager {
+        &self.jwk_set_manager
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn code_verifier_manager(&self) -> &crate::internal::code_verifier_manager::CodeVerifierManager {
+        &self.code_verifier_manager
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn token_manager(&self) -> &crate::internal::token_manager::TokenManager {
+        &self.token_manager
     }
 }
 

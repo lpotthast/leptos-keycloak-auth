@@ -24,7 +24,8 @@ pub enum DerivedUrlError {
     NoEndSessionEndpoint,
 }
 
-pub(crate) struct DerivedUrls {
+#[derive(Debug, Clone, Copy)]
+pub struct DerivedUrls {
     pub(crate) jwks_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
     pub(crate) authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
     pub(crate) token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,

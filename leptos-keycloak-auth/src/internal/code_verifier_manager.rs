@@ -30,7 +30,7 @@ impl CodeVerifierManager {
                     .initial_value(None)
                     .on_error(|err| tracing::error!(?err, "code_verifier storage error")),
             );
-        if code_verifier.get().is_none() {
+        if code_verifier.read_untracked().is_none() {
             tracing::trace!("No code_verifier found in session storage, generating new one...");
             set_code_verifier.set(Some(CodeVerifier::<128>::generate()));
         }

@@ -36,12 +36,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(options, handle_req_error);
 
+    let derived_urls = oidc_mgr.derive_urls();
     let DerivedUrls {
         jwks_endpoint,
         authorization_endpoint,
         token_endpoint,
         end_session_endpoint,
-    } = oidc_mgr.derive_urls();
+    } = derived_urls;
 
     let jwk_set_mgr =
         internal::jwk_set_manager::JwkSetManager::new(options, jwks_endpoint, handle_req_error);
@@ -157,9 +158,17 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let verified_and_decoded_id_token: Memo<
         Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
     > = Memo::new(move |_| {
-        let expected_audiences = options.read_value().id_token_validation.expected_audiences.get();
-        let expected_issuers = options.read_value().id_token_validation.expected_issuers.get();
-        
+        let expected_audiences = options
+            .read_value()
+            .id_token_validation
+            .expected_audiences
+            .get();
+        let expected_issuers = options
+            .read_value()
+            .id_token_validation
+            .expected_issuers
+            .get();
+
         let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
@@ -223,7 +232,13 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
         if has_token && has_verified_and_decoded_id_token && !token_mgr.access_token_expired.get() {
             KeycloakAuthState::Authenticated(Authenticated {
-                access_token: Signal::derive(move || token.get().expect("present").access_token),
+                access_token: Signal::derive(move || {
+                    token
+                        .read()
+                        .as_ref()
+                        .map(|it| it.access_token.clone())
+                        .expect("present")
+                }),
                 id_token_claims: Signal::derive(move || {
                     verified_and_decoded_id_token.get().expect("present")
                 }),
@@ -242,6 +257,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let auth = KeycloakAuth {
         options,
+        derived_urls,
         login_url: login::create_login_url_signal(
             authorization_endpoint,
             options,
@@ -259,13 +275,9 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             KeycloakAuthState::Authenticated(_) => true,
             KeycloakAuthState::NotAuthenticated { .. } => false,
         }),
-        #[cfg(feature = "internals")]
         oidc_config_manager: oidc_mgr,
-        #[cfg(feature = "internals")]
         jwk_set_manager: jwk_set_mgr,
-        #[cfg(feature = "internals")]
         code_verifier_manager: code_mgr,
-        #[cfg(feature = "internals")]
         token_manager: token_mgr,
     };
 

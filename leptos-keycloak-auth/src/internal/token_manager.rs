@@ -316,4 +316,8 @@ impl TokenManager {
     pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
         self.trigger_refresh.run((on_refresh_error,));
     }
+    
+    pub(crate) fn forget(&self) {
+        self.set_token.set(None);
+    }
 }
