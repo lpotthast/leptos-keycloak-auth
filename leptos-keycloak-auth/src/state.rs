@@ -194,8 +194,14 @@ impl KeycloakAuth {
 ///      - ...
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeycloakAuthState {
-    /// The Authenticated state is only used when there is a valid token which did not yet expire.
-    /// If you encounter this state, be ensured that the token can be used to access your api.
+    /// The Authenticated state is only entered when there is a valid token which did not yet expire.
+    /// If you encounter this state, be ensured that the access token can be used to access your API.
+    /// 
+    /// The contained `Authenticated` state provides you:
+    /// - An `AuthenticatedClient` (through `client()`) which uses the access token automatically.
+    /// - The plain `access_token`, for when you need manual access to it.
+    /// - The verified and decoded `id_token_claims`, ready for inspection. These include the users
+    ///   id, name, email, roles, ... 
     Authenticated(Authenticated),
 
     NotAuthenticated(NotAuthenticated),
@@ -206,19 +212,20 @@ pub enum KeycloakAuthState {
     /// 2. We run on the client, received an authorization code (through a redirect from Keycloak)
     ///    but are still pending precessing this authorization code (exchanging it with a token).
     ///
-    /// Having this additional state, in contrast to simple falling back to `NotAuthenticated` in
+    /// Having this additional state, in contrast to simply falling back to `NotAuthenticated` in
     /// both cases just mentioned, allows our `<ShowWhenAuthenticated>` component to render
     /// nothing (NOT using the fallback!) in such cases, which is desired as the fallback will
     /// mostly show some "login page". Showing that always when not authenticated would lead to:
     ///
-    /// 1. On SSR: Rendering "login page", even though the client will promptly replace it with the
-    ///    real/guarded content, leading to a small flicker of the page.
-    /// 1. On the client: After getting the redirect from Keycloak (containing the "to be processed"
-    ///    authorization code), showing the `fallback` of `<ShowWhenAuthenticated>` even though we
-    ///    assume that the guarded content will be shown in a few milliseconds,
-    ///    ultimately leading to a small flicker of the page.
+    /// 1. On SSR: Rendering "login page" regardless, even though the client may/will promptly
+    ///    replace it with the real/guarded content, assuming the user is already authenticated,
+    ///    leading to a small flicker of the page.
+    /// 1. On the client when authenticating: After getting the redirect from Keycloak
+    ///    (containing the "to be processed" authorization code), showing the `fallback` of
+    ///    `<ShowWhenAuthenticated>` even though we assume that the guarded content will be shown
+    ///    in a few milliseconds, ultimately leading to a small unnecessary flicker of the page.
     ///
-    /// Therefore, `<ShowWhenAuthenticated>` simply renders nothing in this case.
+    /// Therefore, `<ShowWhenAuthenticated>` simply renders nothing in these case.
     Indeterminate,
 }
 
