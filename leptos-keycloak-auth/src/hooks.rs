@@ -197,12 +197,6 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     tracing::trace!(?logout_state, "Logout successful");
 
                     if logout_state.destroy_session {
-                        // We have to use `request_animation_frame` here, as setting the token to `None` would
-                        // otherwise lead to an immediate execution of all reactive primitives depending on this.
-                        // This includes our `Authenticated` state (and all component trees rendered under
-                        // a `ShowWhenAuthenticated`). But `Authenticated` expects a token to be present!
-                        // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
-                        // no token is present) first!
                         let set_token = token_mgr.set_token;
                         let remove_token_from_storage = token_mgr.remove_token_from_storage;
                         let set_code_verifier = code_mgr.set_code_verifier;
