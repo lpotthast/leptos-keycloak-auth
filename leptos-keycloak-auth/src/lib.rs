@@ -6,7 +6,7 @@
 //! use leptos::prelude::*;
 //! use leptos_router::path;
 //! use leptos_router::components::*;
-//! use leptos_keycloak_auth::{to_current_url, use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
+//! use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
 //! use leptos_keycloak_auth::components::*;
 //! use leptos_keycloak_auth::url::Url;
 //!
@@ -46,7 +46,7 @@
 //!                 //       and any login attempt can never be completed.
 //!                 //       Using `to_current_url()` allows us to render `<Protected>` anywhere we want.
 //!                 let keycloak_server_url = "http://localhost:8443".to_owned();
-//!                 let _auth = use_keycloak_auth(UseKeycloakAuthOptions {
+//!                 let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
 //!                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
 //!                     realm: "test-realm".to_owned(),
 //!                     client_id: "test-client".to_owned(),

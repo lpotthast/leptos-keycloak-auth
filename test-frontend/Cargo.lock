@@ -1734,7 +1734,7 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 [[package]]
 name = "leptonic"
 version = "0.5.0"
-source = "git+https://github.com/lpotthast/leptonic?branch=migrate-to-leptos-0.7#04238fc6fa1d45c3a4190e376ceb1c2ead64234c"
+source = "git+https://github.com/lpotthast/leptonic?branch=migrate-to-leptos-0.7#e8bad60208194cb9a53cdffa991ade3d61fd0f2a"
 dependencies = [
  "anyhow",
  "cargo_toml",
@@ -1765,7 +1765,7 @@ dependencies = [
 [[package]]
 name = "leptonic-theme"
 version = "0.5.0"
-source = "git+https://github.com/lpotthast/leptonic?branch=migrate-to-leptos-0.7#04238fc6fa1d45c3a4190e376ceb1c2ead64234c"
+source = "git+https://github.com/lpotthast/leptonic?branch=migrate-to-leptos-0.7#e8bad60208194cb9a53cdffa991ade3d61fd0f2a"
 dependencies = [
  "anyhow",
  "include_dir",
@@ -3325,9 +3325,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.96"
+version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5d0adab1ae378d7f53bdebc67a39f1f151407ef230f0ce2883572f5d8985c80"
+checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -1,3 +1,4 @@
+use crate::action::ExchangeCodeForTokenInput;
 use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
@@ -32,15 +33,7 @@ pub struct TokenManager {
     pub refresh_token_expires_in: Signal<StdDuration>,
     pub refresh_token_nearly_expired: Signal<bool>,
     pub refresh_token_expired: Signal<bool>,
-    pub exchange_code_for_token_action: Action<
-        (
-            TokenEndpoint,
-            AuthorizationCode,
-            CodeVerifier<128>,
-            Option<SessionState>,
-        ),
-        (),
-    >,
+    pub exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
     pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     pub remove_token_from_storage: StoredValue<Box<dyn Fn() + Send + Sync>>,
     pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
@@ -293,30 +286,34 @@ impl TokenManager {
     /// Note: This silently errors if no token_endpoint is known yet.
     pub(crate) fn exchange_code_for_token(
         &self,
-        code: AuthorizationCode,
+        auth_code: AuthorizationCode,
         code_verifier: CodeVerifier<128>,
         session_state: Option<SessionState>,
+        finally: Callback<()>,
     ) {
         let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
             Ok(token_endpoint) => token_endpoint.clone(),
             Err(err) => {
                 tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.");
+                finally.run(());
                 return;
             }
         };
 
-        self.exchange_code_for_token_action.dispatch((
-            token_endpoint,
-            code,
-            code_verifier,
-            session_state,
-        ));
+        self.exchange_code_for_token_action
+            .dispatch(ExchangeCodeForTokenInput {
+                token_endpoint,
+                auth_code,
+                code_verifier,
+                session_state,
+                finally,
+            });
     }
 
     pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
         self.trigger_refresh.run((on_refresh_error,));
     }
-    
+
     pub(crate) fn forget(&self) {
         self.set_token.set(None);
     }

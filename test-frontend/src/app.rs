@@ -3,10 +3,7 @@ use leptonic::components::prelude::*;
 use leptos::prelude::*;
 use leptos_keycloak_auth::components::{DebugState, EndSession, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::{
-    to_current_url, use_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions,
-    ValidationOptions,
-};
+use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions, expect_keycloak_auth, expect_authenticated};
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
 use leptos_routes::routes;
@@ -129,14 +126,12 @@ struct WhoAmIResponse {
 
 #[component]
 pub fn MyAccount() -> impl IntoView {
-    let auth = expect_context::<KeycloakAuth>();
-
-    let auth_state = auth.state_pretty_printer();
-
-    let authenticated = expect_context::<Authenticated>();
-
+    let auth = expect_keycloak_auth();
+    let authenticated = expect_authenticated();
+    
+    let auth_state = Signal::derive(move || auth.read().state_pretty_printer());
     let user_name = Signal::derive(move || authenticated.id_token_claims.read().name.clone());
-    let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
+    let logout_url = Signal::derive(move || auth.read().logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
 
     let who_am_i = LocalResource::new(move || {
@@ -166,14 +161,14 @@ pub fn MyAccount() -> impl IntoView {
         </Suspense>
 
         <pre id="auth-state" style="width: 100%; overflow: auto;">
-            { move || auth_state() }
+            { move || auth_state.read()() }
         </pre>
 
         <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
             "Logout"
         </LinkButton>
 
-        <Button attr:id="programmatic-logout" on_press=move |_| auth.end_session()>
+        <Button attr:id="programmatic-logout" on_press=move |_| auth.read().end_session()>
             "Programmatic Logout"
         </Button>
 
@@ -207,7 +202,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
             {Suspend::new(async move {
                 let port = keycloak_port.await;
                 let keycloak_server_url = format!("http://localhost:{port}");
-                let _auth = use_keycloak_auth(UseKeycloakAuthOptions {
+                let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
@@ -219,7 +214,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
                     },
                     advanced: Default::default(),
-                });
+                }, false);
                 view! {
                     <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
                         { children() }
@@ -234,23 +229,22 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
 
 #[component]
 pub fn Login() -> impl IntoView {
-    let auth = expect_context::<KeycloakAuth>();
-
-    let login_url_unavailable = Signal::derive(move || auth.login_url.get().is_none());
+    let auth = expect_keycloak_auth();
+    let login_url_unavailable = Signal::derive(move || auth.read().login_url.get().is_none());
     let login_url = Signal::derive(move || {
-        auth.login_url
+        auth.read().login_url
             .get()
             .map(|url| url.to_string())
             .unwrap_or_default()
     });
     let keycloak_port =
         Signal::derive(
-            move || match auth.login_url.get().and_then(|it| it.port()) {
+            move || match auth.read().login_url.get().and_then(|it| it.port()) {
                 None => "".to_owned(),
                 Some(port) => format!("{port}"),
             },
         );
-    let auth_state = auth.state_pretty_printer();
+    let auth_state = Signal::derive(move ||auth.read().state_pretty_printer());
 
     view! {
        <h1 id="unauthenticated">"Unauthenticated"</h1>
@@ -260,7 +254,7 @@ pub fn Login() -> impl IntoView {
         </div>
 
         <pre id="auth-state" style="width: 100%; overflow: auto;">
-            { move || auth_state() }
+            { move || auth_state.read()() }
         </pre>
 
         <LinkButton

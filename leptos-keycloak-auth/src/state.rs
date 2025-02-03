@@ -199,6 +199,27 @@ pub enum KeycloakAuthState {
     Authenticated(Authenticated),
 
     NotAuthenticated(NotAuthenticated),
+
+    /// The `Indeterminate` state is entered on two scenarios.
+    ///
+    /// 1. `use_keycloak_auth` was used on the server (in an SSR context).
+    /// 2. We run on the client, received an authorization code (through a redirect from Keycloak)
+    ///    but are still pending precessing this authorization code (exchanging it with a token).
+    ///
+    /// Having this additional state, in contrast to simple falling back to `NotAuthenticated` in
+    /// both cases just mentioned, allows our `<ShowWhenAuthenticated>` component to render
+    /// nothing (NOT using the fallback!) in such cases, which is desired as the fallback will
+    /// mostly show some "login page". Showing that always when not authenticated would lead to:
+    ///
+    /// 1. On SSR: Rendering "login page", even though the client will promptly replace it with the
+    ///    real/guarded content, leading to a small flicker of the page.
+    /// 1. On the client: After getting the redirect from Keycloak (containing the "to be processed"
+    ///    authorization code), showing the `fallback` of `<ShowWhenAuthenticated>` even though we
+    ///    assume that the guarded content will be shown in a few milliseconds,
+    ///    ultimately leading to a small flicker of the page.
+    ///
+    /// Therefore, `<ShowWhenAuthenticated>` simply renders nothing in this case.
+    Indeterminate,
 }
 
 impl KeycloakAuthState {
@@ -250,6 +271,9 @@ impl KeycloakAuthState {
                         last_error: last_error.read().as_ref().map(|err| format!("{:?}", err)),
                     }
                 )
+            }
+            KeycloakAuthState::Indeterminate => {
+                "KeycloakAuthState::Indeterminate".to_string()
             }
         }
     }

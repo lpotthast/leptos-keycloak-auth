@@ -18,7 +18,7 @@ impl LifeLeft {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidationOptions {
     pub expected_audiences: Option<Vec<String>>,
     pub expected_issuers: Option<Vec<String>>,
@@ -27,7 +27,7 @@ pub struct ValidationOptions {
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
 /// client ID, and other related data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UseKeycloakAuthOptions {
     /// Url of your keycloak instance, E.g. "https://localhost:8443/"
     pub keycloak_server_url: Url,
