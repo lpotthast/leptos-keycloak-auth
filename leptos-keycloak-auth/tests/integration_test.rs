@@ -16,7 +16,7 @@ mod common;
 mod frontend;
 mod keycloak_container;
 
-const DELAY_TEST_EXECUTION: bool = true;
+const DELAY_TEST_EXECUTION: bool = false;
 
 const USERNAME: &str = "bob@foo.bar";
 const PASSWORD: &str = "password";
@@ -110,11 +110,11 @@ async fn test_integration() {
 
         tracing::info!("Enter username.");
         let username_input = driver.find(By::Id("username")).await?;
-        username_input.send_keys("test-user-mail@foo.bar").await?;
+        username_input.send_keys(USERNAME).await?;
 
         tracing::info!("Enter password.");
         let password_input = driver.find(By::Id("password")).await?;
-        password_input.send_keys("password").await?;
+        password_input.send_keys(PASSWORD).await?;
 
         tracing::info!("Click 'Sign In'.");
         let sign_in_button = driver.find(By::Id("kc-login")).await?;

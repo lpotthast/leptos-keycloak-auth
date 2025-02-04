@@ -172,7 +172,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 |---------------|---------------------------|
 | 0.1           | 0.6                       |
 | 0.2           | 0.6                       |
-| 0.3 - 0.4     | 0.7                       |
+| 0.3 - 0.5     | 0.7                       |
 
 ## MSRV
 
