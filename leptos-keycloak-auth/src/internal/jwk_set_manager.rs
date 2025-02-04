@@ -33,14 +33,18 @@ impl JwkSetManager {
             use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
                 StorageType::Local,
                 "leptos_keycloak_auth__jwk_set_old",
-                UseStorageOptions::default().initial_value(None),
+                UseStorageOptions::default()
+                    .initial_value(None)
+                    .delay_during_hydration(false),
             );
 
         let (jwk_set, set_jwk_set, _remove_jwk_set_from_storage) =
             use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
                 StorageType::Local,
                 "leptos_keycloak_auth__jwk_set",
-                UseStorageOptions::default().initial_value(None),
+                UseStorageOptions::default()
+                    .initial_value(None)
+                    .delay_during_hydration(false),
             );
 
         // Defaults to `Duration::MAX` if no config is known yet.

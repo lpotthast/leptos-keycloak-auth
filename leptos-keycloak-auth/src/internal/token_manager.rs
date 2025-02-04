@@ -77,6 +77,7 @@ impl TokenManager {
                 "leptos_keycloak_auth__token",
                 UseStorageOptions::default()
                     .initial_value(None)
+                    .delay_during_hydration(false)
                     .on_error(|err| tracing::error!(?err, "token storage error")),
             );
         let handle_token = Callback::new(move |val| set_token.set(val));

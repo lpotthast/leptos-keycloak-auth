@@ -29,6 +29,8 @@ pub struct ValidationOptions {
 /// client ID, and other related data.
 #[derive(Debug, Clone)]
 pub struct UseKeycloakAuthOptions {
+    pub delay_during_hydration: bool,
+    
     /// Url of your keycloak instance, E.g. "https://localhost:8443/"
     pub keycloak_server_url: Url,
 
@@ -128,6 +130,7 @@ pub(crate) struct ValidationOptionsInternal {
 /// client ID, and other related data.
 #[derive(Debug, Clone)]
 pub(crate) struct Options {
+    pub(crate) delay_during_hydration: bool,
     pub(crate) keycloak_server_url: Url,
     pub(crate) realm: String,
     pub(crate) client_id: String,
@@ -141,6 +144,7 @@ pub(crate) struct Options {
 impl Options {
     pub(crate) fn new(options: UseKeycloakAuthOptions) -> Self {
         Self {
+            delay_during_hydration: options.delay_during_hydration,
             keycloak_server_url: options.keycloak_server_url,
             realm: options.realm,
             client_id: options.client_id,

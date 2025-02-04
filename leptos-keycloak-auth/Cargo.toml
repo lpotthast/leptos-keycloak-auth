@@ -13,6 +13,7 @@ keywords = ["leptos", "keyclaok", "auth", "oidc", "oauth"]
 include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [features]
+ssr = []
 internals = []
 
 [dependencies]

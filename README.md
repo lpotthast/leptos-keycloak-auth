@@ -35,10 +35,20 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
    [target.wasm32-unknown-unknown]
    rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
    ```
-3. Finally, add `leptos-keycloak-auth` as a dependency.
+3. Finally, add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
    leptos-keycloak-auth = "0.4"
+   
+   [features]
+   hydrate = [ 
+     #...
+   ]
+   ssr = [
+     "leptos/ssr",
+     "leptos-keycloak-auth/ssr",
+     #...
+   ]
    ```
 
 ## Usage

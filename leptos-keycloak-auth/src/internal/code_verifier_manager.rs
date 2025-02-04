@@ -28,6 +28,7 @@ impl CodeVerifierManager {
                 "leptos_keycloak_auth__code_verifier",
                 UseStorageOptions::default()
                     .initial_value(None)
+                    .delay_during_hydration(false)
                     .on_error(|err| tracing::error!(?err, "code_verifier storage error")),
             );
         if code_verifier.read_untracked().is_none() {

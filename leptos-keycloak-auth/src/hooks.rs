@@ -15,14 +15,12 @@ use leptos::context::provide_context;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_query};
 use leptos_router::NavigateOptions;
-use leptos_use::use_document;
 use std::ops::Deref;
 use time::OffsetDateTime;
 
 // TODO
-// TODO: Can we get rid of this signal....
-pub fn expect_keycloak_auth() -> Signal<KeycloakAuth> {
-    expect_context::<Signal<KeycloakAuth>>()
+pub fn expect_keycloak_auth() -> KeycloakAuth {
+    expect_context::<KeycloakAuth>()
 }
 
 // TODO
@@ -35,31 +33,22 @@ pub fn expect_authenticated() -> Authenticated {
 ///
 /// This HAS TO BE called from inside a `<Router>` component, as `use_keycloak_auth` requires
 /// reactive access to the current url of the page.
-pub fn init_keycloak_auth(options: UseKeycloakAuthOptions, delay: bool) -> Signal<KeycloakAuth> {
+pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
 
-    // TODO: ssr check or feature?
-    let is_ssr = use_document().is_none();
-
-    let auth = if is_ssr || delay {
-        ssr_stub(options.clone())
-    } else {
-        real(options.clone())
-    };
-
-    let (auth, set_auth) = signal(auth);
-
-    // We guarantee that the KeycloakAuth state is provided as context.
-    let as_signal: Signal<KeycloakAuth> = auth.into();
-    provide_context(as_signal);
-
-    if !is_ssr && delay {
-        request_animation_frame(move || {
-            set_auth.set(real(options));
-        });
+    #[cfg(feature = "ssr")]
+    {
+        let auth = ssr_stub(options);
+        provide_context(auth);
+        auth
     }
 
-    auth.into()
+    #[cfg(not(feature = "ssr"))]
+    {
+        let auth = real(options);
+        provide_context(auth);
+        auth
+    }
 }
 
 fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
@@ -316,6 +305,14 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
+    let (pending_hydration, set_pending_hydration) =
+        signal(options.read_value().delay_during_hydration);
+    if options.read_value().delay_during_hydration {
+        request_animation_frame(move || {
+            set_pending_hydration.set(false);
+        });
+    }
+
     // Auth state derived from token data or potential errors.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
@@ -324,7 +321,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         let has_token = token.read().is_some();
         let has_verified_and_decoded_id_token = verified_and_decoded_id_token.read().is_ok();
 
-        if pending_login.get() {
+        if pending_hydration.get() || pending_login.get() {
             tracing::trace!("Switching to: KeycloakAuthState::Indeterminate");
             KeycloakAuthState::Indeterminate
         } else if has_token

@@ -58,6 +58,7 @@ ssr = [
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
+    "leptos-keycloak-auth/ssr",
     "leptonic/ssr",
 ]
 
