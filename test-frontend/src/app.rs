@@ -206,7 +206,6 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                 let port = keycloak_port.await;
                 let keycloak_server_url = format!("http://localhost:{port}");
                 let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
-                    delay_during_hydration: false,
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
                     realm: "test-realm".to_owned(),
                     client_id: "test-client".to_owned(),
@@ -217,6 +216,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                         expected_audiences: Some(vec!["test-client".to_owned()]),
                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
                     },
+                    delay_during_hydration: false,
                     advanced: Default::default(),
                 });
                 view! {

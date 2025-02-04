@@ -1,22 +1,5 @@
-use crate::config::Options;
-use crate::error::KeycloakAuthError;
-use crate::internal::derived_urls::{DerivedUrlError, DerivedUrls};
-use crate::internal::token_manager::OnRefreshError;
-use crate::request::RequestError;
-use crate::response::CallbackResponse;
-use crate::token_claims::KeycloakIdTokenClaims;
-use crate::token_validation::KeycloakIdTokenClaimsError;
-use crate::{
-    code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
-    KeycloakAuthState, NotAuthenticated, RequestAction, UseKeycloakAuthOptions,
-};
-use leptos::callback::Callback;
-use leptos::context::provide_context;
+use crate::{Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
-use leptos_router::hooks::{use_navigate, use_query};
-use leptos_router::NavigateOptions;
-use std::ops::Deref;
-use time::OffsetDateTime;
 
 // TODO
 pub fn expect_keycloak_auth() -> KeycloakAuth {
@@ -51,7 +34,13 @@ pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     }
 }
 
+#[cfg(feature = "ssr")]
 fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+    use crate::config::Options;
+    use crate::internals::DerivedUrls;
+    use crate::{KeycloakAuth, KeycloakAuthState};
+    use leptos::prelude::*;
+
     let options = Options::new(options);
     let options = StoredValue::new(options);
 
@@ -98,14 +87,35 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             refresh_token_nearly_expired: Default::default(),
             refresh_token_expired: Default::default(),
             exchange_code_for_token_action: Action::new(|_| async move {}),
-            token_endpoint: Signal::from(Err(DerivedUrlError::NoConfig)),
-            remove_token_from_storage: StoredValue::new(Box::new(|| {})),
+            token_endpoint: Signal::from(Err(
+                crate::internal::derived_urls::DerivedUrlError::NoConfig,
+            )),
             trigger_refresh: Callback::new(|_| ()),
         },
     }
 }
 
+#[cfg(not(feature = "ssr"))]
 fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+    use crate::config::Options;
+    use crate::error::KeycloakAuthError;
+    use crate::internal::derived_urls::DerivedUrls;
+    use crate::internal::token_manager::OnRefreshError;
+    use crate::request::RequestError;
+    use crate::response::CallbackResponse;
+    use crate::token_claims::KeycloakIdTokenClaims;
+    use crate::token_validation::KeycloakIdTokenClaimsError;
+    use crate::{
+        internal, login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
+        NotAuthenticated, RequestAction,
+    };
+    use leptos::callback::Callback;
+    use leptos::prelude::*;
+    use leptos_router::hooks::{use_navigate, use_query};
+    use leptos_router::NavigateOptions;
+    use std::ops::Deref;
+    use time::OffsetDateTime;
+
     let options = Options::new(options);
     let options = StoredValue::new(options);
 
@@ -136,7 +146,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let url_state = use_query::<CallbackResponse>();
 
     let (pending_login, set_pending_login) = signal(false);
-    let unset_pending = Callback::from(move || {
+    let unset_pending_login = Callback::<(), ()>::from(move || {
         set_pending_login.set(false);
     });
 
@@ -155,7 +165,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         login_state.code.clone(),
                         code_mgr.code_verifier.get_untracked().expect("present"),
                         login_state.session_state.clone(),
-                        unset_pending,
+                        unset_pending_login,
                     );
 
                     // We provide Keycloak with a `post_login_redirect_url`. When the Keycloak
@@ -185,24 +195,20 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 CallbackResponse::SuccessfulLogout(logout_state) => {
                     tracing::trace!(?logout_state, "Logout successful");
 
-                    if logout_state.destroy_session {
-                        let set_token = token_mgr.set_token;
-                        let remove_token_from_storage = token_mgr.remove_token_from_storage;
-                        let set_code_verifier = code_mgr.set_code_verifier;
-                        tracing::trace!("Dropping all token data");
-                        set_token.set(None);
+                    // Note: This currently ignores the responses `destroy_session`.
 
-                        // Even though setting the None value will lead to `None` being written to storage
-                        // eventually, we will not completely rely on that side effect and explicitly remove
-                        // the data from storage.
-                        // We cannot only remove the data from storage, as we DEFINITELY WANT to trigger
-                        // reactive effects depending on the current token state.
-                        remove_token_from_storage.read_value()();
+                    // We have to use `request_animation_frame` here, as setting the token to `None` would
+                    // otherwise lead to an immediate execution of all reactive primitives depending on this.
+                    // This includes our `Authenticated` state (and all component trees rendered under
+                    // a `ShowWhenAuthenticated`). But `Authenticated` expects a token to be present!
+                    // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
+                    // no token is present) first!
+                    request_animation_frame(move || {
+                        token_mgr.forget();
 
                         // We should recreate the code_verifier to have a new one for the next login phase.
-                        #[allow(unused_qualifications)]
-                        set_code_verifier.set(Some(code_verifier::CodeVerifier::<128>::generate()));
-                    }
+                        code_mgr.regenerate();
+                    });
 
                     // We currently "remove" the query parameters by doing an extra, programmatic
                     // routing to the `post_logout_redirect_url`. That will just be handled by the

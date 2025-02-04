@@ -103,6 +103,12 @@
 //! }
 //! ```
 
+// Without this annotation, building with the `ssr` feature enabled would result in a multitude
+// of "unused" warnings, as the main entrypoint, `init_keycloak_auth`, just returns a stub
+// without touching much of this libraries code, leaving most code unused.
+// But we are fine with that.
+#![cfg_attr(feature = "ssr", allow(unused))]
+
 mod action;
 mod authenticated_client;
 mod code_verifier;

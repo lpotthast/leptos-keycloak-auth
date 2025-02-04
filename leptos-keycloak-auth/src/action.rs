@@ -64,7 +64,7 @@ pub(crate) fn create_retrieve_jwk_set_action(
     })
 }
 
-pub(crate) struct ExchangeCodeForTokenInput {
+pub struct ExchangeCodeForTokenInput {
     pub(crate) token_endpoint: TokenEndpoint,
     pub(crate) auth_code: AuthorizationCode,
     pub(crate) code_verifier: CodeVerifier<128>,

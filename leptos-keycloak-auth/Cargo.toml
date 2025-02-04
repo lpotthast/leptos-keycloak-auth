@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.81.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -47,7 +47,7 @@ keycloak = "26.1.0"
 testcontainers = "0.23.1"
 thirtyfour = "0.35.0"
 tokio = "1.43.0"
-tokio-process-tools = "0.3.1"
+tokio-process-tools = "0.4.0"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["full"] }
 tracing-subscriber = "0.3.19"
