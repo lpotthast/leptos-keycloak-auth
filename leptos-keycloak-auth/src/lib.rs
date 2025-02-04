@@ -57,6 +57,7 @@
 //!                         expected_audiences: Some(vec!["test-client".to_owned()]),
 //!                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
 //!                     },
+//!                     delay_during_hydration: false,
 //!                     advanced: Default::default(),
 //!                 });
 //!                 view! {
@@ -83,7 +84,7 @@
 //!     view! {
 //!        <h1>"Unauthenticated"</h1>
 //!
-//!         <a href=move || login_url.get() disabled=login_url_unavailable>
+//!         <a href=move || login_url.get() aria_disabled=login_url_unavailable>
 //!             "Log in"
 //!         </a>
 //!     }
