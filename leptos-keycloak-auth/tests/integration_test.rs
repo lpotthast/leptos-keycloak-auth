@@ -146,7 +146,7 @@ async fn test_integration() {
         assert_that(greeting.text().await?).is_equal_to("Hello, firstName lastName!");
 
         let username = driver.find(By::Id("username")).await?;
-        assert_that(username.text().await?).is_equal_to("test-user-mail@foo.bar");
+        assert_that(username.text().await?).is_equal_to(USERNAME);
         let keycloak_uuid = driver.find(By::Id("keycloak_uuid")).await?;
         assert_that(keycloak_uuid.text().await?)
             .is_equal_to("a7060488-c80b-40c5-83e2-d7000bf9738e");
