@@ -18,7 +18,7 @@ impl LifeLeft {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidationOptions {
     pub expected_audiences: Option<Vec<String>>,
     pub expected_issuers: Option<Vec<String>>,
@@ -27,7 +27,7 @@ pub struct ValidationOptions {
 /// Represents authentication parameters required for initializing the `Auth`
 /// structure. These parameters include authentication and token endpoints,
 /// client ID, and other related data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UseKeycloakAuthOptions {
     /// Url of your keycloak instance, E.g. "https://localhost:8443/"
     pub keycloak_server_url: Url,
@@ -56,6 +56,17 @@ pub struct UseKeycloakAuthOptions {
 
     /// Configuration for the validation of the ID token.
     pub id_token_validation: ValidationOptions,
+
+    /// Set this to true when using SSR.
+    /// This allows the client to offset initialization (using `request_animation_frame`) to
+    /// after hydration of the page finished.
+    /// Without this set to `true`, you will most-likely experience hydration errors, as the server
+    /// can (for now) only determine the state to be `Indeterminate`. Always.
+    /// But the client might, because you are already authenticated and still have a valid token,
+    /// resolve to state `Authenticated`, resulting in your content gated by `ShenWhenAuthenticated`
+    /// being rendered immediately, obviously resulting in a different HTML than what the server
+    /// sent, and therefore producing the hydration error.
+    pub delay_during_hydration: bool,
 
     /// It is recommended to just use `Default::default()` here.
     pub advanced: AdvancedOptions,
@@ -135,6 +146,7 @@ pub(crate) struct Options {
     pub(crate) post_logout_redirect_url: RwSignal<Url>,
     pub(crate) scope: Vec<String>,
     pub(crate) id_token_validation: ValidationOptionsInternal,
+    pub(crate) delay_during_hydration: bool,
     pub(crate) advanced: AdvancedOptions,
 }
 
@@ -151,6 +163,7 @@ impl Options {
                 expected_audiences: RwSignal::new(options.id_token_validation.expected_audiences),
                 expected_issuers: RwSignal::new(options.id_token_validation.expected_issuers),
             },
+            delay_during_hydration: options.delay_during_hydration,
             advanced: options.advanced,
         }
     }

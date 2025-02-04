@@ -1,30 +1,120 @@
-use crate::config::Options;
-use crate::error::KeycloakAuthError;
-use crate::internal::derived_urls::DerivedUrls;
-use crate::internal::token_manager::OnRefreshError;
-use crate::request::RequestError;
-use crate::response::CallbackResponse;
-use crate::token_claims::KeycloakIdTokenClaims;
-use crate::token_validation::KeycloakIdTokenClaimsError;
-use crate::{
-    code_verifier, internal, login, logout, token_validation, Authenticated, KeycloakAuth,
-    KeycloakAuthState, NotAuthenticated, RequestAction, UseKeycloakAuthOptions,
-};
-use leptos::callback::Callback;
-use leptos::context::provide_context;
+use crate::{Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
-use leptos_router::hooks::{use_navigate, use_query};
-use leptos_router::NavigateOptions;
-use std::ops::Deref;
-use time::OffsetDateTime;
+
+// TODO
+pub fn expect_keycloak_auth() -> KeycloakAuth {
+    expect_context::<KeycloakAuth>()
+}
+
+// TODO
+pub fn expect_authenticated() -> Authenticated {
+    expect_context::<Authenticated>()
+}
 
 /// Initializes a new `KeycloakAuth` instance, the authentication handler responsible for handling
 /// user authentication and token management, with the provided authentication parameters.
 ///
 /// This HAS TO BE called from inside a `<Router>` component, as `use_keycloak_auth` requires
 /// reactive access to the current url of the page.
-pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
+
+    #[cfg(feature = "ssr")]
+    {
+        let auth = ssr_stub(options);
+        provide_context(auth);
+        auth
+    }
+
+    #[cfg(not(feature = "ssr"))]
+    {
+        let auth = real(options);
+        provide_context(auth);
+        auth
+    }
+}
+
+#[cfg(feature = "ssr")]
+fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+    use crate::config::Options;
+    use crate::internals::DerivedUrls;
+    use crate::{KeycloakAuth, KeycloakAuthState};
+    use leptos::prelude::*;
+
+    let options = Options::new(options);
+    let options = StoredValue::new(options);
+
+    KeycloakAuth {
+        options,
+        derived_urls: DerivedUrls::new(Signal::from(None)),
+        login_url: Signal::from(None),
+        logout_url: Signal::from(None),
+        state: Signal::from(KeycloakAuthState::Indeterminate),
+        is_authenticated: Signal::from(false),
+        oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager {
+            oidc_config: Default::default(),
+            oidc_config_age: Default::default(),
+            oidc_config_expires_in: Default::default(),
+            oidc_config_too_old: Default::default(),
+        },
+        jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager {
+            jwk_set: Default::default(),
+            jwk_set_old: Default::default(),
+            jwk_set_age: Default::default(),
+            jwk_set_expires_in: Default::default(),
+            jwk_set_too_old: Default::default(),
+        },
+        code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager {
+            code_verifier: Default::default(),
+            set_code_verifier: {
+                let (_, w) = signal(None);
+                w
+            },
+            code_challenge: Memo::new(|_| None),
+        },
+        token_manager: crate::internal::token_manager::TokenManager {
+            token: Default::default(),
+            set_token: {
+                let (_, w) = signal(None);
+                w
+            },
+            access_token_lifetime: Default::default(),
+            access_token_expires_in: Default::default(),
+            access_token_nearly_expired: Default::default(),
+            access_token_expired: Default::default(),
+            refresh_token_lifetime: Default::default(),
+            refresh_token_expires_in: Default::default(),
+            refresh_token_nearly_expired: Default::default(),
+            refresh_token_expired: Default::default(),
+            exchange_code_for_token_action: Action::new(|_| async move {}),
+            token_endpoint: Signal::from(Err(
+                crate::internal::derived_urls::DerivedUrlError::NoConfig,
+            )),
+            trigger_refresh: Callback::new(|_| ()),
+        },
+    }
+}
+
+#[cfg(not(feature = "ssr"))]
+fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
+    use crate::config::Options;
+    use crate::error::KeycloakAuthError;
+    use crate::internal::derived_urls::DerivedUrls;
+    use crate::internal::token_manager::OnRefreshError;
+    use crate::request::RequestError;
+    use crate::response::CallbackResponse;
+    use crate::token_claims::KeycloakIdTokenClaims;
+    use crate::token_validation::KeycloakIdTokenClaimsError;
+    use crate::{
+        internal, login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
+        NotAuthenticated, RequestAction,
+    };
+    use leptos::callback::Callback;
+    use leptos::prelude::*;
+    use leptos_router::hooks::{use_navigate, use_query};
+    use leptos_router::NavigateOptions;
+    use std::ops::Deref;
+    use time::OffsetDateTime;
 
     let options = Options::new(options);
     let options = StoredValue::new(options);
@@ -55,6 +145,11 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();
 
+    let (pending_login, set_pending_login) = signal(false);
+    let unset_pending_login = Callback::<(), ()>::from(move || {
+        set_pending_login.set(false);
+    });
+
     // Handle changes in our url parameters.
     // THIS EFFECT MAINLY DRIVES THIS SYSTEM!
     Effect::new(move |_| {
@@ -62,6 +157,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             Ok(state) => match state {
                 CallbackResponse::SuccessfulLogin(login_state) => {
                     tracing::trace!(?login_state, "Login successful");
+                    set_pending_login.set(true);
 
                     // We assume that last_code only changes when we receive a "new" / not-seen-before code.
                     // This means we can safely call the token exchange here, as we will do this only once per code we see.
@@ -69,6 +165,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         login_state.code.clone(),
                         code_mgr.code_verifier.get_untracked().expect("present"),
                         login_state.session_state.clone(),
+                        unset_pending_login,
                     );
 
                     // We provide Keycloak with a `post_login_redirect_url`. When the Keycloak
@@ -98,33 +195,20 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 CallbackResponse::SuccessfulLogout(logout_state) => {
                     tracing::trace!(?logout_state, "Logout successful");
 
-                    if logout_state.destroy_session {
-                        // We have to use `request_animation_frame` here, as setting the token to `None` would
-                        // otherwise lead to an immediate execution of all reactive primitives depending on this.
-                        // This includes our `Authenticated` state (and all component trees rendered under
-                        // a `ShowWhenAuthenticated`). But `Authenticated` expects a token to be present!
-                        // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
-                        // no token is present) first!
-                        let set_token = token_mgr.set_token;
-                        let remove_token_from_storage = token_mgr.remove_token_from_storage;
-                        let set_code_verifier = code_mgr.set_code_verifier;
-                        request_animation_frame(move || {
-                            tracing::trace!("Dropping all token data");
-                            set_token.set(None);
+                    // Note: This currently ignores the responses `destroy_session`.
 
-                            // Even though setting the None value will lead to `None` being written to storage
-                            // eventually, we will not completely rely on that side effect and explicitly remove
-                            // the data from storage.
-                            // We cannot only remove the data from storage, as we DEFINITELY WANT to trigger
-                            // reactive effects depending on the current token state.
-                            remove_token_from_storage.read_value()();
+                    // We have to use `request_animation_frame` here, as setting the token to `None` would
+                    // otherwise lead to an immediate execution of all reactive primitives depending on this.
+                    // This includes our `Authenticated` state (and all component trees rendered under
+                    // a `ShowWhenAuthenticated`). But `Authenticated` expects a token to be present!
+                    // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
+                    // no token is present) first!
+                    request_animation_frame(move || {
+                        token_mgr.forget();
 
-                            // We should recreate the code_verifier to have a new one for the next login phase.
-                            #[allow(unused_qualifications)]
-                            set_code_verifier
-                                .set(Some(code_verifier::CodeVerifier::<128>::generate()));
-                        });
-                    }
+                        // We should recreate the code_verifier to have a new one for the next login phase.
+                        code_mgr.regenerate();
+                    });
 
                     // We currently "remove" the query parameters by doing an extra, programmatic
                     // routing to the `post_logout_redirect_url`. That will just be handled by the
@@ -169,6 +253,8 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             .expected_issuers
             .get();
 
+        let result;
+
         let first_try = token_validation::validate(
             token_mgr.token.get(),
             jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
@@ -177,23 +263,26 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         );
 
         if first_try.is_ok() {
-            return first_try;
+            result = first_try
+        } else {
+            // If validation with the current JWK set fails, we should not try to validate with a
+            // missing old set. This would just lest to a `NoJwkSet` error being ultimately stored,
+            // hiding the real reason why validation failed in the first place.
+            if jwk_set_mgr.jwk_set_old.read().is_some() {
+                let second_try = token_validation::validate(
+                    token_mgr.token.get(),
+                    jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
+                    expected_audiences.as_deref(),
+                    expected_issuers.as_deref(),
+                );
+                result = second_try;
+            } else {
+                result = first_try;
+            }
         }
 
-        // If validation with the current JWK set fails, we should not try to validate with a
-        // missing old set. This would just lest to a `NoJwkSet` error being ultimately stored,
-        // hiding the real reason why validation failed in the first place.
-        if jwk_set_mgr.jwk_set_old.read().is_some() {
-            let second_try = token_validation::validate(
-                token_mgr.token.get(),
-                jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
-                expected_audiences.as_deref(),
-                expected_issuers.as_deref(),
-            );
-            return second_try;
-        }
-
-        first_try
+        tracing::trace!(?result, "ID token validation result");
+        result
     });
 
     let (last_refresh_from_error, set_last_refresh_from_error) =
@@ -222,6 +311,14 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
+    let (pending_hydration, set_pending_hydration) =
+        signal(options.read_value().delay_during_hydration);
+    if options.read_value().delay_during_hydration {
+        request_animation_frame(move || {
+            set_pending_hydration.set(false);
+        });
+    }
+
     // Auth state derived from token data or potential errors.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
@@ -230,7 +327,14 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         let has_token = token.read().is_some();
         let has_verified_and_decoded_id_token = verified_and_decoded_id_token.read().is_ok();
 
-        if has_token && has_verified_and_decoded_id_token && !token_mgr.access_token_expired.get() {
+        if pending_hydration.get() || pending_login.get() {
+            tracing::trace!("Switching to: KeycloakAuthState::Indeterminate");
+            KeycloakAuthState::Indeterminate
+        } else if has_token
+            && has_verified_and_decoded_id_token
+            && !token_mgr.access_token_expired.get()
+        {
+            tracing::trace!("Switching to: KeycloakAuthState::Authenticated");
             KeycloakAuthState::Authenticated(Authenticated {
                 access_token: Signal::derive(move || {
                     token
@@ -245,6 +349,7 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 auth_error_reporter,
             })
         } else {
+            tracing::trace!("Switching to: KeycloakAuthState::NotAuthenticated");
             KeycloakAuthState::NotAuthenticated(NotAuthenticated {
                 has_token_data: Signal::derive(move || token.get().is_some()),
                 last_id_token_error: Signal::derive(move || {
@@ -268,21 +373,19 @@ pub fn use_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             end_session_endpoint,
             token_mgr.token,
             options,
+            pending_hydration.into(),
         )
         .into(),
         state: state.into(),
         is_authenticated: Signal::derive(move || match state.read().deref() {
             KeycloakAuthState::Authenticated(_) => true,
-            KeycloakAuthState::NotAuthenticated { .. } => false,
+            KeycloakAuthState::NotAuthenticated { .. } | KeycloakAuthState::Indeterminate => false,
         }),
         oidc_config_manager: oidc_mgr,
         jwk_set_manager: jwk_set_mgr,
         code_verifier_manager: code_mgr,
         token_manager: token_mgr,
     };
-
-    // We guarantee that the KeycloakAuth state is provided as context.
-    provide_context(auth);
 
     auth
 }

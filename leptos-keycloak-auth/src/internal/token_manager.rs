@@ -1,3 +1,4 @@
+use crate::action::ExchangeCodeForTokenInput;
 use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
@@ -32,17 +33,8 @@ pub struct TokenManager {
     pub refresh_token_expires_in: Signal<StdDuration>,
     pub refresh_token_nearly_expired: Signal<bool>,
     pub refresh_token_expired: Signal<bool>,
-    pub exchange_code_for_token_action: Action<
-        (
-            TokenEndpoint,
-            AuthorizationCode,
-            CodeVerifier<128>,
-            Option<SessionState>,
-        ),
-        (),
-    >,
+    pub exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
     pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
-    pub remove_token_from_storage: StoredValue<Box<dyn Fn() + Send + Sync>>,
     pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
 }
 
@@ -67,7 +59,6 @@ impl Debug for TokenManager {
             .field("refresh_token_expired", &self.refresh_token_expired)
             .field("exchange_code_for_token_action", &"...")
             .field("token_endpoint", &self.token_endpoint)
-            .field("remove_token_from_storage", &self.remove_token_from_storage)
             .finish()
     }
 }
@@ -78,12 +69,13 @@ impl TokenManager {
         handle_req_error: Callback<Option<RequestError>>,
         token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     ) -> Self {
-        let (token, set_token, remove_token_from_storage) =
+        let (token, set_token, _remove_token_from_storage) =
             use_storage_with_options::<Option<TokenData>, JsonSerdeCodec>(
                 StorageType::Local,
                 "leptos_keycloak_auth__token",
                 UseStorageOptions::default()
                     .initial_value(None)
+                    .delay_during_hydration(false)
                     .on_error(|err| tracing::error!(?err, "token storage error")),
             );
         let handle_token = Callback::new(move |val| set_token.set(val));
@@ -92,7 +84,6 @@ impl TokenManager {
         let refresh_token_action =
             action::create_refresh_token_action(options, handle_token, handle_req_error);
 
-        let remover = remove_token_from_storage.clone();
         let trigger_refresh = Callback::new(move |(on_refresh_error,)| {
             let token_endpoint = match token_endpoint.read_untracked().as_ref() {
                 Ok(it) => it.clone(),
@@ -115,7 +106,6 @@ impl TokenManager {
                 }
             };
 
-            let remover_clone = remover.clone();
             let on_refresh_error = Callback::new(move |(err,)| {
                 match on_refresh_error {
                     OnRefreshError::DoNothing => {
@@ -139,14 +129,12 @@ impl TokenManager {
                                     && error_response.error_description == "Invalid refresh token"
                                 {
                                     set_token.set(None);
-                                    remover_clone();
                                 }
                             }
                         }
                     }
                     OnRefreshError::DropToken => {
                         set_token.set(None);
-                        remover_clone();
                     }
                 }
                 err
@@ -256,7 +244,6 @@ impl TokenManager {
             }
         });
 
-        let token_remove = remove_token_from_storage.clone();
         Effect::new(move |_| {
             let access_token_expired = access_token_expired.get();
             let refresh_token_expired = refresh_token_expired.get();
@@ -264,7 +251,6 @@ impl TokenManager {
             if access_token_expired && refresh_token_expired {
                 // The token became unusable and can safely be forgotten.
                 set_token.set(None);
-                token_remove();
             }
         });
 
@@ -285,7 +271,6 @@ impl TokenManager {
                 handle_req_error,
             ),
             token_endpoint,
-            remove_token_from_storage: StoredValue::new(Box::new(remove_token_from_storage)),
             trigger_refresh,
         }
     }
@@ -293,31 +278,36 @@ impl TokenManager {
     /// Note: This silently errors if no token_endpoint is known yet.
     pub(crate) fn exchange_code_for_token(
         &self,
-        code: AuthorizationCode,
+        auth_code: AuthorizationCode,
         code_verifier: CodeVerifier<128>,
         session_state: Option<SessionState>,
+        finally: Callback<()>,
     ) {
         let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
             Ok(token_endpoint) => token_endpoint.clone(),
             Err(err) => {
                 tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.");
+                finally.run(());
                 return;
             }
         };
 
-        self.exchange_code_for_token_action.dispatch((
-            token_endpoint,
-            code,
-            code_verifier,
-            session_state,
-        ));
+        self.exchange_code_for_token_action
+            .dispatch(ExchangeCodeForTokenInput {
+                token_endpoint,
+                auth_code,
+                code_verifier,
+                session_state,
+                finally,
+            });
     }
 
     pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
         self.trigger_refresh.run((on_refresh_error,));
     }
-    
+
     pub(crate) fn forget(&self) {
+        tracing::trace!("Dropping all token data");
         self.set_token.set(None);
     }
 }

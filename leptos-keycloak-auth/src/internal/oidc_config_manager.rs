@@ -30,7 +30,9 @@ impl OidcConfigManager {
             use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonSerdeCodec>(
                 StorageType::Local,
                 "leptos_keycloak_auth__oidc_config",
-                UseStorageOptions::default().initial_value(None),
+                UseStorageOptions::default()
+                    .initial_value(None)
+                    .delay_during_hydration(false),
             );
 
         // Defaults to `Duration::MAX` if no config is known yet.

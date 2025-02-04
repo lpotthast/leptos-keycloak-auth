@@ -1,3 +1,4 @@
+use crate::code_verifier;
 use crate::code_verifier::{CodeChallenge, CodeVerifier};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
@@ -28,6 +29,7 @@ impl CodeVerifierManager {
                 "leptos_keycloak_auth__code_verifier",
                 UseStorageOptions::default()
                     .initial_value(None)
+                    .delay_during_hydration(false)
                     .on_error(|err| tracing::error!(?err, "code_verifier storage error")),
             );
         if code_verifier.read_untracked().is_none() {
@@ -46,5 +48,11 @@ impl CodeVerifierManager {
             set_code_verifier,
             code_challenge,
         }
+    }
+
+    pub(crate) fn regenerate(&self) {
+        #[allow(unused_qualifications)]
+        self.set_code_verifier
+            .set(Some(code_verifier::CodeVerifier::<128>::generate()));
     }
 }

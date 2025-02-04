@@ -1,5 +1,5 @@
-use crate::{KeycloakAuth, KeycloakAuthState};
-use leptos::either::Either;
+use crate::{expect_keycloak_auth, KeycloakAuth, KeycloakAuthState};
+use leptos::either::EitherOf3;
 use leptos::prelude::*;
 
 /// A transparent component representing authenticated user status.
@@ -14,19 +14,20 @@ pub fn ShowWhenAuthenticated<C>(
 where
     C: IntoView + 'static,
 {
-    let auth = expect_context::<KeycloakAuth>();
+    let auth = expect_keycloak_auth();
 
     let children = children.into_inner();
 
     move || match auth.state.get() {
         KeycloakAuthState::Authenticated(authenticated) => {
             provide_context(authenticated);
-            Either::Left(children())
+            EitherOf3::A(children())
         }
         KeycloakAuthState::NotAuthenticated(_not_authenticated) => {
             let _ = take_context::<crate::Authenticated>();
-            Either::Right(fallback.run())
+            EitherOf3::B(fallback.run())
         }
+        KeycloakAuthState::Indeterminate => EitherOf3::C(()),
     }
 }
 
@@ -57,7 +58,7 @@ pub fn EndSession(
 #[cfg(feature = "internals")]
 #[component]
 pub fn DebugState() -> impl IntoView {
-    let auth = expect_context::<KeycloakAuth>();
+    let auth = expect_keycloak_auth();
 
     view! {
         <div style="width: 100%;">

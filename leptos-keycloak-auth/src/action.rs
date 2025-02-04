@@ -64,55 +64,50 @@ pub(crate) fn create_retrieve_jwk_set_action(
     })
 }
 
+pub struct ExchangeCodeForTokenInput {
+    pub(crate) token_endpoint: TokenEndpoint,
+    pub(crate) auth_code: AuthorizationCode,
+    pub(crate) code_verifier: CodeVerifier<128>,
+    pub(crate) session_state: Option<SessionState>,
+    pub(crate) finally: Callback<()>,
+}
+
 pub(crate) fn create_exchange_code_for_token_action(
     options: StoredValue<Options>,
     set_token: Callback<Option<TokenData>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<
-    (
-        TokenEndpoint,
-        AuthorizationCode,
-        CodeVerifier<128>,
-        Option<SessionState>,
-    ),
-    (),
-> {
-    Action::new(
-        move |(token_endpoint, code, verifier, session_state): &(
-            TokenEndpoint,
-            AuthorizationCode,
-            CodeVerifier<128>,
-            Option<SessionState>,
-        )| {
-            let token_endpoint = token_endpoint.clone();
-            let client_id = options.read_value().client_id.clone();
-            let redirect_uri = options.read_value().post_login_redirect_url;
-            let code = code.clone();
-            let code_verifier = verifier.code_verifier().to_owned();
-            let session_state = session_state.clone();
-            async move {
-                leptos::task::spawn_local(async move {
-                    let result = request::exchange_code_for_token(
-                        token_endpoint,
-                        &client_id,
-                        redirect_uri.read_untracked().as_ref(),
-                        &code,
-                        &code_verifier,
-                        session_state.as_deref(),
-                    )
-                    .await;
-                    match result {
-                        Ok(token) => {
-                            set_token.run(Some(token));
-                        }
-                        Err(err) => {
-                            set_req_error.run(Some(err));
-                        }
+) -> Action<ExchangeCodeForTokenInput, ()> {
+    Action::new(move |input: &ExchangeCodeForTokenInput| {
+        let token_endpoint = input.token_endpoint.clone();
+        let client_id = options.read_value().client_id.clone();
+        let redirect_uri = options.read_value().post_login_redirect_url;
+        let auth_code = input.auth_code.clone();
+        let code_verifier = input.code_verifier.code_verifier().to_owned();
+        let session_state = input.session_state.clone();
+        let finally = input.finally;
+        async move {
+            leptos::task::spawn_local(async move {
+                let result = request::exchange_code_for_token(
+                    token_endpoint,
+                    &client_id,
+                    redirect_uri.read_untracked().as_ref(),
+                    &auth_code,
+                    &code_verifier,
+                    session_state.as_deref(),
+                )
+                .await;
+                match result {
+                    Ok(token) => {
+                        set_token.run(Some(token));
                     }
-                });
-            }
-        },
-    )
+                    Err(err) => {
+                        set_req_error.run(Some(err));
+                    }
+                }
+                finally.run(());
+            });
+        }
+    })
 }
 
 #[allow(clippy::type_complexity)]
@@ -120,7 +115,14 @@ pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
     set_token: Callback<Option<TokenData>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<(TokenEndpoint, RefreshToken, Callback<(RequestError,), RequestError>), ()> {
+) -> Action<
+    (
+        TokenEndpoint,
+        RefreshToken,
+        Callback<(RequestError,), RequestError>,
+    ),
+    (),
+> {
     Action::new(
         move |(token_endpoint, refresh_token, on_refresh_error): &(
             TokenEndpoint,

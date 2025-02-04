@@ -110,11 +110,11 @@ async fn test_integration() {
 
         tracing::info!("Enter username.");
         let username_input = driver.find(By::Id("username")).await?;
-        username_input.send_keys("test-user-mail@foo.bar").await?;
+        username_input.send_keys(USERNAME).await?;
 
         tracing::info!("Enter password.");
         let password_input = driver.find(By::Id("password")).await?;
-        password_input.send_keys("password").await?;
+        password_input.send_keys(PASSWORD).await?;
 
         tracing::info!("Click 'Sign In'.");
         let sign_in_button = driver.find(By::Id("kc-login")).await?;
@@ -146,7 +146,7 @@ async fn test_integration() {
         assert_that(greeting.text().await?).is_equal_to("Hello, firstName lastName!");
 
         let username = driver.find(By::Id("username")).await?;
-        assert_that(username.text().await?).is_equal_to("test-user-mail@foo.bar");
+        assert_that(username.text().await?).is_equal_to(USERNAME);
         let keycloak_uuid = driver.find(By::Id("keycloak_uuid")).await?;
         assert_that(keycloak_uuid.text().await?)
             .is_equal_to("a7060488-c80b-40c5-83e2-d7000bf9738e");
