@@ -367,6 +367,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             end_session_endpoint,
             token_mgr.token,
             options,
+            pending_hydration.into(),
         )
         .into(),
         state: state.into(),
