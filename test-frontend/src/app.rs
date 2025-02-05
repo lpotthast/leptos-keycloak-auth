@@ -70,6 +70,7 @@ pub fn App() -> impl IntoView {
                 align-items: center;
                 padding: 1em;
                 background-color: antiquewhite;
+                overflow: auto;
             "#>
                 <Router>
                     <Routes fallback=|| view! { "Page not found." }>
