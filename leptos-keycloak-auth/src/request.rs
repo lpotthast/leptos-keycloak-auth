@@ -2,6 +2,7 @@ use crate::{
     oidc::OidcConfig,
     response::{ErrorResponse, TokenResponse},
     token::TokenData,
+    DiscoveryEndpoint,
 };
 use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};
@@ -65,6 +66,7 @@ pub(crate) async fn exchange_code_for_token(
     code: &str,
     code_verifier: &str,
     session_state: Option<&str>,
+    discovery_endpoint: DiscoveryEndpoint,
 ) -> Result<TokenData, RequestError> {
     let mut params: HashMap<&str, &str> = HashMap::new();
     params.insert("grant_type", "authorization_code");
@@ -75,25 +77,27 @@ pub(crate) async fn exchange_code_for_token(
     if let Some(state) = session_state {
         params.insert("state", state);
     }
-    request_token(token_endpoint, &params).await
+    request_token(token_endpoint, &params, discovery_endpoint).await
 }
 
 pub(crate) async fn refresh_token(
     token_endpoint: impl IntoUrl,
     client_id: &str,
     refresh_token: &str,
+    discovery_endpoint: DiscoveryEndpoint,
 ) -> Result<TokenData, RequestError> {
     let params = [
         ("grant_type", "refresh_token"),
         ("client_id", client_id),
         ("refresh_token", refresh_token),
     ];
-    request_token(token_endpoint, &params).await
+    request_token(token_endpoint, &params, discovery_endpoint).await
 }
 
 async fn request_token<T: Serialize + ?Sized>(
     token_endpoint: impl IntoUrl,
     params: &T,
+    discovery_endpoint: DiscoveryEndpoint,
 ) -> Result<TokenData, RequestError> {
     match reqwest::Client::new()
         .post(token_endpoint)
@@ -105,7 +109,10 @@ async fn request_token<T: Serialize + ?Sized>(
         .await
         .context(DecodeSnafu {})?
     {
-        TokenResponse::Success(success) => Ok(success.into()),
+        TokenResponse::Success(success_token_response) => Ok(TokenData::from_token_response(
+            success_token_response,
+            discovery_endpoint,
+        )),
         TokenResponse::Error(error) => Err(ErrResponseSnafu {
             error_response: error,
         }

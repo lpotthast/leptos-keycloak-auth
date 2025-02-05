@@ -53,13 +53,25 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         is_authenticated: Signal::from(false),
         oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager {
             oidc_config: Default::default(),
+            set_oidc_config: {
+                let (_, w) = signal(None);
+                w
+            },
             oidc_config_age: Default::default(),
             oidc_config_expires_in: Default::default(),
             oidc_config_too_old: Default::default(),
         },
         jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager {
             jwk_set: Default::default(),
+            set_jwk_set: {
+                let (_, w) = signal(None);
+                w
+            },
             jwk_set_old: Default::default(),
+            set_jwk_set_old: {
+                let (_, w) = signal(None);
+                w
+            },
             jwk_set_age: Default::default(),
             jwk_set_expires_in: Default::default(),
             jwk_set_too_old: Default::default(),
@@ -141,6 +153,37 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         internal::token_manager::TokenManager::new(options, handle_req_error, token_endpoint);
 
     let code_mgr = internal::code_verifier_manager::CodeVerifierManager::new();
+
+    // Should our discovery endpoint differ from already known data, drop that data immediately.
+    Effect::new(move |_| {
+        let de = options.read_value().discovery_endpoint();
+        if let Some(&ref source) = oidc_mgr.oidc_config.read().as_ref().as_ref().map(|it| &it.source) {
+            if source != &de {
+                tracing::info!("Current OIDC config came from old discovery endpoint. Dropping it.");
+
+                request_animation_frame(move || {
+                    oidc_mgr.forget();
+                });
+            }
+        }
+        if let Some(&ref source) = jwk_set_mgr.jwk_set.read().as_ref().as_ref().map(|it| &it.source) {
+            if source != &de {
+                tracing::info!("Current JWK set came from old discovery endpoint. Dropping it.");
+                request_animation_frame(move || {
+                    jwk_set_mgr.forget();
+                });
+            }
+        }
+        if let Some(&ref source) = token_mgr.token.read().as_ref().as_ref().map(|it| &it.source) {
+            if source != &de {
+                tracing::info!("Current token came from old discovery endpoint. Dropping it.");
+
+                request_animation_frame(move || {
+                    token_mgr.forget();
+                });
+            }
+        }
+    });
 
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();

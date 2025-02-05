@@ -205,6 +205,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let port = keycloak_port.await;
+                tracing::info!(port, "Initializing Keycloak auth...");
                 let keycloak_server_url = format!("http://localhost:{port}");
                 let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),

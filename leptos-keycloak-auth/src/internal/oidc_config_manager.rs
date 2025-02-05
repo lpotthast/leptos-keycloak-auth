@@ -13,6 +13,7 @@ use time::OffsetDateTime;
 #[derive(Debug, Clone, Copy)]
 pub struct OidcConfigManager {
     pub oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
+    pub(crate) set_oidc_config: WriteSignal<Option<OidcConfigWithTimestamp>>,
     #[allow(unused)]
     pub oidc_config_age: Signal<StdDuration>,
     #[allow(unused)]
@@ -83,6 +84,7 @@ impl OidcConfigManager {
 
         Self {
             oidc_config,
+            set_oidc_config,
             oidc_config_age: oidc_config_age.into(),
             oidc_config_expires_in: oidc_config_expires_in.into(),
             oidc_config_too_old: oidc_config_too_old.into(),
@@ -91,5 +93,9 @@ impl OidcConfigManager {
 
     pub(crate) fn derive_urls(&self) -> DerivedUrls {
         DerivedUrls::new(self.oidc_config)
+    }
+
+    pub(crate) fn forget(&self) {
+        self.set_oidc_config.set(None);
     }
 }

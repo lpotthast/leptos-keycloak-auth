@@ -14,7 +14,9 @@ use time::OffsetDateTime;
 #[derive(Debug, Clone, Copy)]
 pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
+    pub set_jwk_set: WriteSignal<Option<JwkSetWithTimestamp>>,
     pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
+    pub set_jwk_set_old: WriteSignal<Option<JwkSetWithTimestamp>>,
     #[allow(unused)]
     pub jwk_set_age: Signal<StdDuration>,
     #[allow(unused)]
@@ -123,7 +125,10 @@ impl JwkSetManager {
             if jwk_set_too_old.get() {
                 match jwk_set_endpoint.read().as_ref() {
                     Ok(jwk_set_endpoint) => {
-                        retrieve_jwk_set_action.dispatch(jwk_set_endpoint.clone());
+                        retrieve_jwk_set_action.dispatch((
+                            jwk_set_endpoint.clone(),
+                            options.read_value().discovery_endpoint(),
+                        ));
                     }
                     Err(err) => {
                         tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...")
@@ -134,10 +139,17 @@ impl JwkSetManager {
 
         Self {
             jwk_set,
+            set_jwk_set,
             jwk_set_old,
+            set_jwk_set_old,
             jwk_set_age: jwk_set_age.into(),
             jwk_set_expires_in: jwk_set_expires_in.into(),
             jwk_set_too_old: jwk_set_too_old.into(),
         }
+    }
+
+    pub(crate) fn forget(&self) {
+        self.set_jwk_set_old.set(None);
+        self.set_jwk_set.set(None);
     }
 }

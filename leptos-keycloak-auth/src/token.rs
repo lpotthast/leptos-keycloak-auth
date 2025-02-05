@@ -1,6 +1,8 @@
 use crate::response::SuccessTokenResponse;
+use crate::DiscoveryEndpoint;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
+use url::Url;
 
 /// A structure representing the storage of authentication tokens.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -29,9 +31,34 @@ pub struct TokenData {
     /// At all later points in time, this may be used to calculate a percentage of the refresh tokens expiration time.
     #[serde(with = "time::serde::rfc3339")]
     pub(crate) time_received: OffsetDateTime,
+
+    /// The discovery endpoint used to query this information.
+    /// This OIDC config data immediately becomes invalid if we no longer work with that source,
+    /// e.g. the app was reconfigured to use a different authentication provider!
+    /// We see any change in the url, be it host, port, realm, ... as a potentially completely
+    /// different provider for which the already known / cached information is no longer applicable.
+    pub(crate) source: Url,
 }
 
 impl TokenData {
+    pub(crate) fn from_token_response(
+        success_token_response: SuccessTokenResponse,
+        discovery_endpoint: DiscoveryEndpoint,
+    ) -> Self {
+        let now = OffsetDateTime::now_utc();
+        Self {
+            id_token: success_token_response.id_token,
+            access_token: success_token_response.access_token,
+            access_token_expires_at: now + Duration::seconds(success_token_response.expires_in),
+            refresh_token: success_token_response.refresh_token,
+            refresh_expires_at: success_token_response
+                .refresh_expires_in
+                .map(|refresh_expires_in| now + Duration::seconds(refresh_expires_in)),
+            time_received: now,
+            source: discovery_endpoint,
+        }
+    }
+
     pub(crate) fn access_token_time_left(&self) -> Duration {
         self.access_token_expires_at - OffsetDateTime::now_utc()
     }
@@ -50,21 +77,5 @@ impl TokenData {
         self.refresh_expires_at
             .as_ref()
             .map(|expires_in| *expires_in - self.time_received)
-    }
-}
-
-impl From<SuccessTokenResponse> for TokenData {
-    fn from(value: SuccessTokenResponse) -> Self {
-        let now = OffsetDateTime::now_utc();
-        Self {
-            id_token: value.id_token,
-            access_token: value.access_token,
-            access_token_expires_at: now + Duration::seconds(value.expires_in),
-            refresh_token: value.refresh_token,
-            refresh_expires_at: value
-                .refresh_expires_in
-                .map(|refresh_expires_in| now + Duration::seconds(refresh_expires_in)),
-            time_received: now,
-        }
     }
 }

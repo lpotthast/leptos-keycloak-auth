@@ -1,7 +1,3 @@
-use leptos::prelude::*;
-use time::OffsetDateTime;
-use url::Url;
-
 use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
@@ -11,6 +7,8 @@ use crate::{
     AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
     TokenEndpoint,
 };
+use leptos::prelude::*;
+use time::OffsetDateTime;
 
 pub(crate) fn create_retrieve_oidc_config_action(
     set_oidc_config_wt: Callback<Option<OidcConfigWithTimestamp>>,
@@ -20,12 +18,13 @@ pub(crate) fn create_retrieve_oidc_config_action(
         let discovery_endpoint = discovery_endpoint.clone();
         async move {
             leptos::task::spawn_local(async move {
-                let result = request::retrieve_oidc_config(discovery_endpoint).await;
+                let result = request::retrieve_oidc_config(discovery_endpoint.clone()).await;
                 match result {
                     Ok(oidc_config) => {
                         set_oidc_config_wt.run(Some(OidcConfigWithTimestamp {
                             oidc_config,
                             retrieved: OffsetDateTime::now_utc(),
+                            source: discovery_endpoint,
                         }));
                     }
                     Err(err) => {
@@ -41,27 +40,31 @@ pub(crate) fn create_retrieve_oidc_config_action(
 pub(crate) fn create_retrieve_jwk_set_action(
     set_jwk_set_wt: Callback<Option<JwkSetWithTimestamp>>,
     set_req_error: Callback<Option<RequestError>>,
-) -> Action<Url, ()> {
-    Action::new(move |jwk_set_endpoint: &JwkSetEndpoint| {
-        let jwk_set_endpoint = jwk_set_endpoint.clone();
-        async move {
-            leptos::task::spawn_local(async move {
-                let result = request::retrieve_jwk_set(jwk_set_endpoint).await;
-                match result {
-                    Ok(jwk_set) => {
-                        set_jwk_set_wt.run(Some(JwkSetWithTimestamp {
-                            jwk_set,
-                            retrieved: OffsetDateTime::now_utc(),
-                        }));
+) -> Action<(JwkSetEndpoint, DiscoveryEndpoint), ()> {
+    Action::new(
+        move |(jwk_set_endpoint, discovery_endpoint): &(JwkSetEndpoint, DiscoveryEndpoint)| {
+            let jwk_set_endpoint = jwk_set_endpoint.clone();
+            let discovery_endpoint = discovery_endpoint.clone();
+            async move {
+                leptos::task::spawn_local(async move {
+                    let result = request::retrieve_jwk_set(jwk_set_endpoint).await;
+                    match result {
+                        Ok(jwk_set) => {
+                            set_jwk_set_wt.run(Some(JwkSetWithTimestamp {
+                                jwk_set,
+                                retrieved: OffsetDateTime::now_utc(),
+                                source: discovery_endpoint,
+                            }));
+                        }
+                        Err(err) => {
+                            tracing::error!(?err, "Could not retrieve JWK set.");
+                            set_req_error.run(Some(err));
+                        }
                     }
-                    Err(err) => {
-                        tracing::error!(?err, "Could not retrieve JWK set.");
-                        set_req_error.run(Some(err));
-                    }
-                }
-            });
-        }
-    })
+                });
+            }
+        },
+    )
 }
 
 pub struct ExchangeCodeForTokenInput {
@@ -94,6 +97,7 @@ pub(crate) fn create_exchange_code_for_token_action(
                     &auth_code,
                     &code_verifier,
                     session_state.as_deref(),
+                    options.read_value().discovery_endpoint(),
                 )
                 .await;
                 match result {
@@ -135,7 +139,14 @@ pub(crate) fn create_refresh_token_action(
             let on_refresh_error = *on_refresh_error;
             async move {
                 leptos::task::spawn_local(async move {
-                    match request::refresh_token(token_endpoint, &client_id, &refresh_token).await {
+                    match request::refresh_token(
+                        token_endpoint,
+                        &client_id,
+                        &refresh_token,
+                        options.read_value().discovery_endpoint(),
+                    )
+                    .await
+                    {
                         Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
                         Err(err) => {
                             let err = on_refresh_error.run((err,));
