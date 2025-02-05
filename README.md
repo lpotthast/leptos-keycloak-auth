@@ -11,6 +11,7 @@ Secure Leptos applications using Keycloak.
 - Automatic refresh token renewal
 - Automatic access token usage and 401 response handling when using the provided `reqwest`-based `AuthenticatedClient`
 - Programmatic logout
+- SSR support (auth flow still on client only)
 
 ## Installation
 
