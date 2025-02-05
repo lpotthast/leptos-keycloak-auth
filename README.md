@@ -156,12 +156,17 @@ pub fn ConfidentialArea() -> impl IntoView {
 
 ## Test
 
+Make sure that
+
+1. Docker is running
+2. `cargo-leptos` is up to date 
+
 Start the tests (including the integration test) with
 
       cargo test -- --nocapture
 
-This allows you to see the output from `Keycloak` as well as our `test-frontend` build when running the integration
-test.
+This allows you to see the output from `Keycloak` as well as our `test-frontend` (build and running server) 
+when running the integration tests.
 
 You can set `DELAY_TEST_EXECUTION` to `true` in `integration_test.rs` to play around with the test application.
 You can than still run the UI test by entering `y` and pressing enter or canceling the test with `n`.
