@@ -154,37 +154,6 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let code_mgr = internal::code_verifier_manager::CodeVerifierManager::new();
 
-    // Should our discovery endpoint differ from already known data, drop that data immediately.
-    Effect::new(move |_| {
-        let de = options.read_value().discovery_endpoint();
-        if let Some(&ref source) = oidc_mgr.oidc_config.read().as_ref().as_ref().map(|it| &it.source) {
-            if source != &de {
-                tracing::info!("Current OIDC config came from old discovery endpoint. Dropping it.");
-
-                request_animation_frame(move || {
-                    oidc_mgr.forget();
-                });
-            }
-        }
-        if let Some(&ref source) = jwk_set_mgr.jwk_set.read().as_ref().as_ref().map(|it| &it.source) {
-            if source != &de {
-                tracing::info!("Current JWK set came from old discovery endpoint. Dropping it.");
-                request_animation_frame(move || {
-                    jwk_set_mgr.forget();
-                });
-            }
-        }
-        if let Some(&ref source) = token_mgr.token.read().as_ref().as_ref().map(|it| &it.source) {
-            if source != &de {
-                tracing::info!("Current token came from old discovery endpoint. Dropping it.");
-
-                request_animation_frame(move || {
-                    token_mgr.forget();
-                });
-            }
-        }
-    });
-
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();
 

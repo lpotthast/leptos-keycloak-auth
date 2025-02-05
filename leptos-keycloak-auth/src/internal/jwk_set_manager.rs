@@ -40,6 +40,14 @@ impl JwkSetManager {
                     .delay_during_hydration(false),
             );
 
+        // Immediately forget the previously cached value when the discovery endpoint changed!
+        if let Some(source) = jwk_set_old.get_untracked().map(|it| it.source) {
+            if source != options.read_value().discovery_endpoint() {
+                tracing::trace!("Current JWK set (old) came from old discovery endpoint. Dropping it.");
+                set_jwk_set_old.set(None);
+            }
+        }
+
         let (jwk_set, set_jwk_set, _remove_jwk_set_from_storage) =
             use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
                 StorageType::Local,
@@ -48,6 +56,14 @@ impl JwkSetManager {
                     .initial_value(None)
                     .delay_during_hydration(false),
             );
+
+        // Immediately forget the previously cached value when the discovery endpoint changed!
+        if let Some(source) = jwk_set.get_untracked().map(|it| it.source) {
+            if source != options.read_value().discovery_endpoint() {
+                tracing::trace!("Current JWK set came from old discovery endpoint. Dropping it.");
+                set_jwk_set.set(None);
+            }
+        }
 
         // Defaults to `Duration::MAX` if no config is known yet.
         // This leads to a refresh if no config is known yet!
@@ -148,6 +164,7 @@ impl JwkSetManager {
         }
     }
 
+    #[expect(unused)]
     pub(crate) fn forget(&self) {
         self.set_jwk_set_old.set(None);
         self.set_jwk_set.set(None);

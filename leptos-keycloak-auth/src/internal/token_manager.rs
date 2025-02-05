@@ -78,6 +78,15 @@ impl TokenManager {
                     .delay_during_hydration(false)
                     .on_error(|err| tracing::error!(?err, "token storage error")),
             );
+
+        // Immediately forget the previously cached value when the discovery endpoint changed!
+        if let Some(source) = token.get_untracked().map(|it| it.source) {
+            if source != options.read_value().discovery_endpoint() {
+                tracing::trace!("Current token came from old discovery endpoint. Dropping it.");
+                set_token.set(None);
+            }
+        }
+
         let handle_token = Callback::new(move |val| set_token.set(val));
 
         // Note: Only call this after the OIDC config was loaded. Otherwise, no refresh can happen!

@@ -36,6 +36,14 @@ impl OidcConfigManager {
                     .delay_during_hydration(false),
             );
 
+        // Immediately forget the previously cached value when the discovery endpoint changed!
+        if let Some(source) = oidc_config.get_untracked().map(|it| it.source) {
+            if source != options.read_value().discovery_endpoint() {
+                tracing::trace!("Current OIDC config came from old discovery endpoint. Dropping it.");
+                set_oidc_config.set(None);
+            }
+        }
+
         // Defaults to `Duration::MAX` if no config is known yet.
         // This leads to a refresh if no config is known yet!
         let oidc_config_age = {
@@ -95,6 +103,7 @@ impl OidcConfigManager {
         DerivedUrls::new(self.oidc_config)
     }
 
+    #[expect(unused)]
     pub(crate) fn forget(&self) {
         self.set_oidc_config.set(None);
     }
