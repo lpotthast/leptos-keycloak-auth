@@ -67,6 +67,12 @@ async fn test_integration() {
         tracing::info!("Starting webdriver...");
         let mut caps = mgr.prepare_caps(&loaded).await?;
         caps.unset_headless()?;
+        // At least on my macOS machine, chrome-for-testing opened an "Insecure password" popup, 
+        // probably related to its advanced threat protection features.
+        // Kind of "to be expected", as the test account just uses "password" as its password.
+        // But nonetheless useless as we trust the locally running stack.
+        // Configuring this argument made it stop doing that.
+        caps.add_arg("--user-data-dir=/tmp/chrome-testing")?;
         let driver = WebDriver::new(format!("http://localhost:{port}"), caps).await?;
 
         tracing::info!("Navigating to frontend...");
