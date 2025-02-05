@@ -1,12 +1,18 @@
 use crate::{Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
 
-// TODO
+/// Get access to the current authentication state.
+///
+/// Panics when `init_keycloak_auth` was not yet called.
 pub fn expect_keycloak_auth() -> KeycloakAuth {
     expect_context::<KeycloakAuth>()
 }
 
-// TODO
+/// Get access to the current user data.
+///
+/// Panics when the user is not currently authenticated.
+///
+/// Safe to call anywhere under `ShowWhenAuthenticated`.
 pub fn expect_authenticated() -> Authenticated {
     expect_context::<Authenticated>()
 }
