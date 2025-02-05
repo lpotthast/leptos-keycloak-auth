@@ -14,9 +14,9 @@ use time::OffsetDateTime;
 #[derive(Debug, Clone, Copy)]
 pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
-    pub set_jwk_set: WriteSignal<Option<JwkSetWithTimestamp>>,
+    pub(crate) set_jwk_set: WriteSignal<Option<JwkSetWithTimestamp>>,
     pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
-    pub set_jwk_set_old: WriteSignal<Option<JwkSetWithTimestamp>>,
+    pub(crate) set_jwk_set_old: WriteSignal<Option<JwkSetWithTimestamp>>,
     #[allow(unused)]
     pub jwk_set_age: Signal<StdDuration>,
     #[allow(unused)]

@@ -24,7 +24,7 @@ pub struct TokenManager {
     /// Last known token data. Single source of truth of token information.
     /// May contain an expired access and / or refresh token.
     pub token: Signal<Option<TokenData>>,
-    pub set_token: WriteSignal<Option<TokenData>>,
+    pub(crate) set_token: WriteSignal<Option<TokenData>>,
     pub access_token_lifetime: Signal<StdDuration>,
     pub access_token_expires_in: Signal<StdDuration>,
     pub access_token_nearly_expired: Signal<bool>,
@@ -33,7 +33,7 @@ pub struct TokenManager {
     pub refresh_token_expires_in: Signal<StdDuration>,
     pub refresh_token_nearly_expired: Signal<bool>,
     pub refresh_token_expired: Signal<bool>,
-    pub exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
+    pub(crate) exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
     pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
 }

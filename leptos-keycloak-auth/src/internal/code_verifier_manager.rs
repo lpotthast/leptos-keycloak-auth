@@ -7,7 +7,7 @@ use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptio
 #[derive(Debug, Clone, Copy)]
 pub struct CodeVerifierManager {
     pub code_verifier: Signal<Option<CodeVerifier<128>>>,
-    pub set_code_verifier: WriteSignal<Option<CodeVerifier<128>>>,
+    pub(crate) set_code_verifier: WriteSignal<Option<CodeVerifier<128>>>,
     pub code_challenge: Memo<Option<CodeChallenge>>,
 }
 
