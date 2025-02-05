@@ -11,62 +11,58 @@
 //! use leptos_keycloak_auth::url::Url;
 //!
 //! #[component]
+//! pub fn Init(children: Children) -> impl IntoView {
+//!     // Note: These values should be served from environment variables to be overwritten in production.
+//!     // Note: Redirect URLs should match the route path at which you render this component.
+//!     //       If this component is rendered at `/admin`, the redirects should also go to that route,
+//!     //       or we end up in a place where `use_keycloak_auth` is not rendered/active
+//!     //       and any login attempt can never be completed.
+//!     //       Using `to_current_url()` allows us to render `<Protected>` anywhere we want.
+//!     let keycloak_server_url = "http://localhost:8443".to_owned();
+//!     let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
+//!         keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
+//!         realm: "test-realm".to_owned(),
+//!         client_id: "test-client".to_owned(),
+//!         post_login_redirect_url: to_current_url(),
+//!         post_logout_redirect_url: to_current_url(),
+//!         scope: vec![],
+//!         id_token_validation: ValidationOptions {
+//!             expected_audiences: Some(vec!["test-client".to_owned()]),
+//!             expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
+//!         },
+//!         delay_during_hydration: true,
+//!         advanced: Default::default(),
+//!     });
+//!
+//!     children()
+//! }
+//!
+//! #[component]
 //! pub fn App() -> impl IntoView {
 //!     // Meta tags excluded...
 //!     view! {
 //!         <main>
 //!             <Router>
-//!                 <Routes fallback=|| view! { "Page not found." }>
-//!                     <Route path=path!("/") view=|| view! {
-//!                         <Protected>
-//!                             <ConfidentialArea/>
-//!                         </Protected>
-//!                     }/>
-//!                 </Routes>
+//!                 <Init>
+//!                     <Routes fallback=|| view! { "Page not found." }>
+//!                         <Route path=path!("/") view=|| view! {
+//!                             <Protected>
+//!                                 <ConfidentialArea/>
+//!                             </Protected>
+//!                         }/>
+//!                     </Routes>
+//!                 </Init>
 //!             </Router>
 //!         </main>
 //!     }
 //! }
-//!
+//! 
 //! #[component]
 //! pub fn Protected(children: ChildrenFn) -> impl IntoView {
-//!     // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected are
-//!     // client-side only. We should also not execute `use_keycloak_auth` on the server, as it has
-//!     // no support for SSR yet.
-//!     let res = LocalResource::new(|| async move {});
-//!
 //!     view! {
-//!         <Suspense fallback=|| view! { "" }>
-//!             {Suspend::new(async move {
-//!                 let _ = res.await;
-//!                 // Note: These values should be served from environment variables to be overwritten in production.
-//!                 // Note: Redirect URLs should match the route path at which you render this component.
-//!                 //       If this component is rendered at `/admin`, the redirects should also go to that route,
-//!                 //       or we end up in a place where `use_keycloak_auth` is not rendered/active
-//!                 //       and any login attempt can never be completed.
-//!                 //       Using `to_current_url()` allows us to render `<Protected>` anywhere we want.
-//!                 let keycloak_server_url = "http://localhost:8443".to_owned();
-//!                 let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
-//!                     keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
-//!                     realm: "test-realm".to_owned(),
-//!                     client_id: "test-client".to_owned(),
-//!                     post_login_redirect_url: to_current_url(),
-//!                     post_logout_redirect_url: to_current_url(),
-//!                     scope: vec![],
-//!                     id_token_validation: ValidationOptions {
-//!                         expected_audiences: Some(vec!["test-client".to_owned()]),
-//!                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
-//!                     },
-//!                     delay_during_hydration: false,
-//!                     advanced: Default::default(),
-//!                 });
-//!                 view! {
-//!                     <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
-//!                         { children() }
-//!                     </ShowWhenAuthenticated>
-//!                 }
-//!             })}
-//!         </Suspense>
+//!         <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
+//!             { children() }
+//!         </ShowWhenAuthenticated>
 //!     }
 //! }
 //!
