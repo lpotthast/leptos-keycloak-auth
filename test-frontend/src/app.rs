@@ -191,6 +191,9 @@ async fn get_keycloak_port() -> Result<u16, ServerFnError> {
     Ok(keycloak_port)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct KeycloakPort(u16);
+
 #[component]
 pub fn Protected(children: ChildrenFn) -> impl IntoView {
     // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected are
@@ -205,6 +208,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
         <Suspense fallback=|| view! { "" }>
             {Suspend::new(async move {
                 let port = keycloak_port.await;
+                provide_context(KeycloakPort(port));
                 tracing::info!(port, "Initializing Keycloak auth...");
                 let keycloak_server_url = format!("http://localhost:{port}");
                 let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
@@ -243,20 +247,14 @@ pub fn Login() -> impl IntoView {
             .map(|url| url.to_string())
             .unwrap_or_default()
     });
-    let keycloak_port =
-        Signal::derive(
-            move || match auth.login_url.get().and_then(|it| it.port()) {
-                None => "".to_owned(),
-                Some(port) => format!("{port}"),
-            },
-        );
+    let keycloak_port = expect_context::<KeycloakPort>();
     let auth_state = Signal::derive(move || auth.state_pretty_printer());
 
     view! {
        <h1 id="unauthenticated">"Unauthenticated"</h1>
 
         <div id="keycloak-port">
-            { move || keycloak_port.get() }
+            { keycloak_port.0 }
         </div>
 
         <pre id="auth-state" style="width: 100%; overflow: auto;">
