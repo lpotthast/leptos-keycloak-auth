@@ -43,7 +43,7 @@ pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 #[cfg(feature = "ssr")]
 fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::config::Options;
-    use crate::internals::DerivedUrls;
+    use crate::internal::derived_urls::DerivedUrls;
     use crate::{KeycloakAuth, KeycloakAuthState};
     use leptos::prelude::*;
 
