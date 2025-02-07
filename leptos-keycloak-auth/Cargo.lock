@@ -1774,7 +1774,7 @@ dependencies = [
 
 [[package]]
 name = "leptos-keycloak-auth"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "assertr",
