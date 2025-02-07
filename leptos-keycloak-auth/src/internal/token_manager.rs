@@ -3,12 +3,13 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
 use crate::{action, AuthorizationCode, SessionState, TokenEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
+use leptos_use::storage::StorageType;
 use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration as StdDuration;
@@ -69,15 +70,16 @@ impl TokenManager {
         handle_req_error: Callback<Option<RequestError>>,
         token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
     ) -> Self {
-        let (token, set_token, _remove_token_from_storage) =
-            use_storage_with_options::<Option<TokenData>, JsonSerdeCodec>(
-                StorageType::Local,
-                "leptos_keycloak_auth__token",
-                UseStorageOptions::default()
-                    .initial_value(None)
-                    .delay_during_hydration(false)
-                    .on_error(|err| tracing::error!(?err, "token storage error")),
-            );
+        let UseStorageReturn {
+            read: token,
+            write: set_token,
+            remove: _remove_token_from_storage,
+            ..
+        } = use_storage_with_options_and_error_handler::<Option<TokenData>, JsonSerdeCodec>(
+            StorageType::Local,
+            "leptos_keycloak_auth__token",
+            None,
+        );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = token.get_untracked().map(|it| it.source) {

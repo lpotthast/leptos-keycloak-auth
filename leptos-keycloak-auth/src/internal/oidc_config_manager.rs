@@ -2,11 +2,13 @@ use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrls;
 use crate::internal::OidcConfigWithTimestamp;
 use crate::request::RequestError;
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
+use leptos_use::storage::StorageType;
 use leptos_use::{use_interval, UseIntervalReturn};
+use std::fmt::Debug;
 use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
 
@@ -27,14 +29,19 @@ impl OidcConfigManager {
         options: StoredValue<Options>,
         handle_req_error: Callback<Option<RequestError>>,
     ) -> Self {
-        let (oidc_config, set_oidc_config, _remove_oidc_config_from_storage) =
-            use_storage_with_options::<Option<OidcConfigWithTimestamp>, JsonSerdeCodec>(
-                StorageType::Local,
-                "leptos_keycloak_auth__oidc_config",
-                UseStorageOptions::default()
-                    .initial_value(None)
-                    .delay_during_hydration(false),
-            );
+        let UseStorageReturn {
+            read: oidc_config,
+            write: set_oidc_config,
+            remove: _remove_oidc_config_from_storage,
+            ..
+        } = use_storage_with_options_and_error_handler::<
+            Option<OidcConfigWithTimestamp>,
+            JsonSerdeCodec,
+        >(
+            StorageType::Local,
+            "leptos_keycloak_auth__oidc_config",
+            None,
+        );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = oidc_config.get_untracked().map(|it| it.source) {

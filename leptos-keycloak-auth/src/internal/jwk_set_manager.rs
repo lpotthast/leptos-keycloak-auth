@@ -2,11 +2,12 @@ use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::internal::JwkSetWithTimestamp;
 use crate::request::RequestError;
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::{action, JwkSetEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_use::storage::{use_storage_with_options, StorageType, UseStorageOptions};
+use leptos_use::storage::StorageType;
 use leptos_use::{use_interval, UseIntervalReturn};
 use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
@@ -31,14 +32,16 @@ impl JwkSetManager {
         jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
         handle_req_error: Callback<Option<RequestError>>,
     ) -> Self {
-        let (jwk_set_old, set_jwk_set_old, _remove_jwk_set_old_from_storage) =
-            use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
-                StorageType::Local,
-                "leptos_keycloak_auth__jwk_set_old",
-                UseStorageOptions::default()
-                    .initial_value(None)
-                    .delay_during_hydration(false),
-            );
+        let UseStorageReturn {
+            read: jwk_set_old,
+            write: set_jwk_set_old,
+            remove: _remove_jwk_set_old_from_storage,
+            ..
+        } = use_storage_with_options_and_error_handler::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
+            StorageType::Local,
+            "leptos_keycloak_auth__jwk_set_old",
+            None,
+        );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = jwk_set_old.get_untracked().map(|it| it.source) {
@@ -50,14 +53,16 @@ impl JwkSetManager {
             }
         }
 
-        let (jwk_set, set_jwk_set, _remove_jwk_set_from_storage) =
-            use_storage_with_options::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
-                StorageType::Local,
-                "leptos_keycloak_auth__jwk_set",
-                UseStorageOptions::default()
-                    .initial_value(None)
-                    .delay_during_hydration(false),
-            );
+        let UseStorageReturn {
+            read: jwk_set,
+            write: set_jwk_set,
+            remove: _remove_jwk_set_from_storage,
+            ..
+        } = use_storage_with_options_and_error_handler::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
+            StorageType::Local,
+            "leptos_keycloak_auth__jwk_set",
+            None,
+        );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = jwk_set.get_untracked().map(|it| it.source) {
