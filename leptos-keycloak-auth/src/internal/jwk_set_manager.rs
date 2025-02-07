@@ -43,7 +43,9 @@ impl JwkSetManager {
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = jwk_set_old.get_untracked().map(|it| it.source) {
             if source != options.read_value().discovery_endpoint() {
-                tracing::trace!("Current JWK set (old) came from old discovery endpoint. Dropping it.");
+                tracing::trace!(
+                    "Current JWK set (old) came from old discovery endpoint. Dropping it."
+                );
                 set_jwk_set_old.set(None);
             }
         }

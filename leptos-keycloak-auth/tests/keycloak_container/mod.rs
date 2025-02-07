@@ -1,10 +1,10 @@
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
+use testcontainers::core::logs::LogFrame;
 use testcontainers::{
     core::{ContainerPort, WaitFor},
     runners::AsyncRunner,
     GenericImage, ImageExt,
 };
-use testcontainers::core::logs::LogFrame;
 use url::Url;
 
 /// The contained testcontainer instance implements a custom Drop function, cleaning up the running
@@ -41,10 +41,13 @@ impl KeycloakContainer {
             //    "Management interface listening on http://0.0.0.0:9000",
             //))
             .with_log_consumer(|frame: &LogFrame| {
-                println!("{}", match frame {
-                    LogFrame::StdOut(bytes) => String::from_utf8_lossy(&bytes),
-                    LogFrame::StdErr(bytes) => String::from_utf8_lossy(&bytes),
-                });
+                println!(
+                    "{}",
+                    match frame {
+                        LogFrame::StdOut(bytes) => String::from_utf8_lossy(&bytes),
+                        LogFrame::StdErr(bytes) => String::from_utf8_lossy(&bytes),
+                    }
+                );
             });
 
         let container_request = keycloak_image

@@ -46,7 +46,8 @@ pub(crate) fn validate(
         expected_audiences,
         expected_issuers,
         jwk_set,
-    ).context(NoClaimsSnafu {})?;
+    )
+    .context(NoClaimsSnafu {})?;
 
     Ok(KeycloakIdTokenClaims::from(standard_claims))
 }

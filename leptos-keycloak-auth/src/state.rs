@@ -171,7 +171,9 @@ impl KeycloakAuth {
     }
 
     #[cfg(feature = "internals")]
-    pub fn code_verifier_manager(&self) -> &crate::internal::code_verifier_manager::CodeVerifierManager {
+    pub fn code_verifier_manager(
+        &self,
+    ) -> &crate::internal::code_verifier_manager::CodeVerifierManager {
         &self.code_verifier_manager
     }
 
@@ -196,12 +198,12 @@ impl KeycloakAuth {
 pub enum KeycloakAuthState {
     /// The Authenticated state is only entered when there is a valid token which did not yet expire.
     /// If you encounter this state, be ensured that the access token can be used to access your API.
-    /// 
+    ///
     /// The contained `Authenticated` state provides you:
     /// - An `AuthenticatedClient` (through `client()`) which uses the access token automatically.
     /// - The plain `access_token`, for when you need manual access to it.
     /// - The verified and decoded `id_token_claims`, ready for inspection. These include the users
-    ///   id, name, email, roles, ... 
+    ///   id, name, email, roles, ...
     Authenticated(Authenticated),
 
     NotAuthenticated(NotAuthenticated),
@@ -279,9 +281,7 @@ impl KeycloakAuthState {
                     }
                 )
             }
-            KeycloakAuthState::Indeterminate => {
-                "KeycloakAuthState::Indeterminate".to_string()
-            }
+            KeycloakAuthState::Indeterminate => "KeycloakAuthState::Indeterminate".to_string(),
         }
     }
 }

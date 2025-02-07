@@ -56,7 +56,7 @@
 //!         </main>
 //!     }
 //! }
-//! 
+//!
 //! #[component]
 //! pub fn Protected(children: ChildrenFn) -> impl IntoView {
 //!     view! {

@@ -39,7 +39,9 @@ impl OidcConfigManager {
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = oidc_config.get_untracked().map(|it| it.source) {
             if source != options.read_value().discovery_endpoint() {
-                tracing::trace!("Current OIDC config came from old discovery endpoint. Dropping it.");
+                tracing::trace!(
+                    "Current OIDC config came from old discovery endpoint. Dropping it."
+                );
                 set_oidc_config.set(None);
             }
         }
