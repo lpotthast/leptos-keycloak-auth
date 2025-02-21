@@ -1,8 +1,8 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.5.4"
-edition = "2021"
-rust-version = "1.81.0"
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.85.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
@@ -41,7 +41,7 @@ anyhow = "1.0.95"
 assertr = "0.1.0"
 axum = "0.8.1"
 axum-keycloak-auth = "0.7.0"
-chrome-for-testing-manager = { version = "0.1.0", features = ["thirtyfour"] }
+chrome-for-testing-manager = { version = "0.4.0", features = ["thirtyfour"] }
 http = "1.2.0"
 keycloak = "26.1.0"
 testcontainers = "0.23.1"
