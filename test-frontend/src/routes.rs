@@ -4,8 +4,8 @@ use leptos_routes::routes;
 #[routes(with_views, fallback = "|| view! { \"Page not found.\" }")]
 pub mod routes {
     use crate::app::MainLayout;
-    use crate::app::Protected;
     use crate::app::MyAccount;
+    use crate::app::Protected;
     use crate::app::Public;
     use crate::app::Welcome;
     use leptos_keycloak_auth::components::EndSession;
