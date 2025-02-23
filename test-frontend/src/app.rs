@@ -1,32 +1,15 @@
+use crate::routes::routes;
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
 use leptos::prelude::*;
-use leptos_keycloak_auth::components::{DebugState, EndSession, ShowWhenAuthenticated};
+use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
-    UseKeycloakAuthOptions, ValidationOptions,
+    UseKeycloakAuthOptions, ValidationOptions, expect_authenticated, expect_keycloak_auth,
+    init_keycloak_auth, to_current_url,
 };
-use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
+use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::components::*;
-use leptos_routes::routes;
-
-#[routes]
-pub mod routes {
-    #[route("/")]
-    pub mod root {}
-
-    #[route("/public")]
-    pub mod public {}
-
-    #[route("/my-account")]
-    pub mod my_account {}
-
-    /// A route that, when reached, programmatically logs out the current user (if authenticated)
-    /// and redirects to `"/"`.
-    #[route("/logout")]
-    pub mod logout {}
-}
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
@@ -73,15 +56,17 @@ pub fn App() -> impl IntoView {
                 overflow: auto;
             "#>
                 <Router>
-                    <Routes fallback=|| view! { "Page not found." }>
-                        <Route path=routes::Root.path() view=Welcome/>
-                        <Route path=routes::Public.path() view=Public/>
-                        <Route path=routes::MyAccount.path() view=|| view! { <Protected> <MyAccount/> </Protected> }/>
-                        <Route path=routes::Logout.path() view=|| view! { <Protected> <EndSession and_route_to="http://127.0.0.1:3000"/> </Protected> }/>
-                    </Routes>
+                    { routes::generated_routes() }
                 </Router>
             </main>
         </Root>
+    }
+}
+
+#[component]
+pub fn MainLayout() -> impl IntoView {
+    view! {
+        <Outlet />
     }
 }
 
@@ -92,11 +77,11 @@ pub fn Welcome() -> impl IntoView {
     view! {
         <h2>"Welcome to Leptonic"</h2>
 
-        <LinkButton attr:id="to-public" href=routes::Public.materialize().strip_prefix("/").unwrap().to_string()>
+        <LinkButton attr:id="to-public" href=routes::root::Public.materialize().strip_prefix("/").unwrap().to_string()>
             "Public area"
         </LinkButton>
 
-        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
+        <LinkButton attr:id="to-my-account" href=routes::root::MyAccount.materialize()>
             "My Account"
         </LinkButton>
 

@@ -25,7 +25,7 @@ dotenvy = "0.15.7"
 leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to-leptos-0.7" }
 leptos = { version = "0.7.4", features = [] }
 leptos-keycloak-auth = { path = "../leptos-keycloak-auth", features = ["internals"] }
-leptos-routes = { git = "https://github.com/lpotthast/leptos-routes", branch = "main" }
+leptos-routes = "0.2.0"
 leptos_axum = { version = "0.7.4", optional = true }
 leptos_meta = { version = "0.7.4", features = [] }
 leptos_router = { version = "0.7.4", features = [] }
