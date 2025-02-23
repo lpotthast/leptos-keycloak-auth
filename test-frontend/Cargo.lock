@@ -807,7 +807,6 @@ dependencies = [
  "leptos_axum",
  "leptos_meta",
  "leptos_router",
- "reqwest",
  "serde",
  "tokio",
  "tower 0.5.2",
