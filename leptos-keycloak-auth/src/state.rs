@@ -122,7 +122,7 @@ impl KeycloakAuth {
     /// Returns a reactive function that pretty prints the current authentication state.
     ///
     /// Useful for debugging purposes.
-    pub fn state_pretty_printer(&self) -> impl Fn() -> String {
+    pub fn state_pretty_printer(&self) -> impl Fn() -> String + use<> {
         let state = self.state;
         move || state.read().deref().pretty_printer()()
     }

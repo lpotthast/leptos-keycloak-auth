@@ -179,7 +179,8 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 
 ## MSRV
 
-The minimum supported rust version is `1.81.0`
+- Starting from version `0.6.0`, the minimum supported rust version is `1.85.0`
+- Starting from version `0.3.0`, the minimum supported rust version is `1.81.0`
 
 ## Troubleshooting
 

@@ -1,11 +1,11 @@
 use assertr::prelude::*;
-use chrome_for_testing_manager::{ChromeForTestingManager, PortRequest, VersionRequest};
+use chrome_for_testing_manager::prelude::*;
 use keycloak::{
+    KeycloakAdmin,
     types::{
         ClientRepresentation, CredentialRepresentation, RealmRepresentation, RoleRepresentation,
         RolesRepresentation, UserRepresentation,
     },
-    KeycloakAdmin,
 };
 use keycloak_container::KeycloakContainer;
 use std::time::Duration;
@@ -58,25 +58,21 @@ async fn test_integration() -> anyhow::Result<()> {
         }
     }
 
-    let mgr = ChromeForTestingManager::new();
-    let selected = mgr.resolve_version(VersionRequest::Latest).await?;
-    let loaded = mgr.download(selected).await?;
-    let (_chromedriver, port) = mgr.launch_chromedriver(&loaded, PortRequest::Any).await?;
-
     tracing::info!("Starting webdriver...");
-    let mut caps = mgr.prepare_caps(&loaded).await?;
-    caps.unset_headless()?;
-    let driver = WebDriver::new(format!("http://localhost:{port}"), caps).await?;
+    let mut chromedriver = Chromedriver::run_latest_stable().await?;
+    let (handle, driver) = chromedriver
+        .new_session_with_caps(|caps| caps.unset_headless())
+        .await?;
 
     match ui_test(&driver).await {
         Ok(()) => {
             tracing::info!("Frontend test passed!");
-            driver.quit().await?;
+            chromedriver.quit(handle).await?;
             be_jh.abort();
         }
         Err(err) => {
             tracing::error!("Frontend test failed: {:?}", err);
-            driver.quit().await?;
+            chromedriver.quit(handle).await?;
         }
     }
 
