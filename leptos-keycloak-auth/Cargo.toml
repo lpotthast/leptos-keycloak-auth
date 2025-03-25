@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 rust-version = "1.85.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -18,8 +18,7 @@ internals = []
 
 [dependencies]
 base64 = "0.22.1"
-# Must stick to 0.2 until leptos-use is updated.
-codee = { version = "0.2.0", features = ["json_serde"] }
+codee = { version = "0.3.0", features = ["json_serde"] }
 http = "1.2.0"
 itertools = "0.14.0"
 jsonwebtoken = "9.3.0"
@@ -40,8 +39,9 @@ url = { version = "2.5.4", features = ["serde"] }
 anyhow = "1.0.95"
 assertr = "0.1.0"
 axum = "0.8.1"
+# Must stick to 0.7 until leptos is updated to 0.8 (which brings support for axum 0.8).
 axum-keycloak-auth = "0.7.0"
-chrome-for-testing-manager = { version = "0.4.0", features = ["thirtyfour"] }
+chrome-for-testing-manager = { version = "0.5.0", features = ["thirtyfour"] }
 http = "1.2.0"
 keycloak = "26.1.0"
 testcontainers = "0.23.1"

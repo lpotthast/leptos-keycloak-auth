@@ -59,23 +59,24 @@ async fn test_integration() -> anyhow::Result<()> {
     }
 
     tracing::info!("Starting webdriver...");
-    let mut chromedriver = Chromedriver::run_latest_stable().await?;
-    let (handle, driver) = chromedriver
-        .new_session_with_caps(|caps| caps.unset_headless())
+    let chromedriver = Chromedriver::run_latest_stable().await?;
+    chromedriver
+        .with_custom_session(
+            |caps| caps.unset_headless(),
+            async |driver| match ui_test(&driver).await {
+                Ok(()) => {
+                    tracing::info!("Frontend test passed!");
+                    Ok(())
+                }
+                Err(err) => {
+                    tracing::error!("Frontend test failed: {:?}", err);
+                    Ok(())
+                }
+            },
+        )
         .await?;
 
-    match ui_test(&driver).await {
-        Ok(()) => {
-            tracing::info!("Frontend test passed!");
-            chromedriver.quit(handle).await?;
-            be_jh.abort();
-        }
-        Err(err) => {
-            tracing::error!("Frontend test failed: {:?}", err);
-            chromedriver.quit(handle).await?;
-        }
-    }
-
+    chromedriver.terminate().await?;
     drop(fe);
     be_jh.abort();
     Ok(())
