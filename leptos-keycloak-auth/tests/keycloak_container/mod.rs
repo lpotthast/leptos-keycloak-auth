@@ -1,9 +1,9 @@
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
 use testcontainers::core::logs::LogFrame;
 use testcontainers::{
+    GenericImage, ImageExt,
     core::{ContainerPort, WaitFor},
     runners::AsyncRunner,
-    GenericImage, ImageExt,
 };
 use url::Url;
 

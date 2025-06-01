@@ -1,7 +1,7 @@
+use crate::AuthorizationEndpoint;
 use crate::code_verifier::CodeChallenge;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
-use crate::AuthorizationEndpoint;
 use itertools::Itertools;
 use leptos::prelude::*;
 use std::borrow::Cow;

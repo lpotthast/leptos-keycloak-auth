@@ -1,5 +1,5 @@
-use crate::response::SuccessTokenResponse;
 use crate::DiscoveryEndpoint;
+use crate::response::SuccessTokenResponse;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use url::Url;

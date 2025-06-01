@@ -1,8 +1,11 @@
 use codee::{CodecError, Decoder, Encoder};
-use leptos::prelude::{signal, Effect, Get, GetUntracked, LocalStorage, ReadSignal, Set, Signal, UpdateUntracked, WriteSignal};
+use leptos::prelude::{
+    Effect, Get, GetUntracked, LocalStorage, ReadSignal, Set, Signal, UpdateUntracked, WriteSignal,
+    signal,
+};
 use leptos_use::core::MaybeRwSignal;
 use leptos_use::storage::{
-    use_storage_with_options, StorageType, UseStorageError, UseStorageOptions,
+    StorageType, UseStorageError, UseStorageOptions, use_storage_with_options,
 };
 use std::fmt::Debug;
 
@@ -82,7 +85,10 @@ where
     let remove_clone = remove.clone();
     let effect = Effect::new(move |_| {
         if decode_err.get() {
-            tracing::trace!("Removing previously persisted value of '{}' due to a decode error. Using initial value: {initial_value:?}", key.get());
+            tracing::trace!(
+                "Removing previously persisted value of '{}' due to a decode error. Using initial value: {initial_value:?}",
+                key.get()
+            );
             remove_clone();
             write.set(initial_value.clone());
             set_decode_err.update_untracked(|it| *it = false);

@@ -124,13 +124,13 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::token_claims::KeycloakIdTokenClaims;
     use crate::token_validation::KeycloakIdTokenClaimsError;
     use crate::{
-        internal, login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
-        NotAuthenticated, RequestAction,
+        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated, RequestAction, internal,
+        login, logout, token_validation,
     };
     use leptos::callback::Callback;
     use leptos::prelude::*;
-    use leptos_router::hooks::{use_navigate, use_query};
     use leptos_router::NavigateOptions;
+    use leptos_router::hooks::{use_navigate, use_query};
     use std::ops::Deref;
     use time::OffsetDateTime;
 
@@ -378,7 +378,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    let auth = KeycloakAuth {
+    KeycloakAuth {
         options,
         derived_urls,
         login_url: login::create_login_url_signal(
@@ -403,7 +403,5 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         jwk_set_manager: jwk_set_mgr,
         code_verifier_manager: code_mgr,
         token_manager: token_mgr,
-    };
-
-    auth
+    }
 }

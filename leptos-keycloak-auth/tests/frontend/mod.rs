@@ -2,11 +2,12 @@ use std::env;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tokio_process_tools::{Inspector, TerminateOnDrop};
+use tokio_process_tools::broadcast::BroadcastOutputStream;
+use tokio_process_tools::{Inspector, LineParsingOptions, Next, TerminateOnDrop};
 
 pub struct Frontend {
     #[expect(unused)]
-    cargo_leptos_process: TerminateOnDrop,
+    cargo_leptos_process: TerminateOnDrop<BroadcastOutputStream>,
     #[expect(unused)]
     stdout_replay: Inspector,
     #[expect(unused)]
@@ -32,18 +33,34 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
         .await
         .unwrap();
 
-    tracing::info!("Starting frontend in {:?}", fe_dir);
+    tracing::info!("Starting frontend in {fe_dir:?}");
     let mut cmd = Command::new("cargo");
     cmd.arg("leptos")
         .arg("watch") // serve
         .current_dir(fe_dir);
 
-    let fe_process = tokio_process_tools::ProcessHandle::spawn("cargo leptos serve", cmd).unwrap();
+    let fe_process = tokio_process_tools::ProcessHandle::<BroadcastOutputStream>::spawn(
+        "cargo leptos serve",
+        cmd,
+    )
+    .unwrap();
 
     //let stdout_replay = fe_process.stdout().inspect(|line| tracing::info!(line, "cargo leptos out log"));
     //let stderr_replay = fe_process.stderr().inspect(|line| tracing::info!(line, "cargo leptos err log"));
-    let stdout_replay = fe_process.stdout().inspect(|line| println!("{line}"));
-    let stderr_replay = fe_process.stderr().inspect(|line| eprintln!("{line}"));
+    let stdout_replay = fe_process.stdout().inspect_lines(
+        |line| {
+            println!("{line}");
+            Next::Continue
+        },
+        LineParsingOptions::default(),
+    );
+    let stderr_replay = fe_process.stderr().inspect_lines(
+        |line| {
+            eprintln!("{line}");
+            Next::Continue
+        },
+        LineParsingOptions::default(),
+    );
 
     // TODO: Also wait for stderr_line: "warning: build failed, waiting for other jobs to finish..." and fail if it occurs.
 
@@ -51,15 +68,18 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
     tracing::info!("Waiting {fe_start_timeout:?} for frontend to start...");
     match fe_process
         .stdout()
-        .wait_for_with_timeout(
+        .wait_for_line_with_timeout(
             |line| line.contains("listening on http://127.0.0.1:3000"),
+            LineParsingOptions::default(),
             fe_start_timeout,
         )
         .await
     {
         Ok(_wait_for) => {}
         Err(_elapsed) => {
-            tracing::error!("Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work.");
+            tracing::error!(
+                "Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work."
+            );
         }
     };
     let fe = fe_process.terminate_on_drop(Duration::from_secs(4), Duration::from_secs(10));

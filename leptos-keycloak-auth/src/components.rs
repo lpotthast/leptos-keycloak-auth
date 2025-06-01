@@ -1,4 +1,4 @@
-use crate::{expect_keycloak_auth, KeycloakAuth, KeycloakAuthState};
+use crate::{KeycloakAuth, KeycloakAuthState, expect_keycloak_auth};
 use leptos::either::EitherOf3;
 use leptos::prelude::*;
 

@@ -2,10 +2,10 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 use crate::{
-    request::{self, RequestError},
-    token::TokenData,
     AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
     TokenEndpoint,
+    request::{self, RequestError},
+    token::TokenData,
 };
 use leptos::prelude::*;
 use time::OffsetDateTime;

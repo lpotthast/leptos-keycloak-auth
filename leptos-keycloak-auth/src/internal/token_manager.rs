@@ -3,14 +3,14 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
+use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
-use crate::{action, AuthorizationCode, SessionState, TokenEndpoint};
+use crate::{AuthorizationCode, SessionState, TokenEndpoint, action};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{use_interval, UseIntervalReturn};
+use leptos_use::{UseIntervalReturn, use_interval};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration as StdDuration;
 
@@ -297,7 +297,10 @@ impl TokenManager {
         let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
             Ok(token_endpoint) => token_endpoint.clone(),
             Err(err) => {
-                tracing::warn!(?err, "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config.");
+                tracing::warn!(
+                    ?err,
+                    "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config."
+                );
                 finally.run(());
                 return;
             }
