@@ -378,7 +378,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    let auth = KeycloakAuth {
+    KeycloakAuth {
         options,
         derived_urls,
         login_url: login::create_login_url_signal(
@@ -403,7 +403,5 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         jwk_set_manager: jwk_set_mgr,
         code_verifier_manager: code_mgr,
         token_manager: token_mgr,
-    };
-
-    auth
+    }
 }
