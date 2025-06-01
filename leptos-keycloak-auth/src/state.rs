@@ -1,9 +1,9 @@
+use crate::AccessToken;
 use crate::authenticated_client::AuthenticatedClient;
 use crate::config::Options;
 use crate::error::KeycloakAuthError;
 use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
-use crate::AccessToken;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_url};
 use std::ops::Deref;

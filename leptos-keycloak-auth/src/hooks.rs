@@ -124,13 +124,13 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::token_claims::KeycloakIdTokenClaims;
     use crate::token_validation::KeycloakIdTokenClaimsError;
     use crate::{
-        internal, login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
-        NotAuthenticated, RequestAction,
+        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated, RequestAction, internal,
+        login, logout, token_validation,
     };
     use leptos::callback::Callback;
     use leptos::prelude::*;
-    use leptos_router::hooks::{use_navigate, use_query};
     use leptos_router::NavigateOptions;
+    use leptos_router::hooks::{use_navigate, use_query};
     use std::ops::Deref;
     use time::OffsetDateTime;
 

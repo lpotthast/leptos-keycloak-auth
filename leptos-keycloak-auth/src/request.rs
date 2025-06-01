@@ -1,8 +1,8 @@
 use crate::{
+    DiscoveryEndpoint,
     oidc::OidcConfig,
     response::{ErrorResponse, TokenResponse},
     token::TokenData,
-    DiscoveryEndpoint,
 };
 use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};

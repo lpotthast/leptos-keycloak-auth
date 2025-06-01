@@ -12,7 +12,9 @@ impl TimeDurationExt for time::Duration {
             false => match self.whole_nanoseconds().try_into() {
                 Ok(nanos) => StdDuration::from_nanos(nanos),
                 Err(_err) => {
-                    unreachable!("We already handled the negative case. Conversion of i128 to u64 must succeed now.");
+                    unreachable!(
+                        "We already handled the negative case. Conversion of i128 to u64 must succeed now."
+                    );
                 }
             },
         }

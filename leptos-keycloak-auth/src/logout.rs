@@ -1,7 +1,7 @@
+use crate::EndSessionEndpoint;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::token::TokenData;
-use crate::EndSessionEndpoint;
 use leptos::prelude::*;
 use url::Url;
 

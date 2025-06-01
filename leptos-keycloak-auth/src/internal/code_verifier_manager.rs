@@ -1,6 +1,6 @@
 use crate::code_verifier;
 use crate::code_verifier::{CodeChallenge, CodeVerifier};
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
+use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;

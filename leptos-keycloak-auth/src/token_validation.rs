@@ -9,7 +9,9 @@ pub enum JwtValidationError {
     ))]
     DecodeHeader { source: jsonwebtoken::errors::Error },
 
-    #[snafu(display("JwtValidationError: Could not find a JWK which would match the tokens 'kid': {token_kid:?}"))]
+    #[snafu(display(
+        "JwtValidationError: Could not find a JWK which would match the tokens 'kid': {token_kid:?}"
+    ))]
     NoMatchingJwk { token_kid: Option<String> },
 
     #[snafu(display("JwtValidationError: Could not construct DecodingKey from JWK"))]

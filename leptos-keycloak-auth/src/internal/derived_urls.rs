@@ -1,6 +1,6 @@
 use crate::{
-    internal::OidcConfigWithTimestamp, AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint,
-    TokenEndpoint,
+    AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint, TokenEndpoint,
+    internal::OidcConfigWithTimestamp,
 };
 use leptos::prelude::Signal;
 use leptos::prelude::*;
