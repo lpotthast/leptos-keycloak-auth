@@ -25,7 +25,7 @@ const PASSWORD: &str = "245who875hg45";
 async fn test_integration() -> anyhow::Result<()> {
     common::tracing::init_subscriber();
 
-    // Start and configure keycloak.
+    // Start and configure Keycloak.
     let keycloak_container = KeycloakContainer::start().await;
     let admin_client = keycloak_container.admin_client().await;
     configure_keycloak(&admin_client).await;
@@ -59,24 +59,35 @@ async fn test_integration() -> anyhow::Result<()> {
     }
 
     tracing::info!("Starting webdriver...");
-    let chromedriver = Chromedriver::run_latest_stable().await?;
+    let chromedriver = Chromedriver::run(
+        VersionRequest::Fixed(Version {
+            major: 135,
+            minor: 0,
+            patch: 7019,
+            build: 0,
+        }),
+        PortRequest::Any,
+    )
+    .await?;
     chromedriver
         .with_custom_session(
             |caps| caps.unset_headless(),
-            async |driver| match ui_test(&driver).await {
-                Ok(()) => {
-                    tracing::info!("Frontend test passed!");
-                    Ok(())
+            async |driver| {
+                match ui_test(&driver).await {
+                    Ok(()) => {
+                        tracing::info!("Frontend test passed!");
+                    }
+                    Err(err) => {
+                        tracing::error!("Frontend test failed: {:?}", err);
+                    }
                 }
-                Err(err) => {
-                    tracing::error!("Frontend test failed: {:?}", err);
-                    Ok(())
-                }
+                Ok(())
             },
         )
         .await?;
 
     chromedriver.terminate().await?;
+
     drop(fe);
     be_jh.abort();
     Ok(())

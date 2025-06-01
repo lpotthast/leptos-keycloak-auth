@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
 rust-version = "1.85.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -22,9 +22,9 @@ codee = { version = "0.3.0", features = ["json_serde"] }
 http = "1.2.0"
 itertools = "0.14.0"
 jsonwebtoken = "9.3.0"
-leptos = "0.7.4"
-leptos-use = { version = "0.15.5", default-features = false, features = ["use_interval", "storage"] }
-leptos_router = "0.7.4"
+leptos = "0.8.2"
+leptos-use = { version = "0.16.0-beta2", default-features = false, features = ["use_interval", "storage"] }
+leptos_router = "0.8.2"
 rand = "0.9.0"
 reqwest = { version = "0.12.12", features = ["json"] }
 serde = { version = "1.0.217", features = ["derive"] }
@@ -36,19 +36,18 @@ tracing = "0.1.41"
 url = { version = "2.5.4", features = ["serde"] }
 
 [dev-dependencies]
-anyhow = "1.0.95"
-assertr = "0.1.0"
+anyhow = "1.0.98"
+assertr = "0.3.1"
 axum = "0.8.1"
-# Must stick to 0.7 until leptos is updated to 0.8 (which brings support for axum 0.8).
-axum-keycloak-auth = "0.7.0"
-chrome-for-testing-manager = { version = "0.5.0", features = ["thirtyfour"] }
-http = "1.2.0"
-keycloak = "26.1.0"
-testcontainers = "0.23.1"
+axum-keycloak-auth = "0.8.3"
+chrome-for-testing-manager = { version = "0.5.2", features = ["thirtyfour"] }
+http = "1.3.1"
+keycloak = "26.2.300"
+testcontainers = "0.24.0"
 thirtyfour = "0.35.0"
-tokio = "1.43.0"
-tokio-process-tools = "0.4.0"
+tokio = "1.45.1"
+tokio-process-tools = "0.5.4"
 tower = "0.5.2"
-tower-http = { version = "0.6.2", features = ["full"] }
+tower-http = { version = "0.6.4", features = ["full"] }
 tracing-subscriber = "0.3.19"
-uuid = { version = "1.12.1", features = ["v7", "serde"] }
+uuid = { version = "1.17.0", features = ["v7", "serde"] }
