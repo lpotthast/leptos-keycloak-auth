@@ -1,13 +1,13 @@
 use axum::{
+    Extension, Json, Router,
     response::{IntoResponse, Response},
     routing::get,
-    Extension, Json, Router,
 };
 use axum_keycloak_auth::{
+    PassthroughMode,
     decode::KeycloakToken,
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
-    PassthroughMode,
 };
 use http::header::{ACCEPT, AUTHORIZATION};
 use http::{Method, StatusCode};
@@ -79,9 +79,9 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
             // before other middleware.
             .layer(
                 CorsLayer::new()
-                    .allow_origin(AllowOrigin::list(vec!["http://127.0.0.1:3000"
-                        .parse()
-                        .expect("valid url")]))
+                    .allow_origin(AllowOrigin::list(vec![
+                        "http://127.0.0.1:3000".parse().expect("valid url"),
+                    ]))
                     .allow_methods([Method::GET, Method::POST])
                     .allow_headers([AUTHORIZATION, ACCEPT])
                     .allow_credentials(true),
