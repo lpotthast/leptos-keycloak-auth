@@ -191,19 +191,16 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
             realm: Some("test-realm".to_owned()),
             display_name: Some("test-realm".to_owned()),
             registration_email_as_username: Some(true),
-            clients: Some(vec![
-                // Being public and accepting direct-access-grants allows us to log in with grant type "password".
-                ClientRepresentation {
-                    enabled: Some(true),
-                    public_client: Some(true),
-                    standard_flow_enabled: Some(true),
-                    direct_access_grants_enabled: Some(false),
-                    web_origins: Some(vec!["http://127.0.0.1:3000".to_owned()]),
-                    redirect_uris: Some(vec!["http://127.0.0.1:3000/*".to_owned()]),
-                    id: Some("test-client".to_owned()),
-                    ..Default::default()
-                },
-            ]),
+            clients: Some(vec![ClientRepresentation {
+                enabled: Some(true),
+                public_client: Some(true),
+                standard_flow_enabled: Some(true),
+                direct_access_grants_enabled: Some(false),
+                web_origins: Some(vec!["http://127.0.0.1:3000".to_owned()]),
+                redirect_uris: Some(vec!["http://127.0.0.1:3000/*".to_owned()]),
+                id: Some("test-client".to_owned()),
+                ..Default::default()
+            }]),
             roles: Some(RolesRepresentation {
                 realm: Some(vec![RoleRepresentation {
                     name: Some("developer".to_owned()),
