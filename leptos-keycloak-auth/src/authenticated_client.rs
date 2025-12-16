@@ -1,6 +1,6 @@
 use crate::{Authenticated, RequestAction};
 use http::StatusCode;
-use leptos::prelude::Get;
+use leptos::prelude::{ReadUntracked};
 
 #[derive(Debug, Clone)]
 pub struct AuthenticatedClient {
@@ -120,7 +120,7 @@ impl AuthenticatedClient {
             method.clone(),
             url.clone(),
             with.clone(),
-            self.auth.access_token.get().as_str(),
+            self.auth.access_token.read_untracked().as_str(),
         )?;
         let resp = self.client.execute(req).await?;
 
@@ -141,7 +141,7 @@ impl AuthenticatedClient {
                         method,
                         url,
                         with,
-                        self.auth.access_token.get().as_str(),
+                        self.auth.access_token.read_untracked().as_str(),
                     )?;
                     let resp2 = self.client.execute(req2).await?;
                     Ok(resp2)
