@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio_process_tools::broadcast::BroadcastOutputStream;
-use tokio_process_tools::{Inspector, LineParsingOptions, Next, TerminateOnDrop};
+use tokio_process_tools::{Inspector, LineParsingOptions, Next, Process, TerminateOnDrop};
 
 pub struct Frontend {
     #[expect(unused)]
@@ -39,16 +39,11 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
         .arg("watch") // serve
         .current_dir(fe_dir);
 
-    let fe_process = tokio_process_tools::ProcessHandle::<BroadcastOutputStream>::spawn(
-        "cargo leptos serve",
-        cmd,
-    )
-    .unwrap();
+    let fe_process = Process::new(cmd).spawn_broadcast().unwrap();
 
-    //let stdout_replay = fe_process.stdout().inspect(|line| tracing::info!(line, "cargo leptos out log"));
-    //let stderr_replay = fe_process.stderr().inspect(|line| tracing::info!(line, "cargo leptos err log"));
     let stdout_replay = fe_process.stdout().inspect_lines(
         |line| {
+            // Only visible when tests are run with the `--nocapture` flag.
             println!("{line}");
             Next::Continue
         },
@@ -56,6 +51,7 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
     );
     let stderr_replay = fe_process.stderr().inspect_lines(
         |line| {
+            // Only visible when tests are run with the `--nocapture` flag.
             eprintln!("{line}");
             Next::Continue
         },

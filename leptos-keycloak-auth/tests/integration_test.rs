@@ -60,12 +60,7 @@ async fn test_integration() -> anyhow::Result<()> {
 
     tracing::info!("Starting webdriver...");
     let chromedriver = Chromedriver::run(
-        VersionRequest::Fixed(Version {
-            major: 135,
-            minor: 0,
-            patch: 7019,
-            build: 0,
-        }),
+        VersionRequest::LatestIn(Channel::Stable),
         PortRequest::Any,
     )
     .await?;

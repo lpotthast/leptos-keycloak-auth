@@ -24,14 +24,6 @@ use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing::{Level, Span};
 use url::Url;
 
-pub struct AbortOnDrop<T>(JoinHandle<T>);
-
-impl<T> Drop for AbortOnDrop<T> {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
-
 pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<()> {
     let keycloak_auth_instance = KeycloakAuthInstance::new(
         KeycloakConfig::builder()
@@ -74,7 +66,7 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
             .layer(SetSensitiveResponseHeadersLayer::new([]))
             // Timeout should be near the bottom to ensure the entire
             // request pipeline respects the timeout.
-            .layer(TimeoutLayer::new(Duration::from_secs(10)))
+            .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(10)))
             // CORS should usually be early to handle preflight requests
             // before other middleware.
             .layer(
