@@ -2,7 +2,7 @@
 name = "leptos-keycloak-auth"
 version = "0.7.0"
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
