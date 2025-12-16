@@ -4,17 +4,19 @@ pub struct CodeVerifier<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> CodeVerifier<LENGTH> {
-    /// see: https://datatracker.ietf.org/doc/html/rfc7636
+    /// see: <https://datatracker.ietf.org/doc/html/rfc7636>
     pub(crate) fn generate() -> Self {
-        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
         use rand::Rng;
-
-        if LENGTH < 43 || LENGTH > 128 {
-            panic!("Invalid code verifier length");
-        }
 
         const CHARSET: &[u8] =
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+
+        assert!(
+            !(LENGTH < 43 || LENGTH > 128),
+            "Invalid code verifier length"
+        );
+
         let mut rng = rand::rng();
 
         // Leveraging the base64 encoding ratio of encoding 3 bytes into 4 characters
@@ -33,7 +35,7 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
     }
 
     pub(crate) fn to_code_challenge(&self) -> CodeChallenge {
-        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
         use sha2::Digest;
 
         let mut hasher = sha2::Sha256::new();
@@ -59,7 +61,7 @@ pub enum CodeChallengeMethod {
 }
 
 impl CodeChallengeMethod {
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             CodeChallengeMethod::S256 => "S256",
         }

@@ -2,10 +2,10 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 use crate::{
-    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
+    request::{self, RequestError}, token::TokenData, AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint,
+    RefreshToken,
+    SessionState,
     TokenEndpoint,
-    request::{self, RequestError},
-    token::TokenData,
 };
 use leptos::prelude::*;
 use time::OffsetDateTime;
@@ -150,7 +150,7 @@ pub(crate) fn create_refresh_token_action(
                         Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
                         Err(err) => {
                             let err = on_refresh_error.run((err,));
-                            set_req_error.run(Some(err))
+                            set_req_error.run(Some(err));
                         }
                     }
                 });

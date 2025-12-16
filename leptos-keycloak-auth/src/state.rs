@@ -1,11 +1,12 @@
-use crate::AccessToken;
 use crate::authenticated_client::AuthenticatedClient;
 use crate::config::Options;
 use crate::error::KeycloakAuthError;
 use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
+use crate::AccessToken;
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_url};
+use leptos_router::NavigateOptions;
 use std::ops::Deref;
 use url::Url;
 
@@ -58,12 +59,14 @@ pub struct KeycloakAuth {
     pub(crate) token_manager: crate::internal::token_manager::TokenManager,
 }
 
+#[must_use]
 pub fn to_current_url() -> Url {
     let current = use_url().get();
     let current = format!("{}{}", current.origin(), current.path());
     Url::parse(&current).unwrap()
 }
 
+#[must_use]
 pub fn to_current_url_untracked() -> Url {
     let current = use_url().get_untracked();
     let current = format!("{}{}", current.origin(), current.path());
@@ -101,7 +104,7 @@ impl KeycloakAuth {
         self.options.with_value(|it| {
             it.id_token_validation
                 .expected_audiences
-                .set(expected_audiences)
+                .set(expected_audiences);
         });
     }
 
@@ -115,7 +118,7 @@ impl KeycloakAuth {
         self.options.with_value(|it| {
             it.id_token_validation
                 .expected_issuers
-                .set(expected_issuers)
+                .set(expected_issuers);
         });
     }
 
@@ -146,11 +149,11 @@ impl KeycloakAuth {
                     .append_pair("id_token_hint", token.id_token.as_str());
 
                 let navigate = use_navigate();
-                navigate(end_session_endpoint.as_ref(), Default::default());
+                navigate(end_session_endpoint.as_ref(), NavigateOptions::default());
             }
             _ => {
                 let navigate = use_navigate();
-                navigate(path, Default::default());
+                navigate(path, NavigateOptions::default());
             }
         }
     }
@@ -276,8 +279,8 @@ impl KeycloakAuthState {
                         last_id_token_error: last_id_token_error
                             .read()
                             .as_ref()
-                            .map(|err| format!("{:?}", err)),
-                        last_error: last_error.read().as_ref().map(|err| format!("{:?}", err)),
+                            .map(|err| format!("{err:?}")),
+                        last_error: last_error.read().as_ref().map(|err| format!("{err:?}")),
                     }
                 )
             }
@@ -289,7 +292,7 @@ impl KeycloakAuthState {
 /// State only accessible when the user is authenticated.
 ///
 /// You can call `client` to receive an `AuthenticatedClient` (using a `reqwest::Client` in
-/// the background) that automatically (and reactively) attaches the access_token to your requests
+/// the background) that automatically (and reactively) attaches the `access_token` to your requests
 /// and handles potential failure codes by performing a retry of the request if applicable.
 #[derive(Debug, Clone, Copy)]
 pub struct Authenticated {
