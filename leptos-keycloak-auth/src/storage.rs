@@ -1,11 +1,11 @@
 use codee::{CodecError, Decoder, Encoder};
 use leptos::prelude::{
-    Effect, Get, GetUntracked, LocalStorage, ReadSignal, Set, Signal, UpdateUntracked, WriteSignal,
-    signal,
+    signal, Effect, Get, GetUntracked, LocalStorage, ReadSignal, Set, Signal, UpdateUntracked,
+    WriteSignal,
 };
 use leptos_use::core::MaybeRwSignal;
 use leptos_use::storage::{
-    StorageType, UseStorageError, UseStorageOptions, use_storage_with_options,
+    use_storage_with_options, StorageType, UseStorageError, UseStorageOptions,
 };
 use std::fmt::Debug;
 
@@ -43,8 +43,7 @@ where
     let initial_value_signal = initial_value.into();
     let initial_value = match &initial_value_signal {
         MaybeRwSignal::Static(s) => s.clone(),
-        MaybeRwSignal::DynamicRw(r, _) => r.get_untracked(),
-        MaybeRwSignal::DynamicRead(r) => r.get_untracked(),
+        MaybeRwSignal::DynamicRw(r, _) | MaybeRwSignal::DynamicRead(r) => r.get_untracked(),
     };
     let options = UseStorageOptions::default()
         .initial_value(initial_value_signal)
@@ -52,12 +51,12 @@ where
         .delay_during_hydration(false)
         .on_error(move |err| {
             let log_as_error = match &err {
-                UseStorageError::StorageNotAvailable(_) => true,
-                UseStorageError::StorageReturnedNone => true,
-                UseStorageError::GetItemFailed(_) => true,
-                UseStorageError::SetItemFailed(_) => true,
-                UseStorageError::RemoveItemFailed(_) => true,
-                UseStorageError::NotifyItemChangedFailed(_) => true,
+                UseStorageError::StorageNotAvailable(_)
+                | UseStorageError::StorageReturnedNone
+                | UseStorageError::GetItemFailed(_)
+                | UseStorageError::SetItemFailed(_)
+                | UseStorageError::RemoveItemFailed(_)
+                | UseStorageError::NotifyItemChangedFailed(_) => true,
                 UseStorageError::ItemCodecError(codec_err) => match codec_err {
                     CodecError::Encode(_) => true,
                     CodecError::Decode(_decode_err) => {

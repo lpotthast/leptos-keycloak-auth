@@ -1,4 +1,4 @@
-use crate::{KeycloakAuth, KeycloakAuthState, expect_keycloak_auth};
+use crate::{expect_keycloak_auth, KeycloakAuth, KeycloakAuthState};
 use leptos::either::EitherOf3;
 use leptos::prelude::*;
 
@@ -52,7 +52,7 @@ pub fn EndSession(
                 Some(path) => navigate(path.as_str(), Default::default()),
             }
         }
-    };
+    }
 }
 
 #[cfg(feature = "internals")]

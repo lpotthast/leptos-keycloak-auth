@@ -1,6 +1,6 @@
 use crate::{Authenticated, RequestAction};
 use http::StatusCode;
-use leptos::prelude::Get;
+use leptos::prelude::ReadUntracked;
 
 #[derive(Debug, Clone)]
 pub struct AuthenticatedClient {
@@ -16,11 +16,11 @@ impl AuthenticatedClient {
     fn create_request(
         &self,
         method: reqwest::Method,
-        url: impl reqwest::IntoUrl + Clone,
+        url: impl reqwest::IntoUrl,
         with: impl Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder,
         access_token: &str,
     ) -> Result<reqwest::Request, reqwest::Error> {
-        let mut req_builder = self.client.request(method.clone(), url.clone());
+        let mut req_builder = self.client.request(method, url);
 
         // Let the user build the request.
         req_builder = with(req_builder);
@@ -106,7 +106,7 @@ impl AuthenticatedClient {
         self.request(reqwest::Method::DELETE, url, with).await
     }
 
-    /// Performs a request while automatically setting the access_token as an AUTHORIZATION header.
+    /// Performs a request while automatically setting the `access_token` as an AUTHORIZATION header.
     ///
     /// Handles responses failing with a 401 status code (UNAUTHORIZED), by triggering
     /// a background token refresh and silently retrying the request afterwards.
@@ -120,7 +120,7 @@ impl AuthenticatedClient {
             method.clone(),
             url.clone(),
             with.clone(),
-            self.auth.access_token.get().as_str(),
+            self.auth.access_token.read_untracked().as_str(),
         )?;
         let resp = self.client.execute(req).await?;
 
@@ -141,7 +141,7 @@ impl AuthenticatedClient {
                         method,
                         url,
                         with,
-                        self.auth.access_token.get().as_str(),
+                        self.auth.access_token.read_untracked().as_str(),
                     )?;
                     let resp2 = self.client.execute(req2).await?;
                     Ok(resp2)

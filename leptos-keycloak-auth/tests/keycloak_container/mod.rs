@@ -1,9 +1,9 @@
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
 use testcontainers::core::logs::LogFrame;
 use testcontainers::{
-    GenericImage, ImageExt,
-    core::{ContainerPort, WaitFor},
-    runners::AsyncRunner,
+    core::{ContainerPort, WaitFor}, runners::AsyncRunner,
+    GenericImage,
+    ImageExt,
 };
 use url::Url;
 
@@ -27,12 +27,12 @@ impl KeycloakContainer {
         let admin_password = "admin".to_owned();
 
         // This setup is roughly equivalent to the following cli command:
-        // `docker run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.1.0 start-dev`
+        // `podman run -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.4.0 start-dev`
 
-        let keycloak_image = GenericImage::new("quay.io/keycloak/keycloak", "26.1.0")
+        let keycloak_image = GenericImage::new("quay.io/keycloak/keycloak", "26.4.0")
             .with_exposed_port(ContainerPort::Tcp(8080))
             .with_wait_for(WaitFor::message_on_stdout(
-                "Keycloak 26.1.0 on JVM (powered by Quarkus 3.15.2) started",
+                "Keycloak 26.4.0 on JVM (powered by Quarkus 3.27.0) started",
             ))
             .with_wait_for(WaitFor::message_on_stdout(
                 "Listening on: http://0.0.0.0:8080",

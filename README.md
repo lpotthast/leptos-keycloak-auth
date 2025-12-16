@@ -18,28 +18,19 @@ Secure Leptos applications using Keycloak.
 This library has to create random numbers. It uses the `rand` crate for this. `rand` depends on `getrandom`.
 For `wasm32-unknown-unknown`, the target of our hydrating client, a special `getrandom` wasm backend must be specified.
 
-1. Add `getrandom` to the dependency section ouf your final application to include the wasm backend
-   when compiling the hydrating client.
+1. With the current set of dependencies, two versions of `getrandom` will be in the dependency tree. We have to enable
+   `getrandom`s wasm related features on both to mitigate any compile errors. Add this to the Cargo.toml of your
+   application.
+   ```toml
+   [target.'cfg(target_arch = "wasm32")'.dependencies]
+   js-sys = "0.3"
+   getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+   getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+   ```
+2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
-   getrandom = { version = "0.3", features = ["wasm_js"], optional = true }
-   
-   [features]
-   hydrate = [
-       "dep:getrandom",
-       # ...
-   ]
-   ```
-2. Add the following content to `.cargo/config.toml` to actually enable this backend when building for the wasm target (
-   client).
-   ```toml
-   [target.wasm32-unknown-unknown]
-   rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
-   ```
-3. Finally, add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
-   ```toml
-   [dependencies]
-   leptos-keycloak-auth = "0.7"
+   leptos-keycloak-auth = "0.8"
    
    [features]
    hydrate = [ 
@@ -156,14 +147,17 @@ pub fn ConfidentialArea() -> impl IntoView {
 
 Make sure that
 
-1. Docker is running
-2. `cargo-leptos` is up to date 
+1. Podman is running
+2. `cargo-leptos` is up to date
 
 Start the tests (including the integration test) with
 
-      cargo test -- --nocapture
+```sh
+cd leptos-keycloak-auth
+cargo test -- --nocapture
+```
 
-This allows you to see the output from `Keycloak` as well as our `test-frontend` (build and running server) 
+This allows you to see the output from `Keycloak` as well as our `test-frontend` (build and running server)
 when running the integration tests.
 
 You can set `DELAY_TEST_EXECUTION` to `true` in `integration_test.rs` to play around with the test application.
@@ -176,14 +170,24 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 | 0.1           | 0.6                       |
 | 0.2           | 0.6                       |
 | 0.3 - 0.6     | 0.7                       |
-| 0.7           | 0.8                       |
+| 0.7 - 0.8     | 0.8                       |
 
 ## MSRV
 
+- Starting from version `0.8.0`, the minimum supported rust version is `1.88.0`
 - Starting from version `0.6.0`, the minimum supported rust version is `1.85.0`
 - Starting from version `0.3.0`, the minimum supported rust version is `1.81.0`
 
 ## Troubleshooting
+
+Q: My app does not compile due to `getrandom` not compiling for the wasm target.
+
+A: Add this to your projects Cargo.toml
+
+      [target.'cfg(target_arch = "wasm32")'.dependencies]
+      js-sys = "0.3"
+      getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+      getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 
 Q: My app no longer compiles using an Apple Silicon chip (M1 or upwards) after including this crate.
 

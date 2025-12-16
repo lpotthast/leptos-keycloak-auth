@@ -4,16 +4,16 @@ list:
 
 # Install dependencies for maintenance work, profiling and more...
 install-tools:
-  cargo install leptosfmt
-  cargo install cargo-expand
-  cargo install cargo-whatfeatures
-  cargo install cargo-upgrades
-  cargo install cargo-edit
-  cargo install cargo-msrv
+  cargo install --locked leptosfmt
+  cargo install --locked cargo-expand
+  cargo install --locked cargo-whatfeatures
+  cargo install --locked cargo-upgrades
+  cargo install --locked cargo-edit
+  cargo install --locked cargo-msrv
 
 # Find the minimum supported rust version
 find-msrv:
-    cargo msrv find
+    cd leptos-keycloak-auth && cargo msrv find
 
 # Run `cargo sort` for every crate.
 sort:

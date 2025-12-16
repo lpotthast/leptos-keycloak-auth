@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::OffsetDateTime;
 
-/// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+/// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct StandardIdTokenClaims {
     iss: String,
@@ -26,7 +26,7 @@ pub(crate) enum RawAudiences {
     Multiple(Vec<String>),
 }
 
-/// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+/// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct KeycloakIdTokenClaims {
     /// (iss) REQUIRED. Issuer Identifier for the Issuer of the response.
