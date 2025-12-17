@@ -39,7 +39,10 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
         .arg("watch") // serve
         .current_dir(fe_dir);
 
-    let fe_process = Process::new(cmd).spawn_broadcast().unwrap();
+    let fe_process = Process::new(cmd)
+        .spawn_broadcast()
+        .unwrap()
+        .terminate_on_drop(Duration::from_secs(3), Duration::from_secs(8));
 
     let stdout_replay = fe_process.stdout().inspect_lines(
         |line| {
@@ -78,11 +81,10 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
             );
         }
     };
-    let fe = fe_process.terminate_on_drop(Duration::from_secs(4), Duration::from_secs(10));
 
     tracing::info!("Frontend started!");
     Frontend {
-        cargo_leptos_process: fe,
+        cargo_leptos_process: fe_process,
         stdout_replay,
         stderr_replay,
     }

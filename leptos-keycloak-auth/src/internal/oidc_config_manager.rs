@@ -1,13 +1,13 @@
 use crate::config::Options;
-use crate::internal::OidcConfigWithTimestamp;
 use crate::internal::derived_urls::DerivedUrls;
+use crate::internal::OidcConfigWithTimestamp;
 use crate::request::RequestError;
-use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{UseIntervalReturn, use_interval};
+use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::Debug;
 use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
@@ -44,13 +44,11 @@ impl OidcConfigManager {
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
-        if let Some(source) = oidc_config.get_untracked().map(|it| it.source) {
-            if source != options.read_value().discovery_endpoint() {
-                tracing::trace!(
-                    "Current OIDC config came from old discovery endpoint. Dropping it."
-                );
-                set_oidc_config.set(None);
-            }
+        if let Some(source) = oidc_config.get_untracked().map(|it| it.source)
+            && source != options.read_value().discovery_endpoint()
+        {
+            tracing::trace!("Current OIDC config came from old discovery endpoint. Dropping it.");
+            set_oidc_config.set(None);
         }
 
         // Defaults to `Duration::MAX` if no config is known yet.

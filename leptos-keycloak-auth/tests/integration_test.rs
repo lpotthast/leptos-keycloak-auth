@@ -1,11 +1,11 @@
 use assertr::prelude::*;
 use chrome_for_testing_manager::prelude::*;
 use keycloak::{
-    KeycloakAdmin,
     types::{
         ClientRepresentation, CredentialRepresentation, RealmRepresentation, RoleRepresentation,
         RolesRepresentation, UserRepresentation,
     },
+    KeycloakAdmin,
 };
 use keycloak_container::KeycloakContainer;
 use std::time::Duration;
@@ -59,11 +59,8 @@ async fn test_integration() -> anyhow::Result<()> {
     }
 
     tracing::info!("Starting webdriver...");
-    let chromedriver = Chromedriver::run(
-        VersionRequest::LatestIn(Channel::Stable),
-        PortRequest::Any,
-    )
-    .await?;
+    let chromedriver =
+        Chromedriver::run(VersionRequest::LatestIn(Channel::Stable), PortRequest::Any).await?;
     chromedriver
         .with_custom_session(
             |caps| caps.unset_headless(),
@@ -172,9 +169,21 @@ async fn ui_test(driver: &WebDriver) -> anyhow::Result<()> {
     assert_that(username.text().await?).is_equal_to(USERNAME);
     let keycloak_uuid = driver.find(By::Id("keycloak_uuid")).await?;
     assert_that(keycloak_uuid.text().await?).is_equal_to("a7060488-c80b-40c5-83e2-d7000bf9738e");
-    let token_valid_for_whole_seconds =
+    let token_valid_for_whole_seconds_el =
         driver.find(By::Id("token_valid_for_whole_seconds")).await?;
-    assert_that(token_valid_for_whole_seconds.text().await?.parse::<u32>()?).is_in_range(200..=300);
+    let token_valid_for_whole_seconds = token_valid_for_whole_seconds_el
+        .text()
+        .await?
+        .parse::<u64>()?;
+    assert_that(token_valid_for_whole_seconds).is_in_range(1..=5);
+
+    let render_count = driver.find(By::Id("render-count")).await?;
+    assert_that(render_count.text().await?).is_equal_to("render count: 1");
+
+    // Sleep long enough to witness at least one token refresh.
+    tokio::time::sleep(Duration::from_secs(token_valid_for_whole_seconds + 1)).await;
+    // The user component must not have been rerendered!
+    assert_that(render_count.text().await?).is_equal_to("render count: 1");
 
     tracing::info!("Click 'Logout' button.");
     let logout_button = driver.find(By::LinkText("Logout")).await?;
@@ -197,6 +206,10 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
             realm: Some("test-realm".to_owned()),
             display_name: Some("test-realm".to_owned()),
             registration_email_as_username: Some(true),
+            // We use an aggressively short access_token lifetime of 5 seconds here, in order to
+            // force many token refreshes quickly. We want to make sure that those do not interfere
+            // with the user application, e.g. leading to no accidental rerendering.
+            access_token_lifespan: Some(5),
             clients: Some(vec![ClientRepresentation {
                 enabled: Some(true),
                 public_client: Some(true),

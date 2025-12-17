@@ -1,13 +1,13 @@
 use axum::{
-    Extension, Json, Router,
-    response::{IntoResponse, Response},
-    routing::get,
+    response::{IntoResponse, Response}, routing::get, Extension,
+    Json,
+    Router,
 };
 use axum_keycloak_auth::{
-    PassthroughMode,
     decode::KeycloakToken,
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
+    PassthroughMode,
 };
 use http::header::{ACCEPT, AUTHORIZATION};
 use http::{Method, StatusCode};
@@ -66,7 +66,10 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
             .layer(SetSensitiveResponseHeadersLayer::new([]))
             // Timeout should be near the bottom to ensure the entire
             // request pipeline respects the timeout.
-            .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(10)))
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::REQUEST_TIMEOUT,
+                Duration::from_secs(10),
+            ))
             // CORS should usually be early to handle preflight requests
             // before other middleware.
             .layer(
@@ -92,15 +95,13 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
         .await
         .expect("TcpListener");
 
-    let server_jh = tokio::spawn(async move {
+    tokio::spawn(async move {
         tracing::info!("Serving test backend...");
         axum::serve(listener, router.into_make_service())
             .await
             .expect("Server to start successfully");
         tracing::info!("Test backend stopped!");
-    });
-
-    server_jh
+    })
 }
 
 pub async fn who_am_i(Extension(token): Extension<KeycloakToken<String>>) -> Response {

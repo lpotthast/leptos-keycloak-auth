@@ -130,6 +130,11 @@ impl KeycloakAuth {
         move || state.read().deref().pretty_printer()()
     }
 
+    /// End the current session of the user by programmatically performing a logout against the\
+    /// Keycloak server on behalf of the user.
+    ///
+    /// See also `end_session_and_go_to` if you want to immediately move to a different path after
+    /// the logout was performed.
     pub fn end_session(&self) {
         self.end_session_and_go_to(to_current_url_untracked().as_str());
     }
@@ -156,6 +161,17 @@ impl KeycloakAuth {
                 navigate(path, NavigateOptions::default());
             }
         }
+    }
+
+    /// Forget any known token. This is a local operation, not hitting Keycloak in any way.
+    /// It immediately locks the user out of protected areas, but does not perform a logout on the
+    /// OIDC server. If the user tried to log in again, his session would most likely be restored.
+    ///
+    /// Unless you have a specific use case for this, it is, in almost all cases, strongly preferred
+    /// to either show the user an interactable logout link or use `end_session` to instead perform
+    /// a full logout!
+    pub fn forget_session(&self) {
+        self.token_manager.forget();
     }
 
     #[cfg(feature = "internals")]
@@ -209,6 +225,8 @@ pub enum KeycloakAuthState {
     ///   id, name, email, roles, ...
     Authenticated(Authenticated),
 
+    /// The user is logged out (no token data is available) or an error occurred during token
+    /// introspection.
     NotAuthenticated(NotAuthenticated),
 
     /// The `Indeterminate` state is entered on two scenarios.
