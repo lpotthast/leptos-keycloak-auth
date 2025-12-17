@@ -1,14 +1,14 @@
 use crate::config::Options;
-use crate::internal::JwkSetWithTimestamp;
 use crate::internal::derived_urls::DerivedUrlError;
+use crate::internal::JwkSetWithTimestamp;
 use crate::request::RequestError;
-use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
-use crate::{JwkSetEndpoint, action};
+use crate::{action, JwkSetEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{UseIntervalReturn, use_interval};
+use leptos_use::{use_interval, UseIntervalReturn};
 use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
 
@@ -44,13 +44,11 @@ impl JwkSetManager {
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
-        if let Some(source) = jwk_set_old.get_untracked().map(|it| it.source) {
-            if source != options.read_value().discovery_endpoint() {
-                tracing::trace!(
-                    "Current JWK set (old) came from old discovery endpoint. Dropping it."
-                );
-                set_jwk_set_old.set(None);
-            }
+        if let Some(source) = jwk_set_old.get_untracked().map(|it| it.source)
+            && source != options.read_value().discovery_endpoint()
+        {
+            tracing::trace!("Current JWK set (old) came from old discovery endpoint. Dropping it.");
+            set_jwk_set_old.set(None);
         }
 
         let UseStorageReturn {
@@ -65,11 +63,11 @@ impl JwkSetManager {
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
-        if let Some(source) = jwk_set.get_untracked().map(|it| it.source) {
-            if source != options.read_value().discovery_endpoint() {
-                tracing::trace!("Current JWK set came from old discovery endpoint. Dropping it.");
-                set_jwk_set.set(None);
-            }
+        if let Some(source) = jwk_set.get_untracked().map(|it| it.source)
+            && source != options.read_value().discovery_endpoint()
+        {
+            tracing::trace!("Current JWK set came from old discovery endpoint. Dropping it.");
+            set_jwk_set.set(None);
         }
 
         // Defaults to `Duration::MAX` if no config is known yet.

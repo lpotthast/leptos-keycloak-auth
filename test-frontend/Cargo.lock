@@ -910,6 +910,7 @@ dependencies = [
  "dotenvy",
  "getrandom 0.2.16",
  "getrandom 0.3.4",
+ "indoc",
  "js-sys",
  "leptonic",
  "leptos 0.8.14",
@@ -1960,7 +1961,7 @@ dependencies = [
 
 [[package]]
 name = "leptos-keycloak-auth"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "base64",
  "codee",

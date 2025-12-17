@@ -124,8 +124,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::token_claims::KeycloakIdTokenClaims;
     use crate::token_validation::KeycloakIdTokenClaimsError;
     use crate::{
-        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated, RequestAction, internal,
-        login, logout, token_validation,
+        internal, login, logout, token_validation, Authenticated, KeycloakAuth,
+        KeycloakAuthState, NotAuthenticated, RequestAction,
     };
     use leptos::callback::Callback;
     use leptos::prelude::*;
@@ -228,9 +228,11 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         code_mgr.regenerate();
                     });
 
-                    // We currently "remove" the query parameters by doing an extra, programmatic
-                    // routing to the `post_logout_redirect_url`. That will just be handled by the
-                    // leptos router and performed on the client itself.
+                    // We "remove" the auth related query parameters set in the logout process
+                    // by doing an extra, programmatic routing to the user supplied
+                    // `post_logout_redirect_url`.
+                    // That will just be handled by the leptos router and performed on the client
+                    // itself.
                     let navigate = use_navigate();
                     navigate(
                         options
@@ -250,7 +252,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 }
             },
             Err(err) => {
-                // Save to be ignored. This just means that we currently do not have the required parameters to do meaningful work.
+                // Save to be ignored. This just means that we currently do not have the required
+                // parameters to do meaningful work.
                 // You might want to debug this error if things don't work.
                 set_auth_error.set(Some(KeycloakAuthError::Params { err }));
             }
@@ -337,7 +340,38 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         });
     }
 
+    // Create a persistent `Authenticated` state that doesn't get recreated on every evaluation of
+    // our `state` memo.
+    // We ensure the assumptions made here (`expect`s) are upheld by only providing this
+    // `Authenticated` state as context (through `provide_context`) when the user really is
+    // authenticated.
+    let authenticated = StoredValue::new(Authenticated {
+        access_token: Signal::derive(move || {
+            token_mgr
+                .token
+                .read()
+                .as_ref()
+                .map(|it| it.access_token.clone())
+                .expect("access_token signal should only be read when authenticated")
+        }),
+        id_token_claims: Signal::derive(move || {
+            verified_and_decoded_id_token
+                .get()
+                .expect("id_token_claims signal should only be read when authenticated")
+        }),
+        auth_error_reporter,
+    });
+
+    // Create a persistent `NotAuthenticated` state. Same reasoning as above.
+    let not_authenticated = StoredValue::new(NotAuthenticated {
+        has_token_data: Signal::derive(move || token_mgr.token.get().is_some()),
+        last_id_token_error: Signal::derive(move || verified_and_decoded_id_token.get().err()),
+        last_error: auth_error.into(),
+    });
+
     // Auth state derived from token data or potential errors.
+    // Using persistent `authenticated` and `not_authenticated` values with inner signals prevents
+    // unnecessary rerenders of the children passed to ShowWhenAuthenticated when tokens refresh.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
 
@@ -353,28 +387,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             && !token_mgr.access_token_expired.get()
         {
             tracing::trace!("Switching to: KeycloakAuthState::Authenticated");
-            KeycloakAuthState::Authenticated(Authenticated {
-                access_token: Signal::derive(move || {
-                    token
-                        .read()
-                        .as_ref()
-                        .map(|it| it.access_token.clone())
-                        .expect("present")
-                }),
-                id_token_claims: Signal::derive(move || {
-                    verified_and_decoded_id_token.get().expect("present")
-                }),
-                auth_error_reporter,
-            })
+            KeycloakAuthState::Authenticated(authenticated.get_value())
         } else {
             tracing::trace!("Switching to: KeycloakAuthState::NotAuthenticated");
-            KeycloakAuthState::NotAuthenticated(NotAuthenticated {
-                has_token_data: Signal::derive(move || token.get().is_some()),
-                last_id_token_error: Signal::derive(move || {
-                    verified_and_decoded_id_token.get().err()
-                }),
-                last_error: auth_error.into(),
-            })
+            KeycloakAuthState::NotAuthenticated(not_authenticated.get_value())
         }
     });
 

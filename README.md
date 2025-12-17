@@ -5,7 +5,7 @@ Secure Leptos applications using Keycloak.
 ## Features
 
 - OpenID Connect discovery
-- Authorization code flow wik PKCE
+- Authorization code flow with PKCE
 - ID token verification
 - ID token introspection
 - Automatic refresh token renewal

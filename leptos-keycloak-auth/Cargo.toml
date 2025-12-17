@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2024"
 rust-version = "1.88.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -37,7 +37,7 @@ url = { version = "2.5.7", features = ["serde"] }
 
 [dev-dependencies]
 anyhow = "1.0.100"
-assertr = "0.4.2"
+assertr = "0.4.3"
 axum = "0.8.7"
 axum-keycloak-auth = "0.8.3"
 chrome-for-testing-manager = { version = "0.6.0", features = ["thirtyfour"] }

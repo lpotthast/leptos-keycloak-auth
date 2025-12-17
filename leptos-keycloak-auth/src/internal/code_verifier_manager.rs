@@ -1,6 +1,5 @@
-use crate::code_verifier;
 use crate::code_verifier::{CodeChallenge, CodeVerifier};
-use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
@@ -54,8 +53,7 @@ impl CodeVerifierManager {
     }
 
     pub(crate) fn regenerate(&self) {
-        #[allow(unused_qualifications)]
         self.set_code_verifier
-            .set(Some(code_verifier::CodeVerifier::<128>::generate()));
+            .set(Some(CodeVerifier::<128>::generate()));
     }
 }

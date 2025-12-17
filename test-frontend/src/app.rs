@@ -5,11 +5,13 @@ use leptos::prelude::*;
 use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    UseKeycloakAuthOptions, ValidationOptions, expect_authenticated, expect_keycloak_auth,
-    init_keycloak_auth, to_current_url,
+    expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
+    UseKeycloakAuthOptions, ValidationOptions,
 };
-use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::*;
+use leptos_router::hooks::use_location;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
@@ -115,6 +117,25 @@ struct WhoAmIResponse {
 
 #[component]
 pub fn MyAccount() -> impl IntoView {
+    static RENDER_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    RENDER_COUNT.fetch_add(1, Ordering::Release);
+
+    let location = use_location();
+    Effect::new(move || {
+        if location.pathname.get() != routes::root::MyAccount.materialize() {
+            let msg = indoc::formatdoc! {"
+                Navigating away from '{path}'. Resetting RENDER_COUNT to 0.
+                We dont want to track the number of navigations to the path that renders this component.
+                We are only interested in spotting accidental rerenders while staying at the current location.
+                ",
+                path = routes::root::MyAccount.materialize()
+            };
+            tracing::info!("{msg}");
+        }
+        RENDER_COUNT.store(0, Ordering::Release);
+    });
+
     let auth = expect_keycloak_auth();
     let authenticated = expect_authenticated();
 
@@ -141,6 +162,10 @@ pub fn MyAccount() -> impl IntoView {
             "Hello, " { move || user_name.get() } "!"
         </h1>
 
+        <div id="render-count">
+            "render count: " { RENDER_COUNT.load(Ordering::Acquire) }
+        </div>
+
         <Suspense fallback=|| view! { "" }>
             { move || who_am_i.get().map(|who_am_i| view! {
                 <div>"username: " <span id="username">{ who_am_i.username.clone() }</span></div>
@@ -149,7 +174,7 @@ pub fn MyAccount() -> impl IntoView {
             }) }
         </Suspense>
 
-        <pre id="auth-state" style="width: 100%; overflow: auto;">
+        <pre id="auth-state" style="width: 100%;">
             { move || auth_state.read()() }
         </pre>
 
@@ -159,6 +184,10 @@ pub fn MyAccount() -> impl IntoView {
 
         <Button attr:id="programmatic-logout" on_press=move |_| auth.end_session()>
             "Programmatic Logout"
+        </Button>
+
+        <Button attr:id="programmatic-logout" on_press=move |_| auth.forget_session()>
+            "Forget auth state"
         </Button>
 
         <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
@@ -225,7 +254,11 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
 #[component]
 pub fn Login() -> impl IntoView {
     let auth = expect_keycloak_auth();
-    let login_url_unavailable = Signal::derive(move || auth.login_url.get().is_none());
+    let login_url_unavailable = Signal::derive(move || {
+        let res = auth.login_url.read().is_none();
+        tracing::info!("login_url_unavailable now is: {res}");
+        res
+    });
     let login_url = Signal::derive(move || {
         auth.login_url
             .get()
@@ -242,7 +275,7 @@ pub fn Login() -> impl IntoView {
             { keycloak_port.0 }
         </div>
 
-        <pre id="auth-state" style="width: 100%; overflow: auto;">
+        <pre id="auth-state" style="width: 100%;">
             { move || auth_state.read()() }
         </pre>
 

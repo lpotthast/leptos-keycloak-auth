@@ -86,9 +86,9 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "assertr"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e65c749b72cf7cbc5ea70eabf96ff497a25d791ac180ccee924adf3c4a32e22b"
+checksum = "6a93978b9874b77fbf6dbf6b796918cf458ec705cbffeca49d8a8cd32584e67b"
 dependencies = [
  "futures",
  "indoc",
@@ -2054,7 +2054,7 @@ dependencies = [
 
 [[package]]
 name = "leptos-keycloak-auth"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "assertr",

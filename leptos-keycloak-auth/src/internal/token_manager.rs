@@ -3,14 +3,14 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
-use crate::storage::{UseStorageReturn, use_storage_with_options_and_error_handler};
+use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
-use crate::{AuthorizationCode, SessionState, TokenEndpoint, action};
+use crate::{action, AuthorizationCode, SessionState, TokenEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{UseIntervalReturn, use_interval};
+use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration as StdDuration;
 
@@ -82,11 +82,11 @@ impl TokenManager {
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
-        if let Some(source) = token.get_untracked().map(|it| it.source) {
-            if source != options.read_value().discovery_endpoint() {
-                tracing::trace!("Current token came from old discovery endpoint. Dropping it.");
-                set_token.set(None);
-            }
+        if let Some(source) = token.get_untracked().map(|it| it.source)
+            && source != options.read_value().discovery_endpoint()
+        {
+            tracing::trace!("Current token came from old discovery endpoint. Dropping it.");
+            set_token.set(None);
         }
 
         let handle_token = Callback::new(move |val| set_token.set(val));
@@ -320,6 +320,9 @@ impl TokenManager {
         self.trigger_refresh.run((on_refresh_error,));
     }
 
+    /// Forget any known token. This is a local operation, not hitting Keycloak in any way.
+    /// It immediately locks the user out of protected areas, but does not perform a logout on the
+    /// OIDC server. If the user tried to log in again, his session would most likely be restored.
     pub(crate) fn forget(&self) {
         tracing::trace!("Dropping all token data");
         self.set_token.set(None);
