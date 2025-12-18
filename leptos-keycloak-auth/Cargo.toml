@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 rust-version = "1.88.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]

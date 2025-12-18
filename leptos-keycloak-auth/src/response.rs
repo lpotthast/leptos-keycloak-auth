@@ -170,7 +170,7 @@ impl leptos_router::params::Params for ErrorResponse {
                 "Missing query parameter 'error'.".to_string(),
             ));
         };
-        let Ok(error) = serde_json::from_str::<OidcErrorCode>(&error) else {
+        let Ok(error) = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")) else {
             return Err(ParamsError::MissingParam(
                 "Could not parse query parameter 'error' as `OidcErrorCode`.".to_string(),
             ));
@@ -206,5 +206,26 @@ impl leptos_router::params::Params for CallbackResponse {
                 },
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::response::{KnownOidcErrorCode, OidcErrorCode};
+    use assertr::assert_that;
+    use assertr::prelude::PartialEqAssertions;
+
+    #[test]
+    fn deserialize_known_error_code() {
+        let error = "invalid_grant";
+        let parsed = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")).unwrap();
+        assert_that(parsed).is_equal_to(OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant));
+    }
+
+    #[test]
+    fn deserialize_unknown_error_code() {
+        let error = "some_unknown_error";
+        let parsed = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")).unwrap();
+        assert_that(parsed).is_equal_to(OidcErrorCode::Unknown(error.to_owned()));
     }
 }
