@@ -1,11 +1,44 @@
 use crate::{expect_keycloak_auth, KeycloakAuth, KeycloakAuthState};
 use leptos::either::EitherOf3;
 use leptos::prelude::*;
+use leptos_router::NavigateOptions;
 
-/// A transparent component representing authenticated user status.
-/// It provides a way to conditionally render its children based on the user's authentication status.
-/// If the user is authenticated, it renders the children; otherwise, it falls back to the provided loading or unauthenticated view.
+/// Show `children` when the user is [`Authenticated`](crate::state::Authenticated).
+///
+/// If the user is authenticated, it renders the children; otherwise, it falls back to the provided
+/// `fallback` view.
+///
+/// The children function is only evaluated once when the authentication status switches to being
+/// [`Authenticated`](crate::state::Authenticated). No internal state change, like an automated
+/// token refresh should lead to children being re-rendered.
+///
+/// Once the authentication status is no longer `Authenticated`, the children view is dropped and
+/// not hold onto for further display. Once authenticated again, children are rendered new.
+///
+/// # Example
+/// ```no_run
+/// use leptos::prelude::*;
+/// use leptos_keycloak_auth::components::ShowWhenAuthenticated;
+/// use leptos_keycloak_auth::expect_keycloak_auth;
+///
+/// # #[component]
+/// # fn Component() -> impl IntoView {
+/// // Requires an `init_keycloak_auth` to have taken place before.
+/// let auth = expect_keycloak_auth();
+///
+/// let login_url = auth.login_url;
+/// let logout_url = auth.logout_url;
+///
+/// view! {
+///     <ShowWhenAuthenticated fallback=move || view! { <a href=login_url.get().map(|url| url.to_string()).unwrap_or_default()>"Login"</a> }>
+///         <p>"You are authenticated!"</p>
+///         <a href=logout_url.get().map(|url| url.to_string()).unwrap_or_default()>"Logout"</a>
+///     </ShowWhenAuthenticated>
+/// }
+/// # }
+/// ```
 #[component(transparent)]
+#[allow(clippy::must_use_candidate)]
 pub fn ShowWhenAuthenticated<C>(
     #[prop(into, optional)] fallback: ViewFn,
 
@@ -32,6 +65,15 @@ where
 }
 
 /// Immediately programmatically logs out the user when rendered.
+///
+/// You may use this in your router and render it as the only component when the user hits
+/// the "/logout" path locally.
+///
+/// # Params
+/// - `and_route_to` Path to which the Leptos router should navigate to after logout happened. The
+///   redirect to this path is performed by Keycloak as a response to our programmatic logout
+///   request. Should the user not currently be authenticated, we do not interact with Keycloak at
+///   all but instead perform the redirect immediately locally using the Leptos router.
 #[component]
 pub fn EndSession(
     #[prop(into, optional)] and_route_to: Option<Oco<'static, str>>,
@@ -49,7 +91,11 @@ pub fn EndSession(
             let navigate = leptos_router::hooks::use_navigate();
             match and_route_to {
                 None => {}
-                Some(path) => navigate(path.as_str(), Default::default()),
+                Some(path) => {
+                    // We do not give the user the ability to provide these navigation options,
+                    // as we cannot guarantee the same behavior in both code paths.
+                    navigate(path.as_str(), NavigateOptions::default());
+                }
             }
         }
     }

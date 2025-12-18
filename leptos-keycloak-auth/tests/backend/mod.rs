@@ -1,13 +1,13 @@
 use axum::{
-    response::{IntoResponse, Response}, routing::get, Extension,
-    Json,
-    Router,
+    Extension, Json, Router,
+    response::{IntoResponse, Response},
+    routing::get,
 };
 use axum_keycloak_auth::{
+    PassthroughMode,
     decode::KeycloakToken,
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
-    PassthroughMode,
 };
 use http::header::{ACCEPT, AUTHORIZATION};
 use http::{Method, StatusCode};

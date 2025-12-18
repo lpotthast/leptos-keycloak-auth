@@ -1,3 +1,5 @@
+#![allow(clippy::single_match_else)]
+
 //! Protect parts of your Leptos application using Keycloak.
 //!
 //! ## Example

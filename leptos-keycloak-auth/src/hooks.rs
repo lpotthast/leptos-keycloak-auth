@@ -4,6 +4,7 @@ use leptos::prelude::*;
 /// Get access to the current authentication state.
 ///
 /// Panics when `init_keycloak_auth` was not yet called.
+#[must_use]
 pub fn expect_keycloak_auth() -> KeycloakAuth {
     expect_context::<KeycloakAuth>()
 }
@@ -13,6 +14,7 @@ pub fn expect_keycloak_auth() -> KeycloakAuth {
 /// Panics when the user is not currently authenticated.
 ///
 /// Safe to call anywhere under `ShowWhenAuthenticated`.
+#[must_use]
 pub fn expect_authenticated() -> Authenticated {
     expect_context::<Authenticated>()
 }
@@ -114,6 +116,7 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 }
 
 #[cfg(not(feature = "ssr"))]
+#[allow(clippy::too_many_lines)]
 fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::config::Options;
     use crate::error::KeycloakAuthError;
@@ -139,7 +142,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let (auth_error, set_auth_error) = signal::<Option<KeycloakAuthError>>(None);
     let handle_req_error = Callback::new(move |request_error: Option<RequestError>| {
-        set_auth_error.set(request_error.map(|err| KeycloakAuthError::Request { source: err }))
+        set_auth_error.set(request_error.map(|err| KeycloakAuthError::Request { source: err }));
     });
 
     let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(options, handle_req_error);
@@ -284,7 +287,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         );
 
         if first_try.is_ok() {
-            result = first_try
+            result = first_try;
         } else {
             // If validation with the current JWK set fails, we should not try to validate with a
             // missing old set. This would just lest to a `NoJwkSet` error being ultimately stored,

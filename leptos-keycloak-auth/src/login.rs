@@ -17,6 +17,7 @@ pub(crate) fn create_login_url_signal(
             Ok(it) => it.clone(),
             Err(_) => return Option::<Url>::None,
         };
+        #[allow(clippy::manual_let_else)]
         let code_challenge = match code_challenge.get() {
             Some(it) => it,
             None => return Option::<Url>::None,

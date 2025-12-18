@@ -59,6 +59,22 @@ pub struct KeycloakAuth {
     pub(crate) token_manager: crate::internal::token_manager::TokenManager,
 }
 
+/// Get the current URL (origin + path). Uses a tracking access to the current url.
+///
+/// # Returns
+/// A [`Url`] representing the current page's origin and path (query and fragment are excluded).
+///
+/// # Panics
+/// Panics if the current URL cannot be parsed as a valid URL. This should not occur
+/// in normal usage as the URL is constructed from the current route.
+///
+/// # Example
+/// ```no_run
+/// use leptos_keycloak_auth::{expect_keycloak_auth, to_current_url};
+///
+/// let auth = expect_keycloak_auth();
+/// auth.set_post_login_redirect_url(to_current_url());
+/// ```
 #[must_use]
 pub fn to_current_url() -> Url {
     let current = use_url().get();
@@ -66,6 +82,26 @@ pub fn to_current_url() -> Url {
     Url::parse(&current).unwrap()
 }
 
+/// Get the current URL (origin + path) without creating a reactive dependency.
+///
+/// This function gets the current URL value without tracking it for reactive updates.
+/// Use this when you need the current URL but don't want to create a reactive dependency
+/// that would cause re-renders when the URL changes.
+///
+/// # Returns
+/// A [`Url`] representing the current page's origin and path (query and fragment are excluded).
+///
+/// # Panics
+/// Panics if the current URL cannot be parsed as a valid URL. This should not occur
+/// in normal usage as the URL is constructed from the current route.
+///
+/// # Example
+/// ```no_run
+/// use leptos_keycloak_auth::{expect_keycloak_auth, to_current_url_untracked};
+///
+/// let auth = expect_keycloak_auth();
+/// auth.set_post_login_redirect_url(to_current_url_untracked());
+/// ```
 #[must_use]
 pub fn to_current_url_untracked() -> Url {
     let current = use_url().get_untracked();
@@ -78,7 +114,7 @@ impl KeycloakAuth {
     ///
     /// This will lead to a reactive change in the `login_url` signal.
     ///
-    /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
+    /// You can use [`to_current_url`](to_current_url) to get the current url of the page.
     pub fn set_post_login_redirect_url(&self, url: Url) {
         self.options
             .with_value(|it| it.post_login_redirect_url.set(url));
@@ -88,7 +124,7 @@ impl KeycloakAuth {
     ///
     /// This will lead to a reactive change in the `logout_url` signal.
     ///
-    /// You can use `to_current_url` to get the current url of the page as the expected `url::Url`.
+    /// You can use [`to_current_url`](to_current_url) to get the current url of the page.
     pub fn set_post_logout_redirect_url(&self, url: Url) {
         self.options
             .with_value(|it| it.post_logout_redirect_url.set(url));
@@ -139,6 +175,25 @@ impl KeycloakAuth {
         self.end_session_and_go_to(to_current_url_untracked().as_str());
     }
 
+    /// End the current session and navigate to a specified path.
+    ///
+    /// Performs a logout against the Keycloak server (when OIDC discovery is complete and a token
+    /// exists) and then navigates to the specified path. The logout includes the ID token hint and
+    /// sets `destroy_session=true` to ensure the Keycloak session is terminated.
+    ///
+    /// If OIDC discovery hasn't completed or no token exists, this will simply navigate to the path
+    /// without performing a server-side logout.
+    ///
+    /// # Parameters
+    /// - `path`: The path to navigate to after logout (e.g., "/login", "/", etc.)
+    ///
+    /// # Example
+    /// ```no_run
+    /// use leptos_keycloak_auth::{expect_keycloak_auth};
+    ///
+    /// let auth = expect_keycloak_auth();
+    /// auth.end_session_and_go_to("/");
+    /// ```
     pub fn end_session_and_go_to(&self, path: &str) {
         match (
             self.derived_urls.end_session_endpoint.get_untracked(),
@@ -337,6 +392,10 @@ impl PartialEq for Authenticated {
 
 impl Eq for Authenticated {}
 
+/// Action to take after reporting a failed HTTP request.
+///
+/// Returned by [`Authenticated::report_failed_http_request`] to indicate whether
+/// the request should be retried (e.g., after refreshing tokens) or marked as failed.
 pub enum RequestAction {
     /// Indicates that the request should be retried as updated tokens are now available.
     Retry,
@@ -346,22 +405,129 @@ pub enum RequestAction {
 }
 
 impl Authenticated {
+    /// Create an authenticated HTTP client with automatic token injection.
+    ///
+    /// Returns an [`AuthenticatedClient`] that automatically attaches the access token to all
+    /// requests and handles 401 responses by attempting to refresh the token and retry the request.
+    ///
+    /// This creates a new `reqwest::Client` internally. If you need to customize the underlying
+    /// client (e.g., for custom timeouts or middleware), use [`client_from`](Self::client_from)
+    /// instead.
+    ///
+    /// # Returns
+    /// An [`AuthenticatedClient`] configured with a default `reqwest::Client`.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use leptos_keycloak_auth::{expect_authenticated};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let authenticated = expect_authenticated();
+    /// let client = authenticated.client();
+    /// let response = client.get("https://api.example.com/protected-resource").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
     pub fn client(&self) -> AuthenticatedClient {
         AuthenticatedClient::new(reqwest::Client::new(), *self)
     }
 
+    /// Create an authenticated HTTP client from an existing `reqwest::Client`.
+    ///
+    /// Returns an [`AuthenticatedClient`] that wraps your provided `reqwest::Client` and
+    /// automatically attaches the access token to all requests. Use this when you need to
+    /// customize the underlying client configuration.
+    ///
+    /// # Parameters
+    /// - `client`: A configured `reqwest::Client` to use for making requests.
+    ///
+    /// # Returns
+    /// An [`AuthenticatedClient`] wrapping the provided client.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use std::time::Duration;
+    /// use leptos_keycloak_auth::expect_authenticated;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let authenticated = expect_authenticated();
+    /// let custom_client = reqwest::Client::builder()
+    ///     .timeout(Duration::from_secs(30))
+    ///     .build()?;
+    /// let client = authenticated.client_from(custom_client);
+    /// let response = client.get("https://api.example.com/protected-resource").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
     pub fn client_from(&self, client: reqwest::Client) -> AuthenticatedClient {
         AuthenticatedClient::new(client, *self)
     }
 
+    /// Report a failed HTTP request to trigger token refresh logic.
+    ///
+    /// Call this method when you receive a 401 Unauthorized response from your API to determine
+    /// whether the request should be retried after refreshing tokens.
+    ///
+    /// This is primarily used internally by [`AuthenticatedClient`], but is exposed for advanced
+    /// use cases where you're making requests manually.
+    ///
+    /// # Parameters
+    /// - `status_code`: The HTTP status code received from the failed request.
+    ///
+    /// # Returns
+    /// [`RequestAction::Retry`] if tokens were refreshed and the request should be retried,
+    /// or [`RequestAction::Fail`] if the request should be marked as failed.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use leptos_keycloak_auth::{expect_authenticated, Authenticated, RequestAction};
+    ///
+    /// let authenticated = expect_authenticated();
+    /// match authenticated.report_failed_http_request(http::StatusCode::UNAUTHORIZED) {
+    ///     RequestAction::Retry => {
+    ///         // Retry the request...
+    ///     }
+    ///     RequestAction::Fail => {
+    ///         // Handle the failure...
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
     pub fn report_failed_http_request(&self, status_code: http::StatusCode) -> RequestAction {
         self.auth_error_reporter.run(status_code)
     }
 }
 
+/// State when the user is not authenticated.
+///
+/// This state is entered when:
+/// - No token data exists (user hasn't logged in).
+/// - The access token has expired and cannot be refreshed.
+/// - The ID token failed validation.
+/// - OIDC discovery hasn't completed yet.
+/// - Any other authentication error occurred.
+///
+/// Use the signals within this struct to access error information and debug why authentication
+/// failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NotAuthenticated {
+    /// Reactive signal indicating whether any token data exists in local storage.
+    ///
+    /// `true` means token data was found but authentication failed for some other reason
+    /// (e.g., token expired, validation failed). `false` means no token data exists.
     pub has_token_data: Signal<bool>,
+
+    /// Reactive signal containing the last ID token validation error, if any.
+    ///
+    /// Use this to debug why ID token validation failed (e.g., invalid signature, wrong audience,
+    /// expired token, etc.).
     pub last_id_token_error: Signal<Option<KeycloakIdTokenClaimsError>>,
+
+    /// Reactive signal containing the last general authentication error, if any.
+    ///
+    /// This includes errors from OIDC discovery, token exchange, token refresh, and other
+    /// authentication operations.
     pub last_error: Signal<Option<KeycloakAuthError>>,
 }

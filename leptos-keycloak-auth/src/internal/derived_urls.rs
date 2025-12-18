@@ -1,6 +1,6 @@
 use crate::{
-    AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint, TokenEndpoint,
-    internal::OidcConfigWithTimestamp,
+    internal::OidcConfigWithTimestamp, AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint,
+    TokenEndpoint,
 };
 use leptos::prelude::Signal;
 use leptos::prelude::*;
@@ -24,7 +24,21 @@ pub enum DerivedUrlError {
     NoEndSessionEndpoint,
 }
 
+/// Reactive OIDC endpoint URLs derived from discovery configuration, automatically updating when
+/// the OIDC configuration changes, such as after initial discovery or a configuration refresh.
+/// These URLs are used throughout the authentication flow for various operations.
+///
+/// Endpoints include:
+/// - **JWK Set Endpoint**: For fetching public keys to verify token signatures
+/// - **Authorization Endpoint**: For initiating the authorization code flow
+/// - **Token Endpoint**: For exchanging authorization codes and refreshing tokens
+/// - **End Session Endpoint**: For logout operations
+///
+/// # Internal Use
+/// This is an internal component exposed via the `internals` feature flag for advanced
+/// use cases like testing or debugging.
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_field_names)] // Allow all field names to end with `_endpoint`.
 pub struct DerivedUrls {
     pub(crate) jwks_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
     pub(crate) authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,

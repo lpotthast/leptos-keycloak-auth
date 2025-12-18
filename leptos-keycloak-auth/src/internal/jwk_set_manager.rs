@@ -1,23 +1,34 @@
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
-use crate::internal::JwkSetWithTimestamp;
+use crate::internal::{track_age_of, JwkSetWithTimestamp};
 use crate::request::RequestError;
 use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
-use crate::time_ext::TimeDurationExt;
 use crate::{action, JwkSetEndpoint};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{use_interval, UseIntervalReturn};
 use std::time::Duration as StdDuration;
-use time::OffsetDateTime;
 
+/// Manages JSON Web Key (JWK) sets for token signature verification.
+///
+/// The `JwkSetManager` is responsible for:
+/// - Fetching JWK sets from the Keycloak JWKS endpoint
+/// - Caching JWK sets in local storage
+/// - Supporting key rotation scenarios
+/// - Automatic JWK set refreshes when the known data gets too old
+/// - Providing reactive signals for JWK set state
+///
+/// # Internal Use
+/// This is an internal component exposed via the `internals` feature flag for advanced
+/// use cases like testing or debugging.
 #[derive(Debug, Clone, Copy)]
 pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
     pub(crate) set_jwk_set: WriteSignal<Option<JwkSetWithTimestamp>>,
+
     pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
     pub(crate) set_jwk_set_old: WriteSignal<Option<JwkSetWithTimestamp>>,
+
     #[allow(unused)]
     pub jwk_set_age: Signal<StdDuration>,
     #[allow(unused)]
@@ -72,25 +83,10 @@ impl JwkSetManager {
 
         // Defaults to `Duration::MAX` if no config is known yet.
         // This leads to a refresh if no config is known yet!
-        let jwk_set_age = {
-            let UseIntervalReturn { counter, .. } = use_interval::<u64>(
-                options
-                    .read_value()
-                    .advanced
-                    .jwk_set_age_check_interval
-                    .as_millis()
-                    .try_into()
-                    .expect("Millis to not overflow a u64"),
-            );
-            Memo::new(move |_| {
-                let _count = counter.get();
-                jwk_set
-                    .read()
-                    .as_ref()
-                    .map(|it| (OffsetDateTime::now_utc() - it.retrieved).to_std_duration())
-                    .unwrap_or(StdDuration::MAX)
-            })
-        };
+        let jwk_set_age = track_age_of(
+            jwk_set,
+            options.read_value().advanced.jwk_set_age_check_interval,
+        );
 
         let jwk_set_expires_in = Memo::new(move |_| {
             options
@@ -113,8 +109,13 @@ impl JwkSetManager {
             // JWK set.
 
             if val.as_ref().map(|it| &it.jwk_set)
-                != jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
+                == jwk_set.read_untracked().as_ref().map(|it| &it.jwk_set)
             {
+                // If the JWK set itself is still the same, we still have to store the new
+                // timestamp stored in our newly received `val`!
+                // We would otherwise always have an "outdated" JWK set once it became too old.
+                set_jwk_set.set(val);
+            } else {
                 tracing::trace!("JWK set changed");
 
                 // Rotate currently known JWK set to `jwk_set_old`.
@@ -129,11 +130,6 @@ impl JwkSetManager {
                         })
                         .flatten(),
                 );
-            } else {
-                // If the JWK set itself is still the same, we still have to store the new
-                // timestamp stored in our newly received `val`!
-                // We would otherwise always have an "outdated" JWK set once it became too old.
-                set_jwk_set.set(val);
             }
         });
 
@@ -152,7 +148,7 @@ impl JwkSetManager {
                         ));
                     }
                     Err(err) => {
-                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...")
+                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...");
                     }
                 }
             }

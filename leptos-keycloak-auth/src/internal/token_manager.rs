@@ -3,6 +3,7 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
+use crate::response::{KnownOidcErrorCode, OidcErrorCode};
 use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
@@ -14,28 +15,78 @@ use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration as StdDuration;
 
+/// Strategy for handling token refresh failures.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum OnRefreshError {
+    /// Don't take any action. Keep the current (possibly expired) token.
     DoNothing,
+
+    /// Drop the token, effectively logging the user out.
     DropToken,
 }
 
+/// Manages the lifecycle of OAuth tokens including storage, expiry tracking, and automatic refresh.
+/// The manager automatically monitors token expiration and triggers refresh operations when tokens
+/// are "nearly expired" (configured via `AdvancedOptions`). This ensures a seamless user experience
+/// without interruption due to expired tokens.
+///
+/// The `TokenManager` is responsible for:
+/// - Exchanging authorization codes for tokens
+/// - Storing access and refresh tokens in local storage
+/// - Refreshing access tokens using refresh tokens
+/// - Tracking access and refresh token expiration and triggering proactive refreshes
+/// - Providing reactive signals for token state
+///
+/// # Internal Use
+/// This is an internal component exposed via the `internals` feature flag for advanced
+/// use cases like testing or debugging.
 #[derive(Clone, Copy)]
 pub struct TokenManager {
     /// Last known token data. Single source of truth of token information.
     /// May contain an expired access and / or refresh token.
     pub token: Signal<Option<TokenData>>,
+
+    /// Setter for the currently known token data.
     pub(crate) set_token: WriteSignal<Option<TokenData>>,
+
+    /// Duration for which the access token is valid, as configured in Keycloak's realm settings.
     pub access_token_lifetime: Signal<StdDuration>,
+
+    /// The duration for which the access token is still valid.
+    /// Periodically recomputed. Slowly approaching zero.
     pub access_token_expires_in: Signal<StdDuration>,
+
+    /// Whether the access token is about to expire. How much token lifetime
+    /// must be "left over" for this to switch from `false` to `true` depends on configuration.
+    /// Used to control automatic token refreshes.
     pub access_token_nearly_expired: Signal<bool>,
+
+    /// Whether the access token is expired / no longer usable. When this is `true`:
+    /// - `access_token_expires_in` will always report `Duration::ZERO`
+    /// - `access_token_nearly_expired` will always report `true`
     pub access_token_expired: Signal<bool>,
+
+    /// Duration for which the refresh token is valid, as configured in Keycloak's realm settings.
     pub refresh_token_lifetime: Signal<StdDuration>,
+
+    /// The duration for which the refresh token is still valid.
+    /// Periodically recomputed. Slowly approaching zero.
     pub refresh_token_expires_in: Signal<StdDuration>,
+
+    /// Whether the refresh token is about to expire. How much token lifetime
+    /// must be "left over" for this to switch from `false` to `true` depends on configuration.
+    /// Used to control automatic token refreshes.
     pub refresh_token_nearly_expired: Signal<bool>,
+
+    /// Whether the refresh token is expired / no longer usable. When this is `true`:
+    /// - `refresh_token_expires_in` will always report `Duration::ZERO`
+    /// - `refresh_token_nearly_expired` will always report `true`
     pub refresh_token_expired: Signal<bool>,
+
     pub(crate) exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
+
     pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
+
     pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
 }
 
@@ -60,11 +111,12 @@ impl Debug for TokenManager {
             .field("refresh_token_expired", &self.refresh_token_expired)
             .field("exchange_code_for_token_action", &"...")
             .field("token_endpoint", &self.token_endpoint)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl TokenManager {
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn new(
         options: StoredValue<Options>,
         handle_req_error: Callback<Option<RequestError>>,
@@ -133,11 +185,15 @@ impl TokenManager {
                         // let us get stuck in a loop. We therefore deem the access token to also
                         // be unusable.
                         match &err {
-                            RequestError::Send { .. } => {}
-                            RequestError::Decode { .. } => {}
+                            RequestError::Send { .. } | RequestError::Decode { .. } => {}
                             RequestError::ErrResponse { error_response } => {
-                                if error_response.error == "invalid_grant"
-                                    && error_response.error_description == "Invalid refresh token"
+                                if error_response.error
+                                    == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
+                                    && error_response
+                                        .error_description
+                                        .as_deref()
+                                        .unwrap_or_default()
+                                        == "Invalid refresh token"
                                 {
                                     set_token.set(None);
                                 }
@@ -155,11 +211,9 @@ impl TokenManager {
         });
 
         let access_token_lifetime = Memo::new(move |_| {
-            token
-                .read()
-                .as_ref()
-                .map(|it| it.estimated_access_token_lifetime().to_std_duration())
-                .unwrap_or(StdDuration::ZERO)
+            token.read().as_ref().map_or(StdDuration::ZERO, |it| {
+                it.estimated_access_token_lifetime().to_std_duration()
+            })
         });
 
         let access_token_expires_in = {
@@ -174,11 +228,9 @@ impl TokenManager {
             );
             Memo::new(move |_| {
                 let _count = counter.get();
-                token
-                    .read()
-                    .as_ref()
-                    .map(|it| it.access_token_time_left().to_std_duration())
-                    .unwrap_or(StdDuration::ZERO)
+                token.read().as_ref().map_or(StdDuration::ZERO, |it| {
+                    it.access_token_time_left().to_std_duration()
+                })
             })
         };
 
@@ -197,7 +249,7 @@ impl TokenManager {
                 .as_ref()
                 .and_then(|it| {
                     it.estimated_refresh_token_lifetime()
-                        .map(|it| it.to_std_duration())
+                        .map(TimeDurationExt::to_std_duration)
                 })
                 .unwrap_or(StdDuration::ZERO)
         });
@@ -217,7 +269,10 @@ impl TokenManager {
                 token
                     .read()
                     .as_ref()
-                    .and_then(|it| it.refresh_token_time_left().map(|it| it.to_std_duration()))
+                    .and_then(|it| {
+                        it.refresh_token_time_left()
+                            .map(TimeDurationExt::to_std_duration)
+                    })
                     .unwrap_or(StdDuration::ZERO)
             })
         };
@@ -286,7 +341,7 @@ impl TokenManager {
         }
     }
 
-    /// Note: This silently errors if no token_endpoint is known yet.
+    /// Note: This silently errors if no `token` OIDC endpoint is known yet.
     pub(crate) fn exchange_code_for_token(
         &self,
         auth_code: AuthorizationCode,
@@ -297,7 +352,7 @@ impl TokenManager {
         let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
             Ok(token_endpoint) => token_endpoint.clone(),
             Err(err) => {
-                tracing::warn!(
+                tracing::error!(
                     ?err,
                     "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config."
                 );

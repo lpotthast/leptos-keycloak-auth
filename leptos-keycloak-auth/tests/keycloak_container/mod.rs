@@ -44,8 +44,8 @@ impl KeycloakContainer {
                 println!(
                     "{}",
                     match frame {
-                        LogFrame::StdOut(bytes) => String::from_utf8_lossy(&bytes),
-                        LogFrame::StdErr(bytes) => String::from_utf8_lossy(&bytes),
+                        LogFrame::StdOut(bytes) | LogFrame::StdErr(bytes) =>
+                            String::from_utf8_lossy(bytes),
                     }
                 );
             });
@@ -69,7 +69,7 @@ impl KeycloakContainer {
             .await
             .expect("Keycloak to export port 9000");
 
-        let url = Url::parse(format!("http://127.0.0.1:{}", port).as_str()).unwrap();
+        let url = Url::parse(format!("http://127.0.0.1:{port}").as_str()).unwrap();
         tracing::info!(available_at = ?url, "Keycloak started.");
 
         Self {

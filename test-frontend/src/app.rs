@@ -1,3 +1,5 @@
+#![allow(clippy::must_use_candidate)]
+
 use crate::routes::routes;
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
@@ -5,14 +7,15 @@ use leptos::prelude::*;
 use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
-    UseKeycloakAuthOptions, ValidationOptions,
+    AdvancedOptions, UseKeycloakAuthOptions, ValidationOptions, expect_authenticated,
+    expect_keycloak_auth, init_keycloak_auth, to_current_url,
 };
-use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
-use leptos_router::components::*;
+use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_router::components::{Outlet, Router};
 use leptos_router::hooks::use_location;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+#[must_use]
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
         <!DOCTYPE html>
@@ -47,7 +50,7 @@ pub fn App() -> impl IntoView {
         <Title text="Leptonic SSR template"/>
 
         <Root default_theme=LeptonicTheme::default()>
-            <main style=r#"
+            <main style=r"
                 height: 100%;
                 width: 100%;
                 display: flex;
@@ -56,7 +59,7 @@ pub fn App() -> impl IntoView {
                 padding: 1em;
                 background-color: antiquewhite;
                 overflow: auto;
-            "#>
+            ">
                 <Router>
                     { routes::generated_routes() }
                 </Router>
@@ -210,7 +213,7 @@ struct KeycloakPort(u16);
 
 #[component]
 pub fn Protected(children: ChildrenFn) -> impl IntoView {
-    // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected are
+    // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected area
     // client-side only. We should also not execute `use_keycloak_auth` on the server, as it has
     // no support for SSR yet.
     //
@@ -237,7 +240,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
                     },
                     delay_during_hydration: false,
-                    advanced: Default::default(),
+                    advanced: AdvancedOptions::default(),
                 });
                 view! {
                     <ShowWhenAuthenticated fallback=|| view! { <Login/> }>

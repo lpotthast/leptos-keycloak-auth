@@ -44,7 +44,7 @@ async fn test_integration() -> anyhow::Result<()> {
         loop {
             buf.clear();
             let input = std::io::stdin().read_line(&mut buf);
-            if let Ok(_) = input {
+            if input.is_ok() {
                 match buf.trim() {
                     "y" => break,
                     "n" => return Ok(()),
@@ -61,11 +61,12 @@ async fn test_integration() -> anyhow::Result<()> {
     tracing::info!("Starting webdriver...");
     let chromedriver =
         Chromedriver::run(VersionRequest::LatestIn(Channel::Stable), PortRequest::Any).await?;
+    #[allow(clippy::redundant_closure_for_method_calls)]
     chromedriver
         .with_custom_session(
             |caps| caps.unset_headless(),
             async |driver| {
-                match ui_test(&driver).await {
+                match ui_test(driver).await {
                     Ok(()) => {
                         tracing::info!("Frontend test passed!");
                     }
