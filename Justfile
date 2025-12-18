@@ -29,21 +29,21 @@ leptosfmt:
   leptosfmt ./leptos-keycloak-auth/src/*
   leptosfmt ./test-frontend/src/*
 
+# Run `cargo test` for every crate.
+test:
+  cargo test --manifest-path ./leptos-keycloak-auth/Cargo.toml -- --nocapture
+
 # Run `cargo update` for every crate, updating the dependencies of all crates to the latest non-breaking version. Rewrites Cargo.lock files.
 update:
   cargo update --manifest-path ./leptos-keycloak-auth/Cargo.toml
   cargo update --manifest-path ./test-frontend/Cargo.toml
-
-# Run `cargo test` for every crate.
-test:
-  cargo test --manifest-path ./leptos-keycloak-auth/Cargo.toml -- --nocapture
 
 # Run `cargo upgrades` for every crate, checking if new crate versions including potentially breaking changes are available.
 upgrades: # "-" prefixes allow for non-zero status codes!
   -cargo upgrades --manifest-path ./leptos-keycloak-auth/Cargo.toml
   -cargo upgrades --manifest-path ./test-frontend/Cargo.toml
 
-# Run `cargo upgrade` for every crate, automatically bumping all dependencies to their latest versions
+# Run `cargo upgrade` for every crate, automatically bumping all dependencies to their latest versions.
 upgrade: # "-" prefixes allow for non-zero status codes!
   -cargo upgrade --manifest-path ./leptos-keycloak-auth/Cargo.toml
   -cargo upgrade --manifest-path ./test-frontend/Cargo.toml
@@ -51,4 +51,4 @@ upgrade: # "-" prefixes allow for non-zero status codes!
 # Run `cargo clippy --tests -- -Dclippy::all -Dclippy::pedantic` for every crate.
 clippy: # "-" prefixes allow for non-zero status codes!
   -cargo clippy --tests --manifest-path ./leptos-keycloak-auth/Cargo.toml -- -Dclippy::all -Dclippy::pedantic
-  -cargo clippy --tests --manifest-path ../test-frontend/Cargo.toml -- -Dclippy::all -Dclippy::pedantic
+  -cargo clippy --tests --manifest-path ./test-frontend/Cargo.toml -- -Dclippy::all -Dclippy::pedantic

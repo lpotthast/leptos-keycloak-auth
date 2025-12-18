@@ -1,5 +1,9 @@
 use crate::oidc::OidcConfig;
+use crate::time_ext::TimeDurationExt;
+use leptos::prelude::*;
+use leptos_use::{use_interval, UseIntervalReturn};
 use serde::{Deserialize, Serialize};
+use std::time::Duration as StdDuration;
 use time::OffsetDateTime;
 use url::Url;
 
@@ -12,6 +16,7 @@ pub(crate) mod token_manager;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OidcConfigWithTimestamp {
     pub oidc_config: OidcConfig,
+
     #[serde(with = "time::serde::rfc3339")]
     pub retrieved: OffsetDateTime,
 
@@ -26,6 +31,7 @@ pub struct OidcConfigWithTimestamp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JwkSetWithTimestamp {
     pub jwk_set: jsonwebtoken::jwk::JwkSet,
+
     #[serde(with = "time::serde::rfc3339")]
     pub retrieved: OffsetDateTime,
 
@@ -35,4 +41,37 @@ pub struct JwkSetWithTimestamp {
     /// We see any change in the url, be it host, port, realm, ... as a potentially completely
     /// different provider for which the already known / cached information is no longer applicable.
     pub source: Url,
+}
+
+trait BornAt {
+    fn born_at(&self) -> OffsetDateTime;
+}
+impl BornAt for OidcConfigWithTimestamp {
+    fn born_at(&self) -> OffsetDateTime {
+        self.retrieved
+    }
+}
+impl BornAt for JwkSetWithTimestamp {
+    fn born_at(&self) -> OffsetDateTime {
+        self.retrieved
+    }
+}
+
+/// Creates a periodically updating signal, tracking the time the given object is alive for.
+fn track_age_of<T: BornAt + Send + Sync + 'static>(
+    data: Signal<Option<T>>,
+    check_interval: StdDuration,
+) -> Memo<StdDuration> {
+    let UseIntervalReturn { counter, .. } = use_interval::<u64>(
+        check_interval
+            .as_millis()
+            .try_into()
+            .expect("Millis to not overflow a u64"),
+    );
+    Memo::new(move |_| {
+        let _count = counter.get();
+        data.read().as_ref().map_or(StdDuration::MAX, |it| {
+            (OffsetDateTime::now_utc() - it.born_at()).to_std_duration()
+        })
+    })
 }

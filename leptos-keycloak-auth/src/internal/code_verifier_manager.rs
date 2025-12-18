@@ -4,6 +4,21 @@ use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
 
+/// Manages PKCE code verifiers and challenges for secure authorization flows.
+///
+/// The `CodeVerifierManager` is responsible for:
+/// - Generating cryptographically secure code verifiers
+/// - Deriving code challenges from verifiers
+/// - Storing verifiers in session storage to survive navigation
+/// - Regenerating verifiers for new authorization flows
+///
+/// Code verifiers are stored in session storage because the authorization flow involves
+/// navigating away from the application to Keycloak's login page and then being redirected
+/// back, which causes a full page reload.
+///
+/// # Internal Use
+/// This is an internal component exposed via the `internals` feature flag for advanced
+/// use cases like testing or debugging.
 #[derive(Debug, Clone, Copy)]
 pub struct CodeVerifierManager {
     pub code_verifier: Signal<Option<CodeVerifier<128>>>,
@@ -42,7 +57,7 @@ impl CodeVerifierManager {
             code_verifier
                 .read()
                 .as_ref()
-                .map(|it| it.to_code_challenge())
+                .map(CodeVerifier::to_code_challenge)
         });
 
         Self {

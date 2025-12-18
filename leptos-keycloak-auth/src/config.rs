@@ -3,24 +3,112 @@ use leptos::prelude::RwSignal;
 use std::time::Duration as StdDuration;
 use url::Url;
 
+/// Specifies how much lifetime must remain for a token to not be considered "nearly expired".
+///
+/// This is used to determine when tokens should be refreshed proactively, before they actually
+/// expire.
+/// Refreshing tokens before expiration provides a better user experience by avoiding authentication
+/// errors during active sessions. (An expired token would still potentially be handled by a retry
+/// when our [`AuthenticatedClient`](crate::authenticated_client::AuthenticatedClient) is used.)
+///
+/// # Variants
+/// - **Percentage**: Token is nearly expired if remaining lifetime is ≤ this percentage of total lifetime
+///   (e.g., `Percentage(0.25)` means refresh when 25% or less of lifetime remains)
+/// - **Duration**: Token is nearly expired if remaining lifetime is ≤ this duration
+///   (e.g., `Duration(Duration::from_secs(60))` means refresh when 60 seconds or less remain)
 #[derive(Debug, Clone, Copy)]
 pub enum LifeLeft {
+    /// Token is nearly expired when remaining lifetime ≤ this percentage of total lifetime.
+    ///
+    /// Value should be between 0.0 and 1.0 (e.g., 0.25 = 25%).
     Percentage(f64),
+
+    /// Token is nearly expired when remaining lifetime ≤ this absolute duration.
     Duration(StdDuration),
 }
 
 impl LifeLeft {
+    /// Check if a token is nearly expired based on the configured threshold.
+    ///
+    /// # Parameters
+    /// - `lifetime`: The total lifetime of the token (time between issued-at and expiration).
+    /// - `left`: The remaining lifetime of the token (time until expiration).
+    ///
+    /// # Returns
+    /// `true` if the token should be considered nearly expired and should be refreshed.
+    ///
+    /// # Example
+    /// ```
+    /// use std::time::Duration;
+    /// use leptos_keycloak_auth::LifeLeft;
+    ///
+    /// let lifetime = Duration::from_hours(1);
+    /// let left = Duration::from_mins(10);
+    ///
+    /// // Check with percentage threshold (25% = 15 minutes). But 10 min < 15 min!
+    /// let by_percentage = LifeLeft::Percentage(0.25);
+    /// assert!(by_percentage.nearly_expired(lifetime, left));
+    ///
+    /// // Check with absolute duration threshold (5 minutes). But 10 min < 15 min!
+    /// let by_duration = LifeLeft::Duration(Duration::from_mins(15));
+    /// assert!(by_duration.nearly_expired(lifetime, left));
+    /// ```
+    #[must_use]
     pub fn nearly_expired(self, lifetime: StdDuration, left: StdDuration) -> bool {
         match self {
-            LifeLeft::Percentage(p) => (left.as_millis() as f64 / lifetime.as_millis() as f64) <= p,
+            LifeLeft::Percentage(p) => (left.as_secs_f64() / lifetime.as_secs_f64()) <= p,
             LifeLeft::Duration(d) => left <= d,
         }
     }
 }
 
+/// Configuration for ID token validation.
+///
+/// These options control how the ID token received from Keycloak is validated.
+/// Proper validation ensures that tokens are only accepted from trusted issuers and are intended
+/// for your application.
+///
+/// # Security Note
+/// It's recommended to set both `expected_audiences` and `expected_issuers` for production
+/// applications to prevent token replay attacks and ensure tokens are only accepted from your
+/// Keycloak instance.
 #[derive(Debug, Clone)]
 pub struct ValidationOptions {
+    /// Expected audience(s) (`aud` claim) in the ID token.
+    ///
+    /// Set this to your client ID to ensure the token was issued for your application.
+    /// If `None`, audience validation is skipped (not recommended for production).
+    ///
+    /// # Example
+    /// ```
+    /// use leptos_keycloak_auth::ValidationOptions;
+    ///
+    /// let validation = ValidationOptions {
+    ///     expected_audiences: Some(vec!["my-client-id".to_string()]),
+    ///     expected_issuers: None,
+    /// };
+    /// ```
     pub expected_audiences: Option<Vec<String>>,
+
+    /// Expected issuer(s) (`iss` claim) in the ID token.
+    ///
+    /// Set this to your Keycloak realm's issuer URL to ensure the token came from
+    /// your Keycloak instance. The issuer URL typically follows the pattern:
+    /// `https://your-keycloak.example.com/realms/your-realm`
+    ///
+    /// If `None`, issuer validation is skipped (not recommended for production).
+    ///
+    /// # Example
+    /// ```
+    /// use leptos_keycloak_auth::ValidationOptions;
+    ///
+    /// let validation = ValidationOptions {
+    ///     expected_audiences: None,
+    ///     expected_issuers: Some(vec![
+    ///         "https://keycloak.example.com/realms/myrealm".to_string()
+    ///     ]),
+    /// };
+    /// ```
     pub expected_issuers: Option<Vec<String>>,
 }
 
@@ -29,7 +117,7 @@ pub struct ValidationOptions {
 /// client ID, and other related data.
 #[derive(Debug, Clone)]
 pub struct UseKeycloakAuthOptions {
-    /// Url of your keycloak instance, E.g. "https://localhost:8443/"
+    /// Url of your keycloak instance, E.g. <https://localhost:8443>
     pub keycloak_server_url: Url,
 
     /// The keycloak realm you want to use.

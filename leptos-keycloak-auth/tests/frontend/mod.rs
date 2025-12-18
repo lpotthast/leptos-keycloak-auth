@@ -80,7 +80,7 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
                 "Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work."
             );
         }
-    };
+    }
 
     tracing::info!("Frontend started!");
     Frontend {

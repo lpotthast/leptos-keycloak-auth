@@ -1,21 +1,30 @@
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrls;
-use crate::internal::OidcConfigWithTimestamp;
+use crate::internal::{track_age_of, OidcConfigWithTimestamp};
 use crate::request::RequestError;
 use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
-use crate::time_ext::TimeDurationExt;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use leptos_use::{use_interval, UseIntervalReturn};
 use std::fmt::Debug;
 use std::time::Duration as StdDuration;
-use time::OffsetDateTime;
 
+/// Manages OIDC discovery configuration with automatic fetching and caching.
+///
+/// The `OidcConfigManager` is responsible for:
+/// - Fetching OIDC discovery metadata
+/// - Caching the configuration in local storage
+/// - Tracking configuration age and triggering refreshes when too old
+/// - Providing reactive signals for configuration state
+///
+/// # Internal Use
+/// This is an internal component exposed via the `internals` feature flag for advanced
+/// use cases like testing or debugging.
 #[derive(Debug, Clone, Copy)]
 pub struct OidcConfigManager {
     pub oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
     pub(crate) set_oidc_config: WriteSignal<Option<OidcConfigWithTimestamp>>,
+
     #[allow(unused)]
     pub oidc_config_age: Signal<StdDuration>,
     #[allow(unused)]
@@ -53,25 +62,10 @@ impl OidcConfigManager {
 
         // Defaults to `Duration::MAX` if no config is known yet.
         // This leads to a refresh if no config is known yet!
-        let oidc_config_age = {
-            let UseIntervalReturn { counter, .. } = use_interval::<u64>(
-                options
-                    .read_value()
-                    .advanced
-                    .oidc_config_age_check_interval
-                    .as_millis()
-                    .try_into()
-                    .expect("Millis to not overflow a u64"),
-            );
-            Memo::new(move |_| {
-                let _count = counter.get();
-                oidc_config
-                    .read()
-                    .as_ref()
-                    .map(|it| (OffsetDateTime::now_utc() - it.retrieved).to_std_duration())
-                    .unwrap_or(StdDuration::MAX)
-            })
-        };
+        let oidc_config_age = track_age_of(
+            oidc_config,
+            options.read_value().advanced.oidc_config_age_check_interval,
+        );
 
         let oidc_config_expires_in = Memo::new(move |_| {
             options

@@ -1,5 +1,5 @@
-use crate::DiscoveryEndpoint;
 use crate::response::SuccessTokenResponse;
+use crate::DiscoveryEndpoint;
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use url::Url;
@@ -59,6 +59,8 @@ impl TokenData {
         }
     }
 
+    /// # Returns
+    /// A negative duration should the expiration time lay in the past.
     pub(crate) fn access_token_time_left(&self) -> Duration {
         self.access_token_expires_at - OffsetDateTime::now_utc()
     }
