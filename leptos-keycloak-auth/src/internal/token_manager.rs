@@ -3,7 +3,6 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
-use crate::response::{KnownOidcErrorCode, OidcErrorCode};
 use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
@@ -187,14 +186,7 @@ impl TokenManager {
                         match &err {
                             RequestError::Send { .. } | RequestError::Decode { .. } => {}
                             RequestError::ErrResponse { error_response } => {
-                                if error_response.error
-                                    == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
-                                    && error_response
-                                        .error_description
-                                        .as_deref()
-                                        .unwrap_or_default()
-                                        == "Invalid refresh token"
-                                {
+                                if error_response.is_invalid_refresh_token() {
                                     set_token.set(None);
                                 }
                             }
