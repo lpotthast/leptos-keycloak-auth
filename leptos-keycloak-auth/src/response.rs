@@ -122,6 +122,14 @@ pub struct ErrorResponse {
     pub error_uri: Option<String>,
 }
 
+impl ErrorResponse {
+    /// Check if this represents an invalid or expired refresh token.
+    pub fn is_invalid_refresh_token(&self) -> bool {
+        self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
+            && self.error_description.as_deref().unwrap_or_default() == "Invalid refresh token"
+    }
+}
+
 /// A trait for converting parameters from a map to a structure for
 /// `SuccessCallbackResponse`.
 impl leptos_router::params::Params for SuccessLoginResponse {
