@@ -9,7 +9,7 @@
 /// - `LENGTH` - Must be between 43 and 128. Validated at compile time through
 ///   [`generate`](CodeVerifier::generate).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CodeVerifier<const LENGTH: usize> {
+pub struct CodeVerifier<const LENGTH: usize = 128> {
     code_verifier: String,
 }
 

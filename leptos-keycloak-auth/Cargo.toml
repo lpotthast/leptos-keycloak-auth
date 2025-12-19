@@ -1,6 +1,6 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.8.4"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.88.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
@@ -17,14 +17,15 @@ ssr = []
 internals = []
 
 [dependencies]
+async-trait = "0.1.89"
 base64 = "0.22.1"
 codee = { version = "0.3.5", features = ["json_serde"] }
 http = "1.4.0"
 itertools = "0.14.0"
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
-leptos = "0.8.14"
-leptos-use = { version = "0.16.3", default-features = false, features = ["use_interval", "storage"] }
-leptos_router = "0.8.10"
+leptos = "0.8.15"
+leptos-use = { version = "0.17.0", default-features = false, features = ["use_interval", "storage"] }
+leptos_router = "0.8.11"
 rand = "0.9.2"
 reqwest = { version = "0.12.26", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -32,7 +33,7 @@ serde_json = "1.0.145"
 sha2 = "0.10.9"
 snafu = "0.8.9"
 time = { version = "0.3.44", features = ["wasm-bindgen", "serde"] }
-tracing = "0.1.43"
+tracing = "0.1.44"
 url = { version = "2.5.7", features = ["serde"] }
 
 [dev-dependencies]
@@ -43,7 +44,7 @@ axum-keycloak-auth = "0.8.3"
 chrome-for-testing-manager = { version = "0.6.0", features = ["thirtyfour"] }
 http = "1.4.0"
 keycloak = "26.4.0"
-testcontainers = "0.26.0"
+testcontainers = "0.26.2"
 thirtyfour = "0.36.1"
 tokio = "1.48.0"
 tokio-process-tools = "0.7.2"

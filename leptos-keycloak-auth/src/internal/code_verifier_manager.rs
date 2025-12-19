@@ -21,9 +21,10 @@ use leptos_use::storage::StorageType;
 /// use cases like testing or debugging.
 #[derive(Debug, Clone, Copy)]
 pub struct CodeVerifierManager {
-    pub code_verifier: Signal<Option<CodeVerifier<128>>>,
-    pub(crate) set_code_verifier: WriteSignal<Option<CodeVerifier<128>>>,
-    pub code_challenge: Memo<Option<CodeChallenge>>,
+    pub code_verifier: Signal<CodeVerifier<128>>,
+    pub(crate) set_code_verifier: Callback<CodeVerifier<128>>,
+
+    pub code_challenge: Memo<CodeChallenge>,
 }
 
 impl CodeVerifierManager {
@@ -41,24 +42,15 @@ impl CodeVerifierManager {
             write: set_code_verifier,
             remove: _remove_code_verifier_from_storage,
             ..
-        } = use_storage_with_options_and_error_handler::<Option<CodeVerifier<128>>, JsonSerdeCodec>(
+        } = use_storage_with_options_and_error_handler::<CodeVerifier<128>, JsonSerdeCodec>(
             // Forcing session storage, because this data point must be as secure as possible,
             // and we do not care that we may lose the code from a page-refresh or tab-close.
             StorageType::Session,
             "leptos_keycloak_auth__code_verifier",
-            None,
+            move || CodeVerifier::<128>::generate(),
         );
 
-        if code_verifier.read_untracked().is_none() {
-            tracing::trace!("No code_verifier found in session storage, generating new one...");
-            set_code_verifier.set(Some(CodeVerifier::<128>::generate()));
-        }
-        let code_challenge = Memo::new(move |_| {
-            code_verifier
-                .read()
-                .as_ref()
-                .map(CodeVerifier::to_code_challenge)
-        });
+        let code_challenge = Memo::new(move |_| code_verifier.read().to_code_challenge());
 
         Self {
             code_verifier,
@@ -68,7 +60,6 @@ impl CodeVerifierManager {
     }
 
     pub(crate) fn regenerate(&self) {
-        self.set_code_verifier
-            .set(Some(CodeVerifier::<128>::generate()));
+        self.set_code_verifier.run(CodeVerifier::<128>::generate());
     }
 }

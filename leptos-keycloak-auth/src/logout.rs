@@ -1,7 +1,8 @@
-use crate::EndSessionEndpoint;
 use crate::config::Options;
+use crate::csrf_token::CsrfToken;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::token::TokenData;
+use crate::EndSessionEndpoint;
 use leptos::prelude::*;
 use url::Url;
 
@@ -10,6 +11,7 @@ pub(crate) fn create_logout_url_signal(
     token: Signal<Option<TokenData>>,
     options: StoredValue<Options>,
     pending_hydration: Signal<bool>,
+    csrf_token: Signal<CsrfToken>,
 ) -> Memo<Option<Url>> {
     Memo::new(move |_| {
         // Only creating the url (and accessing relevant signals) when not hydrating anymore,
@@ -25,21 +27,38 @@ pub(crate) fn create_logout_url_signal(
             Err(_) => return Option::<Url>::None,
         };
 
-        let mut post_logout_redirect_url = options.read_value().post_logout_redirect_url.get();
-        post_logout_redirect_url
-            .query_pairs_mut()
-            .append_pair("destroy_session", "true");
-
-        let mut logout_url: Url = end_session_endpoint;
-        logout_url.query_pairs_mut().append_pair(
-            "post_logout_redirect_uri",
-            post_logout_redirect_url.as_str(),
-        );
-        if let Some(token_data) = token.read().as_ref() {
-            logout_url
-                .query_pairs_mut()
-                .append_pair("id_token_hint", &token_data.id_token);
-        }
-        Some(logout_url)
+        Some(create_logout_url(
+            end_session_endpoint,
+            options.read_value().post_logout_redirect_url.get(),
+            token.read().as_ref().map(|it| it.id_token.as_str()),
+            &csrf_token.read(),
+        ))
     })
+}
+
+pub(crate) fn create_logout_url(
+    mut end_session_endpoint: EndSessionEndpoint,
+    mut post_logout_redirect_uri: Url,
+    id_token_hint: Option<&str>,
+    logout_token: &CsrfToken,
+) -> Url {
+    post_logout_redirect_uri
+        .query_pairs_mut()
+        .append_pair("destroy_session", "true");
+
+    {
+        let mut query_params = end_session_endpoint.query_pairs_mut();
+
+        query_params.append_pair(
+            "post_logout_redirect_uri",
+            post_logout_redirect_uri.as_str(),
+        );
+        query_params.append_pair("destroy_session", "true");
+
+        if let Some(id_token_hint) = id_token_hint {
+            query_params.append_pair("id_token_hint", id_token_hint);
+        }
+        query_params.append_pair("state", logout_token.as_str());
+    }
+    end_session_endpoint
 }

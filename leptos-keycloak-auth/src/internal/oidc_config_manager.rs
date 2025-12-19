@@ -23,7 +23,7 @@ use std::time::Duration as StdDuration;
 #[derive(Debug, Clone, Copy)]
 pub struct OidcConfigManager {
     pub oidc_config: Signal<Option<OidcConfigWithTimestamp>>,
-    pub(crate) set_oidc_config: WriteSignal<Option<OidcConfigWithTimestamp>>,
+    pub(crate) set_oidc_config: Callback<Option<OidcConfigWithTimestamp>>,
 
     #[allow(unused)]
     pub oidc_config_age: Signal<StdDuration>,
@@ -49,7 +49,7 @@ impl OidcConfigManager {
         >(
             StorageType::Local,
             "leptos_keycloak_auth__oidc_config",
-            None,
+            move || None,
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
@@ -57,7 +57,7 @@ impl OidcConfigManager {
             && source != options.read_value().discovery_endpoint()
         {
             tracing::trace!("Current OIDC config came from old discovery endpoint. Dropping it.");
-            set_oidc_config.set(None);
+            set_oidc_config.run(None);
         }
 
         // Defaults to `Duration::MAX` if no config is known yet.
@@ -80,7 +80,7 @@ impl OidcConfigManager {
         });
 
         let retrieve_oidc_config_action = crate::action::create_retrieve_oidc_config_action(
-            Callback::new(move |val| set_oidc_config.set(val)),
+            Callback::new(move |val| set_oidc_config.run(val)),
             handle_req_error,
         );
 
@@ -106,6 +106,6 @@ impl OidcConfigManager {
 
     #[expect(unused)]
     pub(crate) fn forget(&self) {
-        self.set_oidc_config.set(None);
+        self.set_oidc_config.run(None);
     }
 }

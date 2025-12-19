@@ -113,6 +113,7 @@ mod authenticated_client;
 mod code_verifier;
 pub mod components;
 mod config;
+mod csrf_token;
 mod error;
 mod hooks;
 mod internal;
@@ -146,6 +147,7 @@ pub mod internals {
     pub use crate::code_verifier::CodeChallenge;
     pub use crate::code_verifier::CodeVerifier;
     pub use crate::internal::code_verifier_manager::CodeVerifierManager;
+    pub use crate::internal::csrf_token_manager::CsrfTokenManager;
     pub use crate::internal::derived_urls::DerivedUrls;
     pub use crate::internal::jwk_set_manager::JwkSetManager;
     pub use crate::internal::oidc_config_manager::OidcConfigManager;

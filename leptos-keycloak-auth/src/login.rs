@@ -10,18 +10,14 @@ use url::Url;
 pub(crate) fn create_login_url_signal(
     authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
     options: StoredValue<Options>,
-    code_challenge: Memo<Option<CodeChallenge>>,
+    code_challenge: Memo<CodeChallenge>,
 ) -> Memo<Option<Url>> {
     Memo::new(move |_| {
         let authorization_endpoint = match authorization_endpoint.read().as_ref() {
             Ok(it) => it.clone(),
             Err(_) => return Option::<Url>::None,
         };
-        #[allow(clippy::manual_let_else)]
-        let code_challenge = match code_challenge.get() {
-            Some(it) => it,
-            None => return Option::<Url>::None,
-        };
+        let code_challenge = code_challenge.read();
 
         let mut login_url: Url = authorization_endpoint;
         login_url

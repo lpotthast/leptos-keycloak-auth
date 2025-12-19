@@ -21,6 +21,9 @@ pub(crate) struct SuccessLoginResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) struct SuccessLogoutResponse {
     pub destroy_session: bool,
+
+    /// Should contain the csrf token that we sent as part of our `post_logout_redirect_uri`.
+    pub state: Option<String>,
 }
 
 /// An enumeration representing the response to token requests, including
@@ -128,6 +131,13 @@ impl ErrorResponse {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
             && self.error_description.as_deref().unwrap_or_default() == "Invalid refresh token"
     }
+
+    /// Check if this represents a "Session not active" error.
+    /// In that case, any still known refresh token can be dropped, as the user was logged out.
+    pub fn is_session_not_active(&self) -> bool {
+        self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
+            && self.error_description.as_deref().unwrap_or_default() == "Session not active"
+    }
 }
 
 /// A trait for converting parameters from a map to a structure for
@@ -165,7 +175,13 @@ impl leptos_router::params::Params for SuccessLogoutResponse {
             })
             .unwrap_or_default();
 
-        Ok(SuccessLogoutResponse { destroy_session })
+        // Parse optional state parameter
+        let state = map.get("state");
+
+        Ok(SuccessLogoutResponse {
+            destroy_session,
+            state,
+        })
     }
 }
 
@@ -205,11 +221,11 @@ impl leptos_router::params::Params for CallbackResponse {
                 Err(_) => match ErrorResponse::from_map(map) {
                     Ok(response) => Ok(CallbackResponse::Error(response)),
                     Err(err) => {
-                        let msg = format!(
+                        // Note: This is the expected code path when there are no query parameters!
+                        // We therefore do not log anything error here.
+                        Err(ParamsError::MissingParam(format!(
                             "Could not parse query parameters into any expected Keycloak response: {err}"
-                        );
-                        tracing::error!("{msg}");
-                        Err(ParamsError::MissingParam(msg))
+                        )))
                     }
                 },
             },

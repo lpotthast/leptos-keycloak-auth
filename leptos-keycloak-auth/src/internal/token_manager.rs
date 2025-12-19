@@ -3,6 +3,7 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::derived_urls::DerivedUrlError;
 use crate::request::RequestError;
+use crate::response::{KnownOidcErrorCode, OidcErrorCode};
 use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use crate::time_ext::TimeDurationExt;
 use crate::token::TokenData;
@@ -46,7 +47,7 @@ pub struct TokenManager {
     pub token: Signal<Option<TokenData>>,
 
     /// Setter for the currently known token data.
-    pub(crate) set_token: WriteSignal<Option<TokenData>>,
+    pub(crate) set_token: Callback<Option<TokenData>>,
 
     /// Duration for which the access token is valid, as configured in Keycloak's realm settings.
     pub access_token_lifetime: Signal<StdDuration>,
@@ -129,7 +130,7 @@ impl TokenManager {
         } = use_storage_with_options_and_error_handler::<Option<TokenData>, JsonSerdeCodec>(
             StorageType::Local,
             "leptos_keycloak_auth__token",
-            None,
+            move || None,
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
@@ -137,10 +138,10 @@ impl TokenManager {
             && source != options.read_value().discovery_endpoint()
         {
             tracing::trace!("Current token came from old discovery endpoint. Dropping it.");
-            set_token.set(None);
+            set_token.run(None);
         }
 
-        let handle_token = Callback::new(move |val| set_token.set(val));
+        let handle_token = Callback::new(move |val| set_token.run(val));
 
         // Note: Only call this after the OIDC config was loaded. Otherwise, no refresh can happen!
         let refresh_token_action =
@@ -174,26 +175,39 @@ impl TokenManager {
                         // Even if we haven't gotten an external request to always drop the token
                         // when an error was received, we may still want to drop the taken,
                         // based on the error that we got.
-                        // If Keycloak answers with a `BAD_REQUEST` response of
-                        // `{"error":"invalid_grant","error_description":"Invalid refresh token"}`,
-                        // we should still drop the token.
-                        // AND: We do so immediately, without checking if the token is fully expired.
-                        // This means that even if the token is only about to expire, we will drop it now,
-                        // as the refresh could have been triggered from us not being able to use
-                        // the access token. Not dropping it because it is not fully expired would
-                        // let us get stuck in a loop. We therefore deem the access token to also
-                        // be unusable.
                         match &err {
                             RequestError::Send { .. } | RequestError::Decode { .. } => {}
                             RequestError::ErrResponse { error_response } => {
                                 if error_response.is_invalid_refresh_token() {
-                                    set_token.set(None);
+                                    tracing::trace!(
+                                        "The known refresh_token is not valid. Dropping the refresh token. No additional refreshes will be performed."
+                                    );
+                                    // Drop all token data, including our access_token.
+                                    set_token.run(None);
+                                } else if error_response.is_session_not_active() {
+                                    tracing::trace!(
+                                        "The known refresh_token might be valid but the user has no Keycloak session anymore. User was logged out. Dropping the refresh_token. No additional refreshes will be performed."
+                                    );
+                                    // Drop all token data, including our access_token.
+                                    set_token.run(None);
+                                } else if error_response.error
+                                    == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
+                                {
+                                    tracing::warn!(
+                                        "Received an unexpected `invalid_grant` error. Did Keycloak's error messages change? If you see this, report at `https://github.com/lpotthast/leptos-keycloak-auth/issues`."
+                                    );
+                                    // Drop all token data, including our access_token.
+                                    set_token.run(None);
+                                } else {
+                                    tracing::warn!(
+                                        "Token refresh failed due to unexpected Keycloak error response: {error_response:?}"
+                                    );
                                 }
                             }
                         }
                     }
                     OnRefreshError::DropToken => {
-                        set_token.set(None);
+                        set_token.run(None);
                     }
                 }
                 err
@@ -308,7 +322,7 @@ impl TokenManager {
 
             if access_token_expired && refresh_token_expired {
                 // The token became unusable and can safely be forgotten.
-                set_token.set(None);
+                set_token.run(None);
             }
         });
 
@@ -372,6 +386,6 @@ impl TokenManager {
     /// OIDC server. If the user tried to log in again, his session would most likely be restored.
     pub(crate) fn forget(&self) {
         tracing::trace!("Dropping all token data");
-        self.set_token.set(None);
+        self.set_token.run(None);
     }
 }
