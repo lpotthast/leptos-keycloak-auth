@@ -164,55 +164,59 @@ pub struct UseKeycloakAuthOptions {
 pub struct AdvancedOptions {
     /// Interval after which the access token should be checked for its age.
     /// This has to happen frequently in order to detect an access token becoming expired.
+    ///
     /// Defaults to `Duration::from_millis(500)`.
     pub access_token_age_check_interval: StdDuration,
 
     /// Interval after which the refresh token should be checked for its age.
     /// This has to happen frequently in order to detect a refresh token becoming expired.
+    ///
     /// Defaults to `Duration::from_millis(500)`.
     pub refresh_token_age_check_interval: StdDuration,
 
     /// Describes how much time must be left for the access token to not count as "nearly expired".
     /// If any token is nearly expired, a refresh is triggered.
+    ///
     /// Defaults to `LifeLeft::Percentage(0.25)`.
     pub access_token_nearly_expired_having: LifeLeft,
 
     /// Describes how much time must be left for the refresh token to not count as "nearly expired".
     /// If any token is nearly expired, a refresh is triggered.
+    ///
     /// Defaults to `LifeLeft::Percentage(0.25)`.
     pub refresh_token_nearly_expired_having: LifeLeft,
 
     /// Interval after which the oidc configuration should be checked for its age.
+    ///
     /// Defaults to `Duration::from_secs(3)`.
     pub oidc_config_age_check_interval: StdDuration,
 
     /// Interval after which the jwk set should be checked for its age.
+    ///
     /// Defaults to `Duration::from_secs(3)`.
     pub jwk_set_age_check_interval: StdDuration,
 
     /// Time after which a discovered OIDC config is considered too old.
+    ///
     /// Defaults to `Duration::from_secs(60 * 5)`.
     pub max_oidc_config_age: StdDuration,
 
     /// Time after which the loaded JWK set is considered too old.
     /// After this age is reached, a new set of JWKs is queried for.
     /// If it didn't change, nothing will happen.
+    ///
     /// Defaults to `Duration::from_secs(60 * 5)`.
     pub max_jwk_set_age: StdDuration,
 
-    /// Enable CSRF detection for logout flow.
+    /// Enable CSRF detection for the logout flow.
     ///
     /// When enabled (default), logout URLs will include a `state` parameter that is validated
     /// on the logout callback to detect potential CSRF logout attacks.
     ///
     /// **Note**: This detects CSRF attacks but does not prevent them. Keycloak processes the
-    /// logout before returning control to your application. However, detection is valuable for:
-    /// - Security monitoring and incident response
-    /// - User notification when logout was suspicious
-    /// - Analytics to track if your application is under attack
-    ///
-    /// **Warning**: Disabling this means you won't detect CSRF logout attacks. Only disable
-    /// if you have a specific compatibility requirement (e.g., old bookmarked logout URLs).
+    /// logout before returning control to our application. However, detection is valuable for:
+    /// - Notifying users about suspicious logouts.
+    /// - Security monitoring and incident response.
     ///
     /// Defaults to `true`.
     pub logout_csrf_detection: bool,
