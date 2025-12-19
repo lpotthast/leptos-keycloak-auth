@@ -1,9 +1,10 @@
 use crate::authenticated_client::AuthenticatedClient;
 use crate::config::Options;
 use crate::error::KeycloakAuthError;
+use crate::internal::csrf_token_manager::CsrfTokenManager;
 use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
-use crate::AccessToken;
+use crate::{logout, AccessToken};
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_url};
 use leptos_router::NavigateOptions;
@@ -45,6 +46,18 @@ pub struct KeycloakAuth {
     /// Derived signal stating `true` when `state` is of the `Authenticated` variant.
     pub is_authenticated: Signal<bool>,
 
+    /// Signal indicating whether the last logout was suspicious (a potential CSRF attack).
+    ///
+    /// Applications can read this signal to show a warning message to users, such as:
+    /// "You may have been logged out by a malicious website."
+    ///
+    /// This signal resets to `false` on the next successful login.
+    pub suspicious_logout: Signal<bool>,
+
+    /// Call this function to dismiss/acknowledge the `suspicious_logout` warning.
+    /// This will reset `suspicious_logout` to `false`.
+    pub dismiss_suspicious_logout_warning: Callback<()>,
+
     pub(crate) derived_urls: crate::internal::derived_urls::DerivedUrls,
 
     #[allow(unused)]
@@ -57,6 +70,9 @@ pub struct KeycloakAuth {
     pub(crate) code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager,
 
     pub(crate) token_manager: crate::internal::token_manager::TokenManager,
+
+    #[allow(unused)]
+    pub(crate) csrf_token_manager: CsrfTokenManager,
 }
 
 /// Get the current URL (origin + path). Uses a tracking access to the current url.
@@ -172,7 +188,7 @@ impl KeycloakAuth {
     /// See also `end_session_and_go_to` if you want to immediately move to a different path after
     /// the logout was performed.
     pub fn end_session(&self) {
-        self.end_session_and_go_to(to_current_url_untracked().as_str());
+        self.end_session_and_go_to(to_current_url_untracked());
     }
 
     /// End the current session and navigate to a specified path.
@@ -189,31 +205,33 @@ impl KeycloakAuth {
     ///
     /// # Example
     /// ```no_run
+    /// use url::Url;
     /// use leptos_keycloak_auth::{expect_keycloak_auth};
     ///
     /// let auth = expect_keycloak_auth();
-    /// auth.end_session_and_go_to("/");
+    /// auth.end_session_and_go_to(Url::parse("/").unwrap());
     /// ```
-    pub fn end_session_and_go_to(&self, path: &str) {
+    pub fn end_session_and_go_to(&self, path: Url) {
         match (
             self.derived_urls.end_session_endpoint.get_untracked(),
             // We MUST clone here, as the `token_manager.forget()` will later clear the token data!
             self.token_manager.token.get_untracked(),
         ) {
-            (Ok(mut end_session_endpoint), Some(token)) => {
+            (Ok(end_session_endpoint), Some(token)) => {
                 self.token_manager.forget();
-                end_session_endpoint
-                    .query_pairs_mut()
-                    .append_pair("post_logout_redirect_uri", path)
-                    .append_pair("destroy_session", "true")
-                    .append_pair("id_token_hint", token.id_token.as_str());
+                let logout_url = logout::create_logout_url(
+                    end_session_endpoint,
+                    path,
+                    Some(token.id_token.as_str()),
+                    &self.csrf_token_manager.logout_token().read_untracked(),
+                );
 
                 let navigate = use_navigate();
-                navigate(end_session_endpoint.as_ref(), NavigateOptions::default());
+                navigate(logout_url.as_ref(), NavigateOptions::default());
             }
             _ => {
                 let navigate = use_navigate();
-                navigate(path, NavigateOptions::default());
+                navigate(path.as_str(), NavigateOptions::default());
             }
         }
     }
@@ -254,6 +272,11 @@ impl KeycloakAuth {
     #[cfg(feature = "internals")]
     pub fn token_manager(&self) -> &crate::internal::token_manager::TokenManager {
         &self.token_manager
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn csrf_token_manager(&self) -> &CsrfTokenManager {
+        &self.csrf_token_manager
     }
 }
 

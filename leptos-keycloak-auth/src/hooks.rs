@@ -52,6 +52,8 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let options = Options::new(options);
     let options = StoredValue::new(options);
 
+    let code_verifier = Signal::from(crate::code_verifier::CodeVerifier::generate());
+
     KeycloakAuth {
         options,
         derived_urls: DerivedUrls::new(Signal::from(None)),
@@ -61,43 +63,28 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         is_authenticated: Signal::from(false),
         oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager {
             oidc_config: Default::default(),
-            set_oidc_config: {
-                let (_, w) = signal(None);
-                w
-            },
+            set_oidc_config: { Callback::new(|_| {}) },
             oidc_config_age: Default::default(),
             oidc_config_expires_in: Default::default(),
             oidc_config_too_old: Default::default(),
         },
         jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager {
             jwk_set: Default::default(),
-            set_jwk_set: {
-                let (_, w) = signal(None);
-                w
-            },
+            set_jwk_set: { Callback::new(|_| {}) },
             jwk_set_old: Default::default(),
-            set_jwk_set_old: {
-                let (_, w) = signal(None);
-                w
-            },
+            set_jwk_set_old: { Callback::new(|_| {}) },
             jwk_set_age: Default::default(),
             jwk_set_expires_in: Default::default(),
             jwk_set_too_old: Default::default(),
         },
         code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager {
-            code_verifier: Default::default(),
-            set_code_verifier: {
-                let (_, w) = signal(None);
-                w
-            },
-            code_challenge: Memo::new(|_| None),
+            code_verifier,
+            set_code_verifier: { Callback::new(|_| {}) },
+            code_challenge: Memo::new(move |_| code_verifier.read().to_code_challenge()),
         },
         token_manager: crate::internal::token_manager::TokenManager {
             token: Default::default(),
-            set_token: {
-                let (_, w) = signal(None);
-                w
-            },
+            set_token: { Callback::new(|_| {}) },
             access_token_lifetime: Default::default(),
             access_token_expires_in: Default::default(),
             access_token_nearly_expired: Default::default(),
@@ -112,6 +99,9 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             )),
             trigger_refresh: Callback::new(|_| ()),
         },
+        csrf_token_manager: crate::internal::csrf_token_manager::CsrfTokenManager::new(),
+        suspicious_logout: Signal::from(false),
+        dismiss_suspicious_logout_warning: Callback::new(|_| ()),
     }
 }
 
@@ -163,12 +153,22 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let code_mgr = internal::code_verifier_manager::CodeVerifierManager::new();
 
+    let csrf_mgr = internal::csrf_token_manager::CsrfTokenManager::new();
+
+    // Allow tracing of suspicious logout attempts (potential CSRF attacks).
+    let (suspicious_logout, set_suspicious_logout) = signal(false);
+    let dismiss_suspicious_logout_warning = Callback::new(move |()| {
+        set_suspicious_logout.set(false);
+    });
+
     // Current state of our url parameters.
     let url_state = use_query::<CallbackResponse>();
 
     let (pending_login, set_pending_login) = signal(false);
     let unset_pending_login = Callback::<(), ()>::from(move || {
         set_pending_login.set(false);
+        // Reset suspicious logout flag on successful login.
+        dismiss_suspicious_logout_warning.run(());
     });
 
     // Handle changes in our url parameters.
@@ -184,7 +184,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // This means we can safely call the token exchange here, as we will do this only once per code we see.
                     token_mgr.exchange_code_for_token(
                         login_state.code.clone(),
-                        code_mgr.code_verifier.get_untracked().expect("present"),
+                        code_mgr.code_verifier.get_untracked(),
                         login_state.session_state.clone(),
                         unset_pending_login,
                     );
@@ -213,11 +213,28 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         NavigateOptions::default(),
                     );
                 }
-                CallbackResponse::SuccessfulLogout(logout_state) => {
-                    tracing::trace!(?logout_state, "Logout successful");
+                CallbackResponse::SuccessfulLogout(logout_response) => {
+                    tracing::trace!(?logout_response, "Logout callback received");
 
-                    // Note: This currently ignores the responses `destroy_session`.
+                    // Validate CSRF token to detection potentially malicious logout not controlled
+                    // by us.
+                    let is_suspicious_logout =
+                        if options.read_value().advanced.logout_csrf_detection {
+                            !csrf_mgr.validate_logout_token(
+                                logout_response.state.as_deref().unwrap_or_default(),
+                            )
+                        } else {
+                            tracing::debug!("Logout CSRF detection is disabled");
+                            false
+                        };
 
+                    // Note: This currently ignores the response's `destroy_session`.
+
+                    // Store suspicious logout flag for user notification.
+                    set_suspicious_logout.set(is_suspicious_logout);
+
+                    // Regardless of state validation, we must clean up local state
+                    // because Keycloak has already destroyed the session.
                     // We have to use `request_animation_frame` here, as setting the token to `None` would
                     // otherwise lead to an immediate execution of all reactive primitives depending on this.
                     // This includes our `Authenticated` state (and all component trees rendered under
@@ -229,6 +246,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
                         // We should recreate the code_verifier to have a new one for the next login phase.
                         code_mgr.regenerate();
+
+                        // We should use a new CSRF token in the next logout.
+                        tracing::warn!("regenerate csrf logout token");
+                        csrf_mgr.regenerate();
                     });
 
                     // We "remove" the auth related query parameters set in the logout process
@@ -411,6 +432,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             token_mgr.token,
             options,
             pending_hydration.into(),
+            csrf_mgr.logout_token(),
         )
         .into(),
         state: state.into(),
@@ -418,9 +440,12 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             KeycloakAuthState::Authenticated(_) => true,
             KeycloakAuthState::NotAuthenticated { .. } | KeycloakAuthState::Indeterminate => false,
         }),
+        suspicious_logout: suspicious_logout.into(),
+        dismiss_suspicious_logout_warning,
         oidc_config_manager: oidc_mgr,
         jwk_set_manager: jwk_set_mgr,
         code_verifier_manager: code_mgr,
         token_manager: token_mgr,
+        csrf_token_manager: csrf_mgr,
     }
 }

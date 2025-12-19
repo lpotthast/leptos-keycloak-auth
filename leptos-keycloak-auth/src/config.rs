@@ -199,6 +199,23 @@ pub struct AdvancedOptions {
     /// If it didn't change, nothing will happen.
     /// Defaults to `Duration::from_secs(60 * 5)`.
     pub max_jwk_set_age: StdDuration,
+
+    /// Enable CSRF detection for logout flow.
+    ///
+    /// When enabled (default), logout URLs will include a `state` parameter that is validated
+    /// on the logout callback to detect potential CSRF logout attacks.
+    ///
+    /// **Note**: This detects CSRF attacks but does not prevent them. Keycloak processes the
+    /// logout before returning control to your application. However, detection is valuable for:
+    /// - Security monitoring and incident response
+    /// - User notification when logout was suspicious
+    /// - Analytics to track if your application is under attack
+    ///
+    /// **Warning**: Disabling this means you won't detect CSRF logout attacks. Only disable
+    /// if you have a specific compatibility requirement (e.g., old bookmarked logout URLs).
+    ///
+    /// Defaults to `true`.
+    pub logout_csrf_detection: bool,
 }
 
 impl Default for AdvancedOptions {
@@ -212,6 +229,7 @@ impl Default for AdvancedOptions {
             jwk_set_age_check_interval: StdDuration::from_secs(3),
             max_oidc_config_age: StdDuration::from_secs(60 * 5),
             max_jwk_set_age: StdDuration::from_secs(60 * 5),
+            logout_csrf_detection: true,
         }
     }
 }

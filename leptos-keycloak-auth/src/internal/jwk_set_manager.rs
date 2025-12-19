@@ -24,10 +24,10 @@ use std::time::Duration as StdDuration;
 #[derive(Debug, Clone, Copy)]
 pub struct JwkSetManager {
     pub jwk_set: Signal<Option<JwkSetWithTimestamp>>,
-    pub(crate) set_jwk_set: WriteSignal<Option<JwkSetWithTimestamp>>,
+    pub(crate) set_jwk_set: Callback<Option<JwkSetWithTimestamp>>,
 
     pub jwk_set_old: Signal<Option<JwkSetWithTimestamp>>,
-    pub(crate) set_jwk_set_old: WriteSignal<Option<JwkSetWithTimestamp>>,
+    pub(crate) set_jwk_set_old: Callback<Option<JwkSetWithTimestamp>>,
 
     #[allow(unused)]
     pub jwk_set_age: Signal<StdDuration>,
@@ -51,7 +51,7 @@ impl JwkSetManager {
         } = use_storage_with_options_and_error_handler::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
             StorageType::Local,
             "leptos_keycloak_auth__jwk_set_old",
-            None,
+            move || None,
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
@@ -59,7 +59,7 @@ impl JwkSetManager {
             && source != options.read_value().discovery_endpoint()
         {
             tracing::trace!("Current JWK set (old) came from old discovery endpoint. Dropping it.");
-            set_jwk_set_old.set(None);
+            set_jwk_set_old.run(None);
         }
 
         let UseStorageReturn {
@@ -70,7 +70,7 @@ impl JwkSetManager {
         } = use_storage_with_options_and_error_handler::<Option<JwkSetWithTimestamp>, JsonSerdeCodec>(
             StorageType::Local,
             "leptos_keycloak_auth__jwk_set",
-            None,
+            move || None,
         );
 
         // Immediately forget the previously cached value when the discovery endpoint changed!
@@ -78,7 +78,7 @@ impl JwkSetManager {
             && source != options.read_value().discovery_endpoint()
         {
             tracing::trace!("Current JWK set came from old discovery endpoint. Dropping it.");
-            set_jwk_set.set(None);
+            set_jwk_set.run(None);
         }
 
         // Defaults to `Duration::MAX` if no config is known yet.
@@ -114,22 +114,19 @@ impl JwkSetManager {
                 // If the JWK set itself is still the same, we still have to store the new
                 // timestamp stored in our newly received `val`!
                 // We would otherwise always have an "outdated" JWK set once it became too old.
-                set_jwk_set.set(val);
+                set_jwk_set.run(val);
             } else {
                 tracing::trace!("JWK set changed");
 
                 // Rotate currently known JWK set to `jwk_set_old`.
                 // Because we only do this if the new JWK set is different, old and current
                 // should always be different sets.
-                set_jwk_set_old.set(
-                    set_jwk_set
-                        .try_update(|it| {
-                            let old = it.take();
-                            *it = val;
-                            old
-                        })
-                        .flatten(),
-                );
+
+                // TODO: With `Callback` types now backing the setters, we are no longer able to
+                //  perform an efficient `try_update`. See git logs.
+                let old = jwk_set.get_untracked();
+                set_jwk_set.run(val);
+                set_jwk_set_old.run(old);
             }
         });
 
@@ -167,7 +164,7 @@ impl JwkSetManager {
 
     #[expect(unused)]
     pub(crate) fn forget(&self) {
-        self.set_jwk_set_old.set(None);
-        self.set_jwk_set.set(None);
+        self.set_jwk_set_old.run(None);
+        self.set_jwk_set.run(None);
     }
 }

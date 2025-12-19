@@ -2,6 +2,7 @@ use crate::{expect_keycloak_auth, KeycloakAuth, KeycloakAuthState};
 use leptos::either::EitherOf3;
 use leptos::prelude::*;
 use leptos_router::NavigateOptions;
+use url::Url;
 
 /// Show `children` when the user is [`Authenticated`](crate::state::Authenticated).
 ///
@@ -75,15 +76,13 @@ where
 ///   request. Should the user not currently be authenticated, we do not interact with Keycloak at
 ///   all but instead perform the redirect immediately locally using the Leptos router.
 #[component]
-pub fn EndSession(
-    #[prop(into, optional)] and_route_to: Option<Oco<'static, str>>,
-) -> impl IntoView {
+pub fn EndSession(#[prop(into, optional)] and_route_to: Option<Url>) -> impl IntoView {
     match use_context::<KeycloakAuth>() {
         Some(auth) => {
             tracing::trace!("Logging out...");
             match and_route_to {
                 None => auth.end_session(),
-                Some(path) => auth.end_session_and_go_to(path.as_str()),
+                Some(path) => auth.end_session_and_go_to(path),
             }
         }
         None => {
@@ -156,6 +155,13 @@ pub fn DebugState() -> impl IntoView {
             </div>
             <div>
                 "code_challenge: " {move || format!("{:?}", auth.code_verifier_manager().code_challenge.get())}
+            </div>
+        </div>
+
+        <div style="width: 100%;">
+            <h3>"Internal data: csrf_token_manager"</h3>
+            <div>
+                "logout_token: " {move || format!("{:?}", auth.csrf_token_manager().logout_token().get())}
             </div>
         </div>
 

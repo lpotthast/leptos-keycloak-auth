@@ -7,10 +7,10 @@ use leptos::prelude::*;
 use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
-    AdvancedOptions, UseKeycloakAuthOptions, ValidationOptions, expect_authenticated,
-    expect_keycloak_auth, init_keycloak_auth, to_current_url,
+    expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
+    AdvancedOptions, UseKeycloakAuthOptions, ValidationOptions,
 };
-use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::{Outlet, Router};
 use leptos_router::hooks::use_location;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -146,6 +146,24 @@ pub fn MyAccount() -> impl IntoView {
     let user_name = Signal::derive(move || authenticated.id_token_claims.read().name.clone());
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
+    let malicious_logout_url = Signal::derive(move || {
+        logout_url.get().map(|real| {
+            let mut parsed = real.parse::<Url>().expect("valid url");
+            let query_without_csrf_token = parsed
+                .query_pairs()
+                .filter(|(k, _v)| k != "state")
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<Vec<_>>();
+            {
+                let mut query_mut = parsed.query_pairs_mut();
+                query_mut.clear();
+                for (k, v) in query_without_csrf_token {
+                    query_mut.append_pair(&k, &v);
+                }
+            }
+            parsed.to_string()
+        })
+    });
 
     let who_am_i = LocalResource::new(move || {
         let client = authenticated.client();
@@ -189,9 +207,13 @@ pub fn MyAccount() -> impl IntoView {
             "Programmatic Logout"
         </Button>
 
-        <Button attr:id="programmatic-logout" on_press=move |_| auth.forget_session()>
+        <Button attr:id="forget-auth-state" on_press=move |_| auth.forget_session()>
             "Forget auth state"
         </Button>
+
+        <LinkButton attr:id="force-malicious-logout" href=move || malicious_logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
+            "Force malicious logout"
+        </LinkButton>
 
         <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
             "Back to root"
@@ -257,11 +279,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
 #[component]
 pub fn Login() -> impl IntoView {
     let auth = expect_keycloak_auth();
-    let login_url_unavailable = Signal::derive(move || {
-        let res = auth.login_url.read().is_none();
-        tracing::info!("login_url_unavailable now is: {res}");
-        res
-    });
+    let login_url_unavailable = Signal::derive(move || auth.login_url.read().is_none());
     let login_url = Signal::derive(move || {
         auth.login_url
             .get()
@@ -293,5 +311,15 @@ pub fn Login() -> impl IntoView {
         <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
             "Back to root"
         </LinkButton>
+
+        <Modal show_when=auth.suspicious_logout>
+            <ModalHeader attr:id="suspicious-logout-detected"><ModalTitle>"Suspicious Logout Detected"</ModalTitle></ModalHeader>
+            <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
+            <ModalFooter>
+                <ButtonWrapper>
+                    <Button attr:id="dismiss" on_press=move |_| { auth.dismiss_suspicious_logout_warning.run(()); } color=ButtonColor::Primary>"Dismiss"</Button>
+                </ButtonWrapper>
+            </ModalFooter>
+        </Modal>
     }
 }

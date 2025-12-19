@@ -1,13 +1,10 @@
 use codee::{CodecError, Decoder, Encoder};
-use leptos::prelude::{
-    signal, Effect, Get, GetUntracked, LocalStorage, ReadSignal, Set, Signal, UpdateUntracked,
-    WriteSignal,
-};
-use leptos_use::core::MaybeRwSignal;
+use leptos::prelude::*;
 use leptos_use::storage::{
     use_storage_with_options, StorageType, UseStorageError, UseStorageOptions,
 };
 use std::fmt::Debug;
+use std::sync::{Arc, LazyLock};
 
 pub(crate) struct UseStorageReturn<T, Remover>
 where
@@ -15,38 +12,35 @@ where
     Remover: Fn() + Clone + Send + Sync,
 {
     pub(crate) read: Signal<T>,
-    pub(crate) write: WriteSignal<T>,
+    pub(crate) write: Callback<T>,
     pub(crate) remove: Remover,
 
     #[expect(unused)]
     decode_err: (ReadSignal<bool>, WriteSignal<bool>),
-    #[expect(unused)]
-    effect: Effect<LocalStorage>,
 }
 
+/// # Params
+/// - `initial_value_provider` - Lazy evaluated initial value. Only computed when necessary.
 pub(crate) fn use_storage_with_options_and_error_handler<T, C>(
     storage_type: StorageType,
     key: impl Into<Signal<String>> + 'static,
-    // Read once on creation. Reused through cloning when a decode error must be resolved by using the initial value again.
-    initial_value: impl Into<MaybeRwSignal<T>>,
+    initial_value_provider: impl FnOnce() -> T + Send + 'static,
 ) -> UseStorageReturn<T, impl Fn() + Clone + Send + Sync>
 where
-    T: Default + Debug + Clone + PartialEq + Send + Sync,
-    C: Encoder<T, Encoded = String> + Decoder<T, Encoded = str>,
-    <C as Encoder<T>>::Error: Debug,
-    <C as Decoder<T>>::Error: Debug,
+    T: Debug + Clone + PartialEq + Send + Sync,
+    C: Encoder<Option<T>, Encoded = String> + Decoder<Option<T>, Encoded = str>,
+    <C as Encoder<Option<T>>>::Error: Debug,
+    <C as Decoder<Option<T>>>::Error: Debug,
 {
-    let (decode_err, set_decode_err) = signal(false);
-
     let key = key.into();
 
-    let initial_value_signal = initial_value.into();
-    let initial_value = match &initial_value_signal {
-        MaybeRwSignal::Static(s) => s.clone(),
-        MaybeRwSignal::DynamicRw(r, _) | MaybeRwSignal::DynamicRead(r) => r.get_untracked(),
-    };
-    let options = UseStorageOptions::default()
-        .initial_value(initial_value_signal)
+    let initial_value: LazyLock<T, _> = LazyLock::new(initial_value_provider);
+    let initial_value = Arc::new(initial_value);
+
+    let (decode_err, set_decode_err) = signal(false);
+
+    let options = UseStorageOptions::<Option<T>, _, _>::default()
+        .initial_value(None)
         .listen_to_storage_changes(true)
         .delay_during_hydration(false)
         .on_error(move |err| {
@@ -79,26 +73,46 @@ where
             }
         });
 
-    let (read, write, remove) = use_storage_with_options::<T, C>(storage_type, key, options);
+    let storage_type_identifier = match storage_type {
+        StorageType::Local => "Local",
+        StorageType::Session => "Session",
+        StorageType::Custom(_) => "Custom",
+    };
+
+    let (read, write, remove) =
+        use_storage_with_options::<Option<T>, C>(storage_type, key, options);
+
+    let initial_value_clone = initial_value.clone();
+    if read.read_untracked().is_none() {
+        tracing::trace!(
+            "No '{}' found in {storage_type_identifier} storage. Setting initial value.",
+            key.read_untracked(),
+        );
+        write.set(Some((*initial_value_clone).clone()));
+    }
 
     let remove_clone = remove.clone();
-    let effect = Effect::new(move |_| {
+    let initial_value_clone = initial_value.clone();
+    Effect::new(move |_| {
         if decode_err.get() {
+            let initial_value = (*initial_value_clone).clone();
             tracing::trace!(
                 "Removing previously persisted value of '{}' due to a decode error. Using initial value: {initial_value:?}",
                 key.get()
             );
             remove_clone();
-            write.set(initial_value.clone());
+            write.set(Some(initial_value));
             set_decode_err.update_untracked(|it| *it = false);
         }
     });
 
+    let initial_value_clone = initial_value.clone();
     UseStorageReturn {
-        read,
-        write,
+        // We use Memo instead of Signal to achieve lazy evaluation.
+        read: Memo::new(move |_| read.get().unwrap_or_else(|| (*initial_value_clone).clone()))
+            .into(),
+        write: Callback::new(move |new| write.set(Some(new))),
         remove,
         decode_err: (decode_err, set_decode_err),
-        effect,
     }
 }
