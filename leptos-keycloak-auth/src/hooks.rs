@@ -1,3 +1,5 @@
+use crate::request::GrantType;
+use crate::token_validation::NonceValidation;
 use crate::{Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
 
@@ -100,6 +102,7 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             trigger_refresh: Callback::new(|_| ()),
         },
         csrf_token_manager: crate::internal::csrf_token_manager::CsrfTokenManager::new(),
+        nonce_manager: crate::internal::nonce_manager::NonceManager::new(),
         suspicious_logout: Signal::from(false),
         dismiss_suspicious_logout_warning: Callback::new(|_| ()),
     }
@@ -152,6 +155,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         internal::token_manager::TokenManager::new(options, handle_req_error, token_endpoint);
 
     let code_mgr = internal::code_verifier_manager::CodeVerifierManager::new();
+
+    let nonce_mgr = internal::nonce_manager::NonceManager::new();
 
     let csrf_mgr = internal::csrf_token_manager::CsrfTokenManager::new();
 
@@ -247,8 +252,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         // We should recreate the code_verifier to have a new one for the next login phase.
                         code_mgr.regenerate();
 
+                        // We should regenerate the nonce to have a new one for the next login phase.
+                        nonce_mgr.regenerate();
+
                         // We should use a new CSRF token in the next logout.
-                        tracing::warn!("regenerate csrf logout token");
                         csrf_mgr.regenerate();
                     });
 
@@ -287,38 +294,57 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let verified_and_decoded_id_token: Memo<
         Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
     > = Memo::new(move |_| {
-        let expected_audiences = options
-            .read_value()
-            .id_token_validation
-            .expected_audiences
-            .get();
-        let expected_issuers = options
-            .read_value()
-            .id_token_validation
-            .expected_issuers
-            .get();
+        let options = options.read_value();
+        let expected_audiences = options.id_token_validation.expected_audiences.get();
+        let expected_issuers = options.id_token_validation.expected_issuers.get();
+        let nonce_validation_requested = options.advanced.nonce_validation;
+
+        let token_data = token_validation::validate_token_data_presence(token_mgr.token.get())?;
+        let jwk_set = token_validation::validate_jwk_set_presence(jwk_set_mgr.jwk_set.get())?;
+
+        // Do not require a nonce in the ID token when the token data source was a refresh.
+        // As stated in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>,
+        // refresh tokens SHOULD NOT have a `nonce` claim, and Keycloak generally respects that.
+        // A backwards compatibility claim mapper can be enabled to still include nonce claims in
+        // refresh tokens, but this is not required from a security perspective. If the mapper is
+        // enabled, also enabling nonce claims in ID tokens returned from a refresh, we again
+        // validate against the initial nonce value, as this value is only regenerated on logout.
+        let expected_nonce = nonce_mgr.nonce().read_untracked();
+        let nonce_validation_required =
+            nonce_validation_requested && token_data.grant_type != GrantType::RefreshToken;
+        let nonce_validation = match (nonce_validation_requested, nonce_validation_required) {
+            (true, true) => NonceValidation::Required {
+                expected_nonce: expected_nonce.as_str(),
+            },
+            (true, false) => NonceValidation::IfPresent {
+                expected_nonce: expected_nonce.as_str(),
+            },
+            (false, _) => NonceValidation::Disabled,
+        };
 
         let result;
 
         let first_try = token_validation::validate(
-            token_mgr.token.get(),
-            jwk_set_mgr.jwk_set.get().as_ref().map(|it| &it.jwk_set),
+            &token_data,
+            &jwk_set.jwk_set,
             expected_audiences.as_deref(),
             expected_issuers.as_deref(),
+            nonce_validation,
         );
 
         if first_try.is_ok() {
             result = first_try;
         } else {
             // If validation with the current JWK set fails, we should not try to validate with a
-            // missing old set. This would just lest to a `NoJwkSet` error being ultimately stored,
+            // missing old set. This would just lead to a `NoJwkSet` error being ultimately stored,
             // hiding the real reason why validation failed in the first place.
-            if jwk_set_mgr.jwk_set_old.read().is_some() {
+            if let Some(jwk_set_old) = jwk_set_mgr.jwk_set_old.read().as_ref() {
                 let second_try = token_validation::validate(
-                    token_mgr.token.get(),
-                    jwk_set_mgr.jwk_set_old.get().as_ref().map(|it| &it.jwk_set),
+                    &token_data,
+                    &jwk_set_old.jwk_set,
                     expected_audiences.as_deref(),
                     expected_issuers.as_deref(),
+                    nonce_validation,
                 );
                 result = second_try;
             } else {
@@ -425,6 +451,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             authorization_endpoint,
             options,
             code_mgr.code_challenge,
+            nonce_mgr.nonce(),
         )
         .into(),
         logout_url: logout::create_logout_url_signal(
@@ -447,5 +474,6 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         code_verifier_manager: code_mgr,
         token_manager: token_mgr,
         csrf_token_manager: csrf_mgr,
+        nonce_manager: nonce_mgr,
     }
 }

@@ -30,7 +30,7 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
-   leptos-keycloak-auth = "0.8"
+   leptos-keycloak-auth = "0.10"
    
    [features]
    hydrate = [ 
@@ -49,7 +49,7 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 use leptos::prelude::*;
 use leptos_router::path;
 use leptos_router::components::*;
-use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
+use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, IdTokenValidationOptions};
 use leptos_keycloak_auth::components::*;
 use leptos_keycloak_auth::url::Url;
 
@@ -69,7 +69,7 @@ pub fn Init(children: Children) -> impl IntoView {
         post_login_redirect_url: to_current_url(),
         post_logout_redirect_url: to_current_url(),
         scope: vec![],
-        id_token_validation: ValidationOptions {
+        id_token_validation: IdTokenValidationOptions {
             expected_audiences: Some(vec!["test-client".to_owned()]),
             expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
         },
@@ -170,7 +170,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 | 0.1           | 0.6                       |
 | 0.2           | 0.6                       |
 | 0.3 - 0.6     | 0.7                       |
-| 0.7 - 0.8     | 0.8                       |
+| 0.7 - 0.10    | 0.8                       |
 
 ## MSRV
 

@@ -6,12 +6,6 @@ use leptos_use::storage::StorageType;
 
 /// Manages PKCE code verifiers and challenges for secure authorization flows.
 ///
-/// The `CodeVerifierManager` is responsible for:
-/// - Generating cryptographically secure code verifiers
-/// - Deriving code challenges from verifiers
-/// - Storing verifiers in session storage to survive navigation
-/// - Regenerating verifiers for new authorization flows
-///
 /// Code verifiers are stored in session storage because the authorization flow involves
 /// navigating away from the application to Keycloak's login page and then being redirected
 /// back, which causes a full page reload.

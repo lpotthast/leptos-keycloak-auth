@@ -11,6 +11,7 @@ pub(crate) mod code_verifier_manager;
 pub(crate) mod csrf_token_manager;
 pub(crate) mod derived_urls;
 pub(crate) mod jwk_set_manager;
+pub(crate) mod nonce_manager;
 pub(crate) mod oidc_config_manager;
 pub(crate) mod token_manager;
 

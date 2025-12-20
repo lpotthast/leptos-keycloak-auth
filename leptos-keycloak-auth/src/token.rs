@@ -1,3 +1,4 @@
+use crate::request::GrantType;
 use crate::response::SuccessTokenResponse;
 use crate::DiscoveryEndpoint;
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,11 @@ pub struct TokenData {
     #[serde(with = "time::serde::rfc3339")]
     pub(crate) time_received: OffsetDateTime,
 
+    /// The grant type used to request this token data.
+    ///
+    /// Can inform whether this token data originated from a token refresh or an initial request.
+    pub(crate) grant_type: GrantType,
+
     /// The discovery endpoint used to query this information.
     /// This OIDC config data immediately becomes invalid if we no longer work with that source,
     /// e.g. the app was reconfigured to use a different authentication provider!
@@ -43,6 +49,7 @@ pub struct TokenData {
 impl TokenData {
     pub(crate) fn from_token_response(
         success_token_response: SuccessTokenResponse,
+        grant_type: GrantType,
         discovery_endpoint: DiscoveryEndpoint,
     ) -> Self {
         let now = OffsetDateTime::now_utc();
@@ -55,6 +62,7 @@ impl TokenData {
                 .refresh_expires_in
                 .map(|refresh_expires_in| now + Duration::seconds(refresh_expires_in)),
             time_received: now,
+            grant_type,
             source: discovery_endpoint,
         }
     }
