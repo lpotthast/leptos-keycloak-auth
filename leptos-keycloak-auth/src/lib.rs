@@ -8,7 +8,7 @@
 //! use leptos::prelude::*;
 //! use leptos_router::path;
 //! use leptos_router::components::*;
-//! use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, ValidationOptions};
+//! use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, IdTokenValidationOptions};
 //! use leptos_keycloak_auth::components::*;
 //! use leptos_keycloak_auth::url::Url;
 //!
@@ -28,7 +28,7 @@
 //!         post_login_redirect_url: to_current_url(),
 //!         post_logout_redirect_url: to_current_url(),
 //!         scope: vec![],
-//!         id_token_validation: ValidationOptions {
+//!         id_token_validation: IdTokenValidationOptions {
 //!             expected_audiences: Some(vec!["test-client".to_owned()]),
 //!             expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
 //!         },
@@ -119,6 +119,7 @@ mod hooks;
 mod internal;
 mod login;
 mod logout;
+mod nonce;
 mod oidc;
 mod request;
 mod response;
@@ -150,8 +151,10 @@ pub mod internals {
     pub use crate::internal::csrf_token_manager::CsrfTokenManager;
     pub use crate::internal::derived_urls::DerivedUrls;
     pub use crate::internal::jwk_set_manager::JwkSetManager;
+    pub use crate::internal::nonce_manager::NonceManager;
     pub use crate::internal::oidc_config_manager::OidcConfigManager;
     pub use crate::internal::token_manager::TokenManager;
+    pub use crate::nonce::Nonce;
     pub use crate::token::TokenData;
 }
 

@@ -1,3 +1,4 @@
+use crate::internal::JwkSetWithTimestamp;
 use crate::token::TokenData;
 use crate::token_claims::{KeycloakIdTokenClaims, StandardIdTokenClaims};
 use snafu::{OptionExt, ResultExt, Snafu};
@@ -32,18 +33,43 @@ pub enum KeycloakIdTokenClaimsError {
 
     #[snafu(display("KeycloakIdTokenClaimsError: No claims"))]
     NoClaims { source: JwtValidationError },
+
+    #[snafu(display("KeycloakIdTokenClaimsError: Nonce mismatch"))]
+    NonceMismatch,
+
+    #[snafu(display("KeycloakIdTokenClaimsError: Missing nonce in ID token"))]
+    MissingNonce,
+}
+
+pub(crate) fn validate_token_data_presence(
+    token: Option<TokenData>,
+) -> Result<TokenData, KeycloakIdTokenClaimsError> {
+    let token_data = token.context(NoTokenSnafu {})?;
+    Ok(token_data)
+}
+
+pub(crate) fn validate_jwk_set_presence(
+    jwk_set: Option<JwkSetWithTimestamp>,
+) -> Result<JwkSetWithTimestamp, KeycloakIdTokenClaimsError> {
+    let jwk_set = jwk_set.context(NoJwkSetSnafu {})?;
+    Ok(jwk_set)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NonceValidation<'n> {
+    Required { expected_nonce: &'n str },
+    IfPresent { expected_nonce: &'n str },
+    Disabled,
 }
 
 pub(crate) fn validate(
-    token: Option<TokenData>,
-    jwk_set: Option<&jsonwebtoken::jwk::JwkSet>,
+    token: &TokenData,
+    jwk_set: &jsonwebtoken::jwk::JwkSet,
     expected_audiences: Option<&[String]>,
     expected_issuers: Option<&[String]>,
+    nonce_validation: NonceValidation<'_>,
 ) -> Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError> {
-    let token = token.context(NoTokenSnafu {})?;
-    let jwk_set = jwk_set.context(NoJwkSetSnafu {})?;
-
-    let standard_claims = validate_and_decode_base64_encoded_token(
+    let standard_id_token_claims = validate_and_decode_base64_encoded_token(
         &token.id_token,
         expected_audiences,
         expected_issuers,
@@ -51,7 +77,34 @@ pub(crate) fn validate(
     )
     .context(NoClaimsSnafu {})?;
 
-    Ok(KeycloakIdTokenClaims::from(standard_claims))
+    match nonce_validation {
+        NonceValidation::Required { expected_nonce } => match &standard_id_token_claims.nonce {
+            Some(actual_nonce) if actual_nonce == expected_nonce => {
+                tracing::trace!("Nonce validation succeeded.");
+            }
+            Some(actual_nonce) => {
+                tracing::error!(expected_nonce, actual_nonce, "Nonce mismatch.");
+                return Err(KeycloakIdTokenClaimsError::NonceMismatch);
+            }
+            None => {
+                tracing::error!("ID token is missing the `nonce` claim.");
+                return Err(KeycloakIdTokenClaimsError::MissingNonce);
+            }
+        },
+        NonceValidation::IfPresent { expected_nonce } => match &standard_id_token_claims.nonce {
+            Some(actual_nonce) if actual_nonce == expected_nonce => {
+                tracing::trace!("Nonce validation succeeded.");
+            }
+            Some(actual_nonce) => {
+                tracing::error!(expected_nonce, actual_nonce, "Nonce mismatch.");
+                return Err(KeycloakIdTokenClaimsError::NonceMismatch);
+            }
+            None => {}
+        },
+        NonceValidation::Disabled => {}
+    }
+
+    Ok(KeycloakIdTokenClaims::from(standard_id_token_claims))
 }
 
 fn validate_and_decode_base64_encoded_token(

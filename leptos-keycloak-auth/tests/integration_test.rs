@@ -18,6 +18,9 @@ mod keycloak_container;
 mod pages;
 mod ui_tests;
 
+// Set this to `true` if you want to manually play around with the fully running test application.
+// This prevents the integration tests from being started until you enter "y" and press enter.
+// Enter "n" to tear down the spun up resources gracefully and terminate.
 const DELAY_TEST_EXECUTION: bool = false;
 
 const USERNAME: &str = "bob@foo.bar";
@@ -40,7 +43,6 @@ async fn test_integration() -> anyhow::Result<()> {
     // Start leptos frontend.
     let fe = frontend::start_frontend(keycloak_container.port).await;
 
-    // Optional long wait-time. Use this if you want to play around with a fully running stack.
     if DELAY_TEST_EXECUTION {
         tracing::info!("Continue with test? y/n");
         let mut buf = String::new();

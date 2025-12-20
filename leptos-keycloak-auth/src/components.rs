@@ -166,6 +166,13 @@ pub fn DebugState() -> impl IntoView {
         </div>
 
         <div style="width: 100%;">
+            <h3>"Internal data: nonce_manager"</h3>
+            <div>
+                "nonce: " {move || format!("{:?}", auth.nonce_manager().nonce().get())}
+            </div>
+        </div>
+
+        <div style="width: 100%;">
             <h3>"Internal data: token_manager"</h3>
             <div>
                 "access_token_lifetime: " {move || format!("{:?}", auth.token_manager().access_token_lifetime.get())}

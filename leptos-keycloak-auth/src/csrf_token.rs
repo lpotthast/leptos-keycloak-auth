@@ -1,12 +1,12 @@
-/// Cryptographically secure token used to avoid CSRF attack.
+/// Cryptographically secure token used to avoid or detect CSRF attacks.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CsrfToken {
     csrf_token: String,
 }
 
 impl CsrfToken {
-    /// Generate a new cryptographically secure CSRF token, using 32 bytes of cryptographically
-    /// secure random data, base64 url encoded as a 43 character string.
+    /// Generate a new cryptographically secure CSRF token using 32 bytes of random data,
+    /// base64 url encoded as a 43 character string.
     pub fn new() -> Self {
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
         use rand::Rng;

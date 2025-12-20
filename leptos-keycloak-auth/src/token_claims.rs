@@ -5,18 +5,18 @@ use time::OffsetDateTime;
 /// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct StandardIdTokenClaims {
-    iss: String,
-    sub: String,
-    aud: RawAudiences,
-    exp: i64,
-    iat: i64,
-    auth_time: Option<i64>,
-    nonce: Option<String>,
-    acr: Option<String>,
-    amr: Option<Vec<String>>,
-    azp: Option<String>,
+    pub(crate) iss: String,
+    pub(crate) sub: String,
+    pub(crate) aud: RawAudiences,
+    pub(crate) exp: i64,
+    pub(crate) iat: i64,
+    pub(crate) auth_time: Option<i64>,
+    pub(crate) nonce: Option<String>,
+    pub(crate) acr: Option<String>,
+    pub(crate) amr: Option<Vec<String>>,
+    pub(crate) azp: Option<String>,
     #[serde(flatten)]
-    remaining: HashMap<String, serde_json::Value>,
+    pub(crate) remaining: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

@@ -2,6 +2,7 @@ use crate::authenticated_client::AuthenticatedClient;
 use crate::config::Options;
 use crate::error::KeycloakAuthError;
 use crate::internal::csrf_token_manager::CsrfTokenManager;
+use crate::internal::nonce_manager::NonceManager;
 use crate::token_claims::KeycloakIdTokenClaims;
 use crate::token_validation::KeycloakIdTokenClaimsError;
 use crate::{logout, AccessToken};
@@ -73,6 +74,9 @@ pub struct KeycloakAuth {
 
     #[allow(unused)]
     pub(crate) csrf_token_manager: CsrfTokenManager,
+
+    #[allow(unused)]
+    pub(crate) nonce_manager: NonceManager,
 }
 
 /// Get the current URL (origin + path). Uses a tracking access to the current url.
@@ -277,6 +281,11 @@ impl KeycloakAuth {
     #[cfg(feature = "internals")]
     pub fn csrf_token_manager(&self) -> &CsrfTokenManager {
         &self.csrf_token_manager
+    }
+
+    #[cfg(feature = "internals")]
+    pub fn nonce_manager(&self) -> &NonceManager {
+        &self.nonce_manager
     }
 }
 

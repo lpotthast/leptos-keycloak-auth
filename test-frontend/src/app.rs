@@ -8,7 +8,7 @@ use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
 use leptos_keycloak_auth::url::Url;
 use leptos_keycloak_auth::{
     expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
-    AdvancedOptions, UseKeycloakAuthOptions, ValidationOptions,
+    AdvancedOptions, IdTokenValidationOptions, UseKeycloakAuthOptions,
 };
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::{Outlet, Router};
@@ -257,7 +257,7 @@ pub fn Protected(children: ChildrenFn) -> impl IntoView {
                     post_login_redirect_url: to_current_url(),
                     post_logout_redirect_url: to_current_url(),
                     scope: vec![],
-                    id_token_validation: ValidationOptions {
+                    id_token_validation: IdTokenValidationOptions {
                         expected_audiences: Some(vec!["test-client".to_owned()]),
                         expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
                     },
