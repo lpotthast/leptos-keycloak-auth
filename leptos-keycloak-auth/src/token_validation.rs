@@ -24,33 +24,33 @@ pub enum JwtValidationError {
 
 #[derive(Debug, Clone, PartialEq, Snafu)]
 #[allow(clippy::enum_variant_names)]
-pub enum KeycloakIdTokenClaimsError {
-    #[snafu(display("KeycloakIdTokenClaimsError: No token"))]
+pub enum IdTokenClaimsError {
+    #[snafu(display("IdTokenClaimsError: No token."))]
     NoToken,
 
-    #[snafu(display("KeycloakIdTokenClaimsError: No JWK set"))]
+    #[snafu(display("IdTokenClaimsError: No JWK set."))]
     NoJwkSet,
 
-    #[snafu(display("KeycloakIdTokenClaimsError: No claims"))]
-    NoClaims { source: JwtValidationError },
+    #[snafu(display("IdTokenClaimsError: Validation failed."))]
+    Validation { source: JwtValidationError },
 
-    #[snafu(display("KeycloakIdTokenClaimsError: Nonce mismatch"))]
+    #[snafu(display("IdTokenClaimsError: Nonce mismatch."))]
     NonceMismatch,
 
-    #[snafu(display("KeycloakIdTokenClaimsError: Missing nonce in ID token"))]
+    #[snafu(display("IdTokenClaimsError: Missing nonce in ID token."))]
     MissingNonce,
 }
 
 pub(crate) fn validate_token_data_presence(
     token: Option<TokenData>,
-) -> Result<TokenData, KeycloakIdTokenClaimsError> {
+) -> Result<TokenData, IdTokenClaimsError> {
     let token_data = token.context(NoTokenSnafu {})?;
     Ok(token_data)
 }
 
 pub(crate) fn validate_jwk_set_presence(
     jwk_set: Option<JwkSetWithTimestamp>,
-) -> Result<JwkSetWithTimestamp, KeycloakIdTokenClaimsError> {
+) -> Result<JwkSetWithTimestamp, IdTokenClaimsError> {
     let jwk_set = jwk_set.context(NoJwkSetSnafu {})?;
     Ok(jwk_set)
 }
@@ -68,14 +68,14 @@ pub(crate) fn validate(
     expected_audiences: Option<&[String]>,
     expected_issuers: Option<&[String]>,
     nonce_validation: NonceValidation<'_>,
-) -> Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError> {
+) -> Result<KeycloakIdTokenClaims, IdTokenClaimsError> {
     let standard_id_token_claims = validate_and_decode_base64_encoded_token(
         &token.id_token,
         expected_audiences,
         expected_issuers,
         jwk_set,
     )
-    .context(NoClaimsSnafu {})?;
+    .context(ValidationSnafu {})?;
 
     match nonce_validation {
         NonceValidation::Required { expected_nonce } => match &standard_id_token_claims.nonce {
@@ -84,11 +84,11 @@ pub(crate) fn validate(
             }
             Some(actual_nonce) => {
                 tracing::error!(expected_nonce, actual_nonce, "Nonce mismatch.");
-                return Err(KeycloakIdTokenClaimsError::NonceMismatch);
+                return Err(IdTokenClaimsError::NonceMismatch);
             }
             None => {
                 tracing::error!("ID token is missing the `nonce` claim.");
-                return Err(KeycloakIdTokenClaimsError::MissingNonce);
+                return Err(IdTokenClaimsError::MissingNonce);
             }
         },
         NonceValidation::IfPresent { expected_nonce } => match &standard_id_token_claims.nonce {
@@ -97,7 +97,7 @@ pub(crate) fn validate(
             }
             Some(actual_nonce) => {
                 tracing::error!(expected_nonce, actual_nonce, "Nonce mismatch.");
-                return Err(KeycloakIdTokenClaimsError::NonceMismatch);
+                return Err(IdTokenClaimsError::NonceMismatch);
             }
             None => {}
         },
@@ -140,7 +140,6 @@ fn validate_and_decode_base64_encoded_token(
     let jwt_decoding_key =
         jsonwebtoken::DecodingKey::from_jwk(jwk).context(JwkToDecodingKeySnafu {})?;
 
-    tracing::trace!("Trying decode");
     let token_data = jsonwebtoken::decode::<StandardIdTokenClaims>(
         base64_encoded_token,
         &jwt_decoding_key,

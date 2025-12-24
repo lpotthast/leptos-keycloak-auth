@@ -5,7 +5,7 @@ Secure Leptos applications using Keycloak.
 ## Features
 
 - OpenID Connect discovery
-- Authorization code flow with PKCE
+- Authorization code flow with PKCE, Nonce validation, and Logout validation
 - ID token verification
 - ID token introspection
 - Automatic refresh token renewal
@@ -30,7 +30,7 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
-   leptos-keycloak-auth = "0.10"
+   leptos-keycloak-auth = "0.11"
    
    [features]
    hydrate = [ 
@@ -45,100 +45,81 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 
 ## Usage
 
+Initialize auth at the root of your application with the `<AuthProvider>` component.
+
+**Note:** `expected_audiences` defaults to `["<client>"]` and `expected_issuers` defaults to
+`["<realm>"]`, so you don't need to specify them for standard setups. Redirect URLs automatically track
+the current page, so wherever you display a login link the user will be redirected to automatically once the login was
+completed on the Keycloak side.
+
+This should happen between `Router` and `Routes`, so that initialization runs on all pages but has access ot the router
+hook.
+
+Use the `MaybeAuthenticated`, `Authenticated` and `Unauthenticated` component to conditionally render content based on
+the current authentication status. These give you immediate access to the relevant state.
+
+Use `use_keycloak_auth` or `try_use_keycloak_auth` to access `leptos-keycloak-auth`'s main state. The try variant can
+be used when you don't use the `<AuthProvider>` on all pages are unsure whether the library was initialized.
+
+Use `use_authenticated` or `try_use_authenticated` to directly access the `Authenticated` state, providing information
+about the user. The try variant can be used if you are unsure whether the user is currently logged in.
+
 ```rust
 use leptos::prelude::*;
-use leptos_router::path;
-use leptos_router::components::*;
-use leptos_keycloak_auth::{to_current_url, init_keycloak_auth, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, IdTokenValidationOptions};
+use leptos_router::{path, components::*};
 use leptos_keycloak_auth::components::*;
 use leptos_keycloak_auth::url::Url;
-
-#[component]
-pub fn Init(children: Children) -> impl IntoView {
-    // Note: These values should be served from environment variables to be overwritten in production.
-    // Note: Redirect URLs should match the route path at which you render this component.
-    //       If this component is rendered at `/admin`, the redirects should also go to that route,
-    //       or we end up in a place where `use_keycloak_auth` is not rendered/active
-    //       and any login attempt can never be completed.
-    //       Using `to_current_url()` allows us to render `<Protected>` anywhere we want.
-    let keycloak_server_url = "http://localhost:8443".to_owned();
-    let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
-        keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
-        realm: "test-realm".to_owned(),
-        client_id: "test-client".to_owned(),
-        post_login_redirect_url: to_current_url(),
-        post_logout_redirect_url: to_current_url(),
-        scope: vec![],
-        id_token_validation: IdTokenValidationOptions {
-            expected_audiences: Some(vec!["test-client".to_owned()]),
-            expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
-        },
-        delay_during_hydration: true,
-        advanced: Default::default(),
-    });
-
-    children()
-}
+use leptos_keycloak_auth::hooks::use_keycloak_auth;
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Meta tags excluded...
     view! {
-        <main>
-            <Router>
-                <Init>
-                    <Routes fallback=|| view! { "Page not found." }>
-                        <Route path=path!("/") view=|| view! {
-                            <Protected>
-                                <ConfidentialArea/>
-                            </Protected>
-                        }/>
-                    </Routes>
-                </Init>
-            </Router>
-        </main>
+        <Router>
+            <AuthProvider
+                keycloak_server_url=Url::parse("http://localhost:8443").unwrap()
+                realm="my-realm"
+                client="my-client"
+            >
+                <Routes fallback=|| view! { "Page not found." }>
+                    <Route path=path!("/") view=HomePage/>
+                    <Route path=path!("/protected") view=ProtectedPage/>
+                </Routes>
+            </AuthProvider>
+        </Router>
     }
 }
 
 #[component]
-pub fn Protected(children: ChildrenFn) -> impl IntoView {
+pub fn HomePage() -> impl IntoView {
     view! {
-        <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
-            { children() }
-        </ShowWhenAuthenticated>
+        <h1>"Welcome"</h1>
+        <MaybeAuthenticated
+            authenticated=|auth| view! {
+                <p>"Hello, " { auth.id_token_claims.read().name }</p>
+            }
+            unauthenticated=|| view! { <LoginButton/> }
+        />
     }
 }
 
 #[component]
-pub fn Login() -> impl IntoView {
-    let auth = expect_context::<KeycloakAuth>();
-    let login_url_unavailable = Signal::derive(move || auth.login_url.get().is_none());
-    let login_url = Signal::derive(move || {
-        auth.login_url
-            .get()
-            .map(|url| url.to_string())
-            .unwrap_or_default()
-    });
-
+pub fn ProtectedPage() -> impl IntoView {
     view! {
-       <h1>"Unauthenticated"</h1>
-
-        <a href=move || login_url.get() aria_disabled=login_url_unavailable>
-            "Log in"
-        </a>
+        <Authenticated fallback=|| view! { <LoginButton/> }>
+            {|auth| view! {
+                <p>"Welcome, " { auth.id_token_claims.read().name }</p>
+            }}
+        </Authenticated>
     }
 }
 
 #[component]
-pub fn ConfidentialArea() -> impl IntoView {
-    // We can expect this context, as we only render this component under `ShowWhenAuthenticated`.
-    // It gives direct access to the users decoded ID token.
-    let auth = expect_context::<Authenticated>();
-
+pub fn LoginButton() -> impl IntoView {
+    let auth = use_keycloak_auth();
+    let login_url = move || auth.login_url.get().map(|u| u.to_string()).unwrap_or_default();
+    let login_url_unavailable = move || auth.login_url.get().is_none();
     view! {
-        <div>
-            "Hello, " { move || auth.id_token_claims.read().name.clone() }
-        </div>
+        <a href=login_url aria-disabled=login_url_unavailable>"Log In"</a>
     }
 }
 ```
@@ -170,7 +151,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 | 0.1           | 0.6                       |
 | 0.2           | 0.6                       |
 | 0.3 - 0.6     | 0.7                       |
-| 0.7 - 0.10    | 0.8                       |
+| 0.7 - 0.11    | 0.8                       |
 
 ## MSRV
 

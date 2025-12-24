@@ -1,6 +1,6 @@
 use std::env;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio_process_tools::broadcast::BroadcastOutputStream;
 use tokio_process_tools::{Inspector, LineParsingOptions, Next, Process, TerminateOnDrop};
@@ -21,15 +21,29 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
         .canonicalize()
         .unwrap();
 
+    let dotenv_template = fe_dir.join(".env.template");
+    let mut dotenv_content = String::new();
+    tokio::fs::OpenOptions::new()
+        .read(true)
+        .open(&dotenv_template)
+        .await
+        .unwrap()
+        .read_to_string(&mut dotenv_content)
+        .await
+        .unwrap();
+
+    let dotenv_content =
+        dotenv_content.replace("{kc_port_placeholder}", &keycloak_port.to_string());
+
     let dotenv = fe_dir.join(".env");
     tokio::fs::OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(dotenv)
+        .open(&dotenv)
         .await
         .unwrap()
-        .write_all(format!("KEYCLOAK_PORT={keycloak_port}").as_bytes())
+        .write_all(dotenv_content.as_bytes())
         .await
         .unwrap();
 
@@ -37,6 +51,7 @@ pub async fn start_frontend(keycloak_port: u16) -> Frontend {
     let mut cmd = Command::new("cargo");
     cmd.arg("leptos")
         .arg("watch") // serve
+        .env("RUST_BACKTRACE", "1")
         .current_dir(fe_dir);
 
     let fe_process = Process::new(cmd)

@@ -1,5 +1,7 @@
 pub mod app;
+pub mod environment;
 pub mod routes;
+pub mod services;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

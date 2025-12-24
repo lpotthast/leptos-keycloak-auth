@@ -27,11 +27,18 @@ impl Root<'_> {
         Ok(())
     }
 
-    pub(crate) async fn check_that_count_is(&self, expected: u64) -> anyhow::Result<()> {
-        tracing::info!("Check that count is: {expected}");
-        let count_span = self.driver.find(By::Id("count")).await?;
-        let count_text = count_span.text().await?;
-        assert_that(count_text).is_equal_to(format!("Count: {expected}"));
+    pub async fn read_keycloak_port(&self) -> anyhow::Result<u16> {
+        tracing::info!("Read keycloak port from frontend.");
+        let keycloak_port_div = self.driver.find(By::Id("keycloak-port")).await?;
+        let keycloak_port = keycloak_port_div.text().await?;
+        let keycloak_port = keycloak_port.trim().parse::<u16>()?;
+        Ok(keycloak_port)
+    }
+
+    pub(crate) async fn check_not_logged_in(&self) -> anyhow::Result<()> {
+        let el = self.driver.find(By::Id("auth-state")).await?;
+        let text = el.text().await?;
+        assert_that(text).contains("You are not logged in.");
         Ok(())
     }
 

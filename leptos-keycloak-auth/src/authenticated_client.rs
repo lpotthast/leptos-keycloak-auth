@@ -21,10 +21,10 @@ use leptos::prelude::ReadUntracked;
 ///
 /// # Example
 /// ```no_run
-/// # use leptos_keycloak_auth::expect_authenticated;
+/// # use leptos_keycloak_auth::use_authenticated;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let client = expect_authenticated().client();
+/// let client = use_authenticated().client();
 /// let response = client.get("https://api.example.com/protected-resource").await?;
 /// # Ok(())
 /// # }
@@ -76,10 +76,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// let response = client.get("https://api.example.com/protected-resource").await?;
     /// # Ok(())
@@ -108,10 +108,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// let response = client
     ///     .get_with("https://api.example.com/protected-resource", |builder| {
@@ -146,10 +146,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// // For POST with body, use post_with instead!
     /// let response = client.post("https://api.example.com/trigger-protected-action").await?;
@@ -178,10 +178,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// #[derive(serde::Serialize)]
     /// struct CreateResource { name: String }
@@ -218,10 +218,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// // For PUT with body, use put_with instead!
     /// let response = client.put("https://api.example.com/resource/123").await?;
@@ -250,10 +250,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// #[derive(serde::Serialize)]
     /// struct Update { name: String }
@@ -290,10 +290,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// // For PATCH with body, use patch_with instead!
     /// let response = client.patch("https://api.example.com/protected-resource/42").await?;
@@ -324,10 +324,10 @@ impl AuthenticatedClient {
     /// # Example
     /// ```no_run
     /// # use leptos::prelude::*;
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// #[derive(serde::Serialize)]
     /// struct PartialUpdate { name: Option<String> }
@@ -365,10 +365,10 @@ impl AuthenticatedClient {
     /// # Example
     /// ```no_run
     /// # use leptos::prelude::*;
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// let response = client.delete("https://api.example.com/protected-resource/42").await?;
     /// # Ok(())
@@ -396,10 +396,10 @@ impl AuthenticatedClient {
     ///
     /// # Example
     /// ```no_run
-    /// # use leptos_keycloak_auth::expect_authenticated;
+    /// # use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let client = expect_authenticated().client();
+    /// let client = use_authenticated().client();
     ///
     /// let response = client
     ///     .delete_with("https://api.example.com/protected-resource/42", |builder| {

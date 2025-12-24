@@ -2,10 +2,10 @@ use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
 use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 use crate::{
-    request::{self, RequestError}, token::TokenData, AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint,
-    RefreshToken,
-    SessionState,
+    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
     TokenEndpoint,
+    request::{self, RequestError},
+    token::TokenData,
 };
 use leptos::prelude::*;
 use time::OffsetDateTime;
@@ -114,16 +114,21 @@ pub(crate) fn create_exchange_code_for_token_action(
     })
 }
 
+/// Leptos action to call the token endpoint to perform a token refresh.
+///
+/// We call callbacks using `try_run` to mitigate any "has been disposed" panics should refresh
+/// happen in parallel with another action, e.g. a logout triggered by the user or code.
+/// In such a case, we could have already disposed these callbacks.
 #[allow(clippy::type_complexity)]
 pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
-    set_token: Callback<Option<TokenData>>,
-    set_req_error: Callback<Option<RequestError>>,
+    on_success: Callback<Option<TokenData>>,
+    on_error: Callback<Option<RequestError>>,
 ) -> Action<
     (
         TokenEndpoint,
         RefreshToken,
-        Callback<(RequestError,), RequestError>,
+        Callback<RequestError, RequestError>,
     ),
     (),
 > {
@@ -131,7 +136,7 @@ pub(crate) fn create_refresh_token_action(
         move |(token_endpoint, refresh_token, on_refresh_error): &(
             TokenEndpoint,
             RefreshToken,
-            Callback<(RequestError,), RequestError>,
+            Callback<RequestError, RequestError>,
         )| {
             let token_endpoint = token_endpoint.clone();
             let client_id = options.read_value().client_id.clone();
@@ -147,10 +152,13 @@ pub(crate) fn create_refresh_token_action(
                     )
                     .await
                     {
-                        Ok(refreshed_token) => set_token.run(Some(refreshed_token)),
+                        Ok(refreshed_token) => {
+                            on_success.try_run(Some(refreshed_token));
+                        }
                         Err(err) => {
-                            let err = on_refresh_error.run((err,));
-                            set_req_error.run(Some(err));
+                            if let Some(err) = on_refresh_error.try_run(err) {
+                                on_error.try_run(Some(err));
+                            }
                         }
                     }
                 });

@@ -1,28 +1,28 @@
 #![allow(clippy::must_use_candidate)]
 
 use crate::routes::routes;
+use crate::services::user_service::UserService;
 use leptonic::atoms::button::LinkTarget;
 use leptonic::components::prelude::*;
 use leptos::prelude::*;
-use leptos_keycloak_auth::components::{DebugState, ShowWhenAuthenticated};
+use leptos_keycloak_auth::components::{AuthProvider, DebugState, MaybeAuthenticated, WithAuth};
 use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::{
-    expect_authenticated, expect_keycloak_auth, init_keycloak_auth, to_current_url,
-    AdvancedOptions, IdTokenValidationOptions, UseKeycloakAuthOptions,
-};
+use leptos_keycloak_auth::{use_authenticated, use_keycloak_auth};
 use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::components::{Outlet, Router};
 use leptos_router::hooks::use_location;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 #[must_use]
-pub fn shell(options: LeptosOptions) -> impl IntoView {
+pub fn shell(options: LeptosOptions, keycloak_port: u16) -> impl IntoView {
     view! {
         <!DOCTYPE html>
         <html lang="en">
             <head>
                 <meta charset="utf-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="keycloak-port" content={keycloak_port}/>
+                <link rel="preconnect" href="https://fonts.gstatic.com"/>
                 <AutoReload options=options.clone() />
                 <HydrationScripts options/>
                 <MetaTags/>
@@ -34,9 +34,51 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct KeycloakPort(u16);
+
+impl KeycloakPort {
+    fn provide() {
+        #[cfg(feature = "ssr")]
+        let keycloak_port = {
+            dotenvy::dotenv().unwrap();
+            let keycloak_port = std::env::var("KC_PORT")
+                .expect("KC_PORT must be set")
+                .parse::<u16>()
+                .expect("KC_PORT to be a u16");
+            tracing::info!(keycloak_port, "parsed KC_PORT");
+            keycloak_port
+        };
+        #[cfg(not(feature = "ssr"))]
+        let keycloak_port = {
+            leptos_use::use_document()
+                .as_ref()
+                .unwrap()
+                .query_selector("meta[name='keycloak-port']")
+                .ok()
+                .flatten()
+                .and_then(|element| {
+                    use wasm_bindgen::JsCast;
+                    element.dyn_into::<leptos::web_sys::HtmlMetaElement>().ok()
+                })
+                .map(|meta| meta.content())
+                .unwrap_or_default()
+                .parse::<u16>()
+                .expect("keycloak-port should be a valid number")
+        };
+        provide_context(KeycloakPort(keycloak_port));
+    }
+
+    fn get() -> Self {
+        expect_context::<KeycloakPort>()
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
+
+    KeycloakPort::provide();
 
     view! {
         <Meta name="charset" content="UTF-8"/>
@@ -61,63 +103,91 @@ pub fn App() -> impl IntoView {
                 overflow: auto;
             ">
                 <Router>
-                    { routes::generated_routes() }
+                    <Init>
+                        { routes::generated_routes() }
+                    </Init>
                 </Router>
             </main>
         </Root>
     }
 }
 
+/// These initializations always take place when the app starts.
 #[component]
-pub fn MainLayout() -> impl IntoView {
+pub fn Init(children: Children) -> impl IntoView {
+    // Services
+    UserService::provide();
+
     view! {
-        <Outlet />
+        <AuthProvider
+            keycloak_server_url=Url::parse(&format!("http://localhost:{}", KeycloakPort::get().0)).expect("valid keycloak server url")
+            realm="test-realm"
+            client="test-client"
+        >
+            { children() }
+
+            <WithAuth render=move |auth| view! {
+                <Modal show_when=auth.suspicious_logout>
+                    <ModalHeader attr:id="suspicious-logout-detected"><ModalTitle>"Suspicious Logout Detected"</ModalTitle></ModalHeader>
+                    <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
+                    <ModalFooter>
+                        <ButtonWrapper>
+                            <Button
+                                attr:id="dismiss"
+                                on_press=move |_| { auth.dismiss_suspicious_logout_warning.run(()); }
+                                color=ButtonColor::Primary
+                            >
+                                "Dismiss"
+                            </Button>
+                        </ButtonWrapper>
+                    </ModalFooter>
+                </Modal>
+            }/>
+        </AuthProvider>
     }
 }
 
 #[component]
-pub fn Welcome() -> impl IntoView {
-    let (count, set_count) = signal(0);
+pub fn MainLayout() -> impl IntoView {
+    let keycloak_port = expect_context::<KeycloakPort>();
 
     view! {
-        <h2>"Welcome to Leptonic"</h2>
+        <h2>"leptos-keycloak-auth - test-frontend"</h2>
 
-        <LinkButton attr:id="to-public" href=routes::root::Public.materialize().strip_prefix("/").unwrap().to_string()>
-            "Public area"
-        </LinkButton>
+        <div>
+            "Keycloak port: " <span id="keycloak-port">{ keycloak_port.0 }</span>
+        </div>
+
+        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;"/>
+
+        <Outlet />
+
+        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;"/>
+
+        <DebugState attr:style="font-size: 0.6em;"/>
+    }
+}
+
+#[component]
+pub fn Home() -> impl IntoView {
+    view! {
+        <h2>"Home"</h2>
+
+        <p id="auth-state">
+            <MaybeAuthenticated
+                authenticated=move |_| view! { "You are logged in!" }
+                unauthenticated=move |_| view! { "You are not logged in." }
+                fallback=move || view! { "Auth state is undetermined." }
+            />
+        </p>
 
         <LinkButton attr:id="to-my-account" href=routes::root::MyAccount.materialize()>
             "My Account"
         </LinkButton>
-
-        <span id="count" style="margin-top: 3em;">
-            "Count: " { move || count.get() }
-        </span>
-
-        <Button attr:id="increase" on_press=move|_| set_count.update(|c| *c += 1)>
-            "Increase"
-        </Button>
     }
 }
 
-#[component]
-pub fn Public() -> impl IntoView {
-    view! {
-        <h2>"Welcome to Leptonic"</h2>
-
-        <LinkButton attr:id="to-my-account" href=routes::Root.materialize()>
-            "Back"
-        </LinkButton>
-    }
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct WhoAmIResponse {
-    username: String,
-    keycloak_uuid: String,
-    token_valid_for_whole_seconds: i32,
-}
-
+/// A component that expects to be rendered only when the user is authenticated.
 #[component]
 pub fn MyAccount() -> impl IntoView {
     static RENDER_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -139,10 +209,9 @@ pub fn MyAccount() -> impl IntoView {
         RENDER_COUNT.store(0, Ordering::Release);
     });
 
-    let auth = expect_keycloak_auth();
-    let authenticated = expect_authenticated();
+    let auth = use_keycloak_auth();
+    let authenticated = use_authenticated();
 
-    let auth_state = Signal::derive(move || auth.state_pretty_printer());
     let user_name = Signal::derive(move || authenticated.id_token_claims.read().name.clone());
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
@@ -165,18 +234,9 @@ pub fn MyAccount() -> impl IntoView {
         })
     });
 
-    let who_am_i = LocalResource::new(move || {
-        let client = authenticated.client();
-        async move {
-            client
-                .get("http://127.0.0.1:9999/who-am-i")
-                .await
-                .unwrap()
-                .json::<WhoAmIResponse>()
-                .await
-                .unwrap()
-        }
-    });
+    let user_service = UserService::get();
+    let who_am_i = LocalResource::new(move || async move { user_service.who_am_i().await.ok() });
+    let who_am_i = Signal::derive(move || who_am_i.get().flatten());
 
     view! {
         <h1 id="greeting">
@@ -194,10 +254,6 @@ pub fn MyAccount() -> impl IntoView {
                 <div>"token_valid_for_whole_seconds: " <span id="token_valid_for_whole_seconds">{ who_am_i.token_valid_for_whole_seconds }</span></div>
             }) }
         </Suspense>
-
-        <pre id="auth-state" style="width: 100%;">
-            { move || auth_state.read()() }
-        </pre>
 
         <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
             "Logout"
@@ -221,64 +277,24 @@ pub fn MyAccount() -> impl IntoView {
     }
 }
 
-#[server]
-async fn get_keycloak_port() -> Result<u16, ServerFnError> {
-    let _ = dotenvy::dotenv().ok();
-    let port = std::env::var("KEYCLOAK_PORT").expect("KEYCLOAK_PORT must be set");
-    let keycloak_port = port.parse::<u16>().expect("KEYCLOAK_PORT to be a u16");
-    tracing::info!(keycloak_port, "parsed KEYCLOAK_PORT");
-    Ok(keycloak_port)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct KeycloakPort(u16);
-
 #[component]
-pub fn Protected(children: ChildrenFn) -> impl IntoView {
-    // Note: Use a `LocalResource` with a `Suspend` to force rendering of the protected area
-    // client-side only. We should also not execute `use_keycloak_auth` on the server, as it has
-    // no support for SSR yet.
-    //
-    // Our test-setup starts Keycloak with randomized ports, so we cannot hardcode "8443" here,
-    // but can actually make use of the enforced resource to asynchronously retrieve the port.
-    let keycloak_port = LocalResource::new(|| async move { get_keycloak_port().await.unwrap() });
-
+pub fn Login() -> impl IntoView {
     view! {
-        <Suspense fallback=|| view! { "" }>
-            {Suspend::new(async move {
-                let port = keycloak_port.await;
-                provide_context(KeycloakPort(port));
-                tracing::info!(port, "Initializing Keycloak auth...");
-                let keycloak_server_url = format!("http://localhost:{port}");
-                let _auth = init_keycloak_auth(UseKeycloakAuthOptions {
-                    keycloak_server_url: Url::parse(&keycloak_server_url).unwrap(),
-                    realm: "test-realm".to_owned(),
-                    client_id: "test-client".to_owned(),
-                    post_login_redirect_url: to_current_url(),
-                    post_logout_redirect_url: to_current_url(),
-                    scope: vec![],
-                    id_token_validation: IdTokenValidationOptions {
-                        expected_audiences: Some(vec!["test-client".to_owned()]),
-                        expected_issuers: Some(vec![format!("{keycloak_server_url}/realms/test-realm")]),
-                    },
-                    delay_during_hydration: false,
-                    advanced: AdvancedOptions::default(),
-                });
-                view! {
-                    <ShowWhenAuthenticated fallback=|| view! { <Login/> }>
-                        { children() }
-                    </ShowWhenAuthenticated>
+        <h1 id="unauthenticated">"Unauthenticated"</h1>
 
-                    <DebugState/>
-                }
-            })}
-        </Suspense>
+        <LoginButton />
+
+        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
+            "Back to root"
+        </LinkButton>
     }
 }
 
+/// A button to start the login flow, bringing the user to Keycloak login page.
+/// Once credentials were entered, a redirect to the current url will be performed.
 #[component]
-pub fn Login() -> impl IntoView {
-    let auth = expect_keycloak_auth();
+pub fn LoginButton() -> impl IntoView {
+    let auth = use_keycloak_auth();
     let login_url_unavailable = Signal::derive(move || auth.login_url.read().is_none());
     let login_url = Signal::derive(move || {
         auth.login_url
@@ -286,20 +302,8 @@ pub fn Login() -> impl IntoView {
             .map(|url| url.to_string())
             .unwrap_or_default()
     });
-    let keycloak_port = expect_context::<KeycloakPort>();
-    let auth_state = Signal::derive(move || auth.state_pretty_printer());
 
     view! {
-       <h1 id="unauthenticated">"Unauthenticated"</h1>
-
-        <div id="keycloak-port">
-            { keycloak_port.0 }
-        </div>
-
-        <pre id="auth-state" style="width: 100%;">
-            { move || auth_state.read()() }
-        </pre>
-
         <LinkButton
             href=move || login_url.get()
             target=LinkTarget::_Self
@@ -307,19 +311,5 @@ pub fn Login() -> impl IntoView {
         >
             "Log in"
         </LinkButton>
-
-        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
-            "Back to root"
-        </LinkButton>
-
-        <Modal show_when=auth.suspicious_logout>
-            <ModalHeader attr:id="suspicious-logout-detected"><ModalTitle>"Suspicious Logout Detected"</ModalTitle></ModalHeader>
-            <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
-            <ModalFooter>
-                <ButtonWrapper>
-                    <Button attr:id="dismiss" on_press=move |_| { auth.dismiss_suspicious_logout_warning.run(()); } color=ButtonColor::Primary>"Dismiss"</Button>
-                </ButtonWrapper>
-            </ModalFooter>
-        </Modal>
     }
 }

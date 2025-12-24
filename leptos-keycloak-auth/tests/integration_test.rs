@@ -111,6 +111,8 @@ async fn configure_keycloak(admin_client: &KeycloakAdmin) {
             // force many token refreshes quickly. We want to make sure that those do not interfere
             // with the user application, e.g. leading to no accidental rerendering.
             access_token_lifespan: Some(5),
+            sso_session_idle_timeout: Some(10),
+            sso_session_max_lifespan: Some(20),
             clients: Some(vec![ClientRepresentation {
                 enabled: Some(true),
                 public_client: Some(true),

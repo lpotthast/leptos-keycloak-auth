@@ -3,23 +3,29 @@ use leptos_routes::routes;
 #[allow(clippy::module_inception)]
 #[routes(with_views, fallback = "|| view! { \"Page not found.\" }")]
 pub mod routes {
+    use crate::app::Home;
+    use crate::app::Login;
     use crate::app::MainLayout;
     use crate::app::MyAccount;
-    use crate::app::Protected;
-    use crate::app::Public;
-    use crate::app::Welcome;
     use leptos_keycloak_auth::components::EndSession;
+    use leptos_keycloak_auth::components::MaybeAuthenticated;
     use leptos_keycloak_auth::url::Url;
 
-    #[route("/", layout = "MainLayout", fallback = "Welcome")]
+    #[route("/", layout = "MainLayout", fallback = "Home")]
     pub mod root {
-
-        #[route("/public", view = "Public")]
-        pub mod public {}
 
         #[route(
             "/my-account",
-            view = "|| view! { <Protected> <MyAccount/> </Protected> }"
+            view = "|| view! {
+                <MaybeAuthenticated
+                    authenticated=|_auth| view! {
+                        <MyAccount/>
+                    }
+                    unauthenticated=|_| view! {
+                        <Login/>
+                    }
+                />
+            }"
         )]
         pub mod my_account {}
 
@@ -27,7 +33,7 @@ pub mod routes {
         /// and redirects to `"/"`.
         #[route(
             "/logout",
-            view = "|| view! { <Protected> <EndSession and_route_to=Url::parse(\"http://127.0.0.1:3000\").unwrap()/> </Protected> }"
+            view = "|| view! { <EndSession and_route_to=Url::parse(\"http://127.0.0.1:3000\").unwrap()/> }"
         )]
         pub mod logout {}
     }

@@ -44,14 +44,6 @@ impl MyAccount<'_> {
         Ok(())
     }
 
-    pub async fn read_keycloak_port(&self) -> anyhow::Result<u16> {
-        tracing::info!("Read keycloak port from frontend.");
-        let keycloak_port_div = self.driver.find(By::Id("keycloak-port")).await?;
-        let keycloak_port = keycloak_port_div.text().await?;
-        let keycloak_port = keycloak_port.trim().parse::<u16>()?;
-        Ok(keycloak_port)
-    }
-
     pub async fn click_login(&self) -> anyhow::Result<()> {
         self.click_link_btn_with_title("Log in").await
     }

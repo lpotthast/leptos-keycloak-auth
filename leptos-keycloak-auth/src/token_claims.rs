@@ -260,9 +260,9 @@ pub struct Access {
 /// # Example
 /// ```no_run
 /// use leptos::prelude::*;
-/// use leptos_keycloak_auth::expect_authenticated;
+/// use leptos_keycloak_auth::use_authenticated;
 ///
-/// let authenticated = expect_authenticated();
+/// let authenticated = use_authenticated();
 /// let id_claims = authenticated.id_token_claims.get();
 ///
 /// if let Some(realm_access) = &id_claims.realm_access {
@@ -286,9 +286,9 @@ pub struct RealmAccess(pub Access);
 /// # Example
 /// ```no_run
 /// use leptos::prelude::*;
-/// use leptos_keycloak_auth::expect_authenticated;
+/// use leptos_keycloak_auth::use_authenticated;
 ///
-/// let authenticated = expect_authenticated();
+/// let authenticated = use_authenticated();
 /// let id_claims = authenticated.id_token_claims.get();
 ///
 /// if let Some(resource_access) = &id_claims.resource_access {
