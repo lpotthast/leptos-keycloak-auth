@@ -1,5 +1,5 @@
 use tracing_subscriber::{
-    Layer, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Layer,
 };
 
 pub fn init_subscriber() {
@@ -7,7 +7,7 @@ pub fn init_subscriber() {
         .with_default(tracing::Level::INFO)
         .with_target("tokio", tracing::Level::WARN)
         .with_target("axum", tracing::Level::WARN)
-        .with_target("leptos_keycloak_auth", tracing::Level::DEBUG)
+        .with_target("leptos_keycloak_auth", tracing::Level::TRACE)
         .with_target("axum_keycloak_auth", tracing::Level::DEBUG)
         .with_target("runtime", tracing::Level::WARN);
 

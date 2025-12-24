@@ -5,11 +5,13 @@ async fn main() {
     use frontend::app::*;
     use leptos::logging::log;
     use leptos::prelude::*;
-    use leptos_axum::{LeptosRoutes, generate_route_list};
+    use leptos_axum::{generate_route_list, LeptosRoutes};
 
     use tracing_subscriber::{
-        Layer, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
+        prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Layer,
     };
+
+    dotenvy::dotenv().unwrap();
 
     let log_filter = tracing_subscriber::filter::Targets::new()
         .with_default(tracing::Level::INFO)
@@ -36,12 +38,20 @@ async fn main() {
     // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
 
+    let keycloak_port = std::env::var("KC_PORT")
+        .expect("KC_PORT must be set")
+        .parse::<u16>()
+        .expect("KC_PORT to be a u16");
+    tracing::info!(keycloak_port, "parsed KC_PORT");
+
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, {
             let leptos_options = leptos_options.clone();
-            move || shell(leptos_options.clone())
+            move || shell(leptos_options.clone(), keycloak_port)
         })
-        .fallback(leptos_axum::file_and_error_handler(shell))
+        .fallback(leptos_axum::file_and_error_handler(move |options| {
+            shell(options, keycloak_port)
+        }))
         .with_state(leptos_options);
 
     // run our app with hyper

@@ -22,12 +22,14 @@ impl UiTest for AuthFlow {
         let root = pages::root::Root { driver };
         root.goto().await?;
         root.wait_for_navigation().await?;
-        root.check_that_count_is(0).await?;
+
+        let keycloak_port = root.read_keycloak_port().await?;
+
+        root.check_not_logged_in().await?;
         root.click_on_my_account().await?;
 
         let my_account = MyAccount { driver };
         my_account.expect_not_authenticated().await?;
-        let keycloak_port = my_account.read_keycloak_port().await?;
 
         let keycloak = KeycloakLogin {
             driver,

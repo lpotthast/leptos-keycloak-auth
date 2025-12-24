@@ -1,13 +1,13 @@
 use crate::request::GrantType;
 use crate::token_validation::NonceValidation;
-use crate::{Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
+use crate::{AccessToken, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, internal};
 use leptos::prelude::*;
 
 /// Get access to the current authentication state.
 ///
 /// Panics when `init_keycloak_auth` was not yet called.
 #[must_use]
-pub fn expect_keycloak_auth() -> KeycloakAuth {
+pub fn use_keycloak_auth() -> KeycloakAuth {
     expect_context::<KeycloakAuth>()
 }
 
@@ -15,10 +15,61 @@ pub fn expect_keycloak_auth() -> KeycloakAuth {
 ///
 /// Panics when the user is not currently authenticated.
 ///
-/// Safe to call anywhere under `ShowWhenAuthenticated`.
+/// Safe to call anywhere under [`Authenticated`](crate::components::Authenticated).
 #[must_use]
-pub fn expect_authenticated() -> Authenticated {
+pub fn use_authenticated() -> Authenticated {
     expect_context::<Authenticated>()
+}
+
+/// Get access to the current authentication state without panicking.
+///
+/// This is only useful in apps where `init_keycloak_auth`/`<AuthProvider>` is not called/used
+/// globally on every route.
+///
+/// # Example
+/// ```no_run
+/// use leptos_keycloak_auth::try_use_keycloak_auth;
+///
+/// # use leptos::prelude::*;
+/// # #[component]
+/// # fn Example() -> impl IntoView {
+/// if let Some(auth) = try_use_keycloak_auth() {
+///     if auth.is_authenticated.get() {
+///         view! { <a href="/account">"My Account"</a> }.into_any()
+///     } else {
+///         view! { <span>"Not logged in"</span> }.into_any()
+///     }
+/// } else {
+///     view! { <span>"Loading..."</span> }.into_any()
+/// }
+/// # }
+/// ```
+#[must_use]
+pub fn try_use_keycloak_auth() -> Option<KeycloakAuth> {
+    use_context::<KeycloakAuth>()
+}
+
+/// Get access to the current user data without panicking.
+///
+/// Returns `None` when the user is not currently authenticated or when auth is not initialized.
+/// This is useful for components that want to adapt their behavior based on authentication status.
+///
+/// # Example
+/// ```no_run
+/// use leptos_keycloak_auth::try_use_authenticated;
+///
+/// # use leptos::prelude::*;
+/// # #[component]
+/// # fn Example() -> impl IntoView {
+/// match try_use_authenticated() {
+///     Some(auth) => view! { <p>"Welcome, " { auth.id_token_claims.read().name.clone() }</p> }.into_any(),
+///     None => view! { <p>"Welcome, guest!"</p> }.into_any()
+/// }
+/// # }
+/// ```
+#[must_use]
+pub fn try_use_authenticated() -> Option<Authenticated> {
+    use_context::<Authenticated>()
 }
 
 /// Initializes a new `KeycloakAuth` instance, the authentication handler responsible for handling
@@ -56,6 +107,8 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let code_verifier = Signal::from(crate::code_verifier::CodeVerifier::generate());
 
+    let hydration_manager = internal::hydration_manager::HydrationManager::new();
+
     KeycloakAuth {
         options,
         derived_urls: DerivedUrls::new(Signal::from(None)),
@@ -63,14 +116,14 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         logout_url: Signal::from(None),
         state: Signal::from(KeycloakAuthState::Indeterminate),
         is_authenticated: Signal::from(false),
-        oidc_config_manager: crate::internal::oidc_config_manager::OidcConfigManager {
+        oidc_config_manager: internal::oidc_config_manager::OidcConfigManager {
             oidc_config: Default::default(),
             set_oidc_config: { Callback::new(|_| {}) },
             oidc_config_age: Default::default(),
             oidc_config_expires_in: Default::default(),
             oidc_config_too_old: Default::default(),
         },
-        jwk_set_manager: crate::internal::jwk_set_manager::JwkSetManager {
+        jwk_set_manager: internal::jwk_set_manager::JwkSetManager {
             jwk_set: Default::default(),
             set_jwk_set: { Callback::new(|_| {}) },
             jwk_set_old: Default::default(),
@@ -79,12 +132,12 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             jwk_set_expires_in: Default::default(),
             jwk_set_too_old: Default::default(),
         },
-        code_verifier_manager: crate::internal::code_verifier_manager::CodeVerifierManager {
+        code_verifier_manager: internal::code_verifier_manager::CodeVerifierManager {
             code_verifier,
             set_code_verifier: { Callback::new(|_| {}) },
             code_challenge: Memo::new(move |_| code_verifier.read().to_code_challenge()),
         },
-        token_manager: crate::internal::token_manager::TokenManager {
+        token_manager: internal::token_manager::TokenManager {
             token: Default::default(),
             set_token: { Callback::new(|_| {}) },
             access_token_lifetime: Default::default(),
@@ -96,15 +149,14 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             refresh_token_nearly_expired: Default::default(),
             refresh_token_expired: Default::default(),
             exchange_code_for_token_action: Action::new(|_| async move {}),
-            token_endpoint: Signal::from(Err(
-                crate::internal::derived_urls::DerivedUrlError::NoConfig,
-            )),
+            token_endpoint: Signal::from(Err(internal::derived_urls::DerivedUrlError::NoConfig)),
             trigger_refresh: Callback::new(|_| ()),
         },
-        csrf_token_manager: crate::internal::csrf_token_manager::CsrfTokenManager::new(),
-        nonce_manager: crate::internal::nonce_manager::NonceManager::new(),
+        csrf_token_manager: internal::csrf_token_manager::CsrfTokenManager::new(),
+        nonce_manager: internal::nonce_manager::NonceManager::new(),
         suspicious_logout: Signal::from(false),
         dismiss_suspicious_logout_warning: Callback::new(|_| ()),
+        hydration_manager,
     }
 }
 
@@ -118,10 +170,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::request::RequestError;
     use crate::response::CallbackResponse;
     use crate::token_claims::KeycloakIdTokenClaims;
-    use crate::token_validation::KeycloakIdTokenClaimsError;
+    use crate::token_validation::IdTokenClaimsError;
     use crate::{
-        internal, login, logout, token_validation, Authenticated, KeycloakAuth,
-        KeycloakAuthState, NotAuthenticated, RequestAction,
+        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated, RequestAction, login,
+        logout, token_validation,
     };
     use leptos::callback::Callback;
     use leptos::prelude::*;
@@ -132,6 +184,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let options = Options::new(options);
     let options = StoredValue::new(options);
+
+    let hydration_manager = internal::hydration_manager::HydrationManager::new();
 
     let (auth_error, set_auth_error) = signal::<Option<KeycloakAuthError>>(None);
     let handle_req_error = Callback::new(move |request_error: Option<RequestError>| {
@@ -291,70 +345,69 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    let verified_and_decoded_id_token: Memo<
-        Result<KeycloakIdTokenClaims, KeycloakIdTokenClaimsError>,
-    > = Memo::new(move |_| {
-        let options = options.read_value();
-        let expected_audiences = options.id_token_validation.expected_audiences.get();
-        let expected_issuers = options.id_token_validation.expected_issuers.get();
-        let nonce_validation_requested = options.advanced.nonce_validation;
+    let verified_and_decoded_id_token: Memo<Result<KeycloakIdTokenClaims, IdTokenClaimsError>> =
+        Memo::new(move |_| {
+            let options = options.read_value();
+            let expected_audiences = options.id_token_validation.expected_audiences.get();
+            let expected_issuers = options.id_token_validation.expected_issuers.get();
+            let nonce_validation_requested = options.advanced.nonce_validation;
 
-        let token_data = token_validation::validate_token_data_presence(token_mgr.token.get())?;
-        let jwk_set = token_validation::validate_jwk_set_presence(jwk_set_mgr.jwk_set.get())?;
+            let token_data = token_validation::validate_token_data_presence(token_mgr.token.get())?;
+            let jwk_set = token_validation::validate_jwk_set_presence(jwk_set_mgr.jwk_set.get())?;
 
-        // Do not require a nonce in the ID token when the token data source was a refresh.
-        // As stated in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>,
-        // refresh tokens SHOULD NOT have a `nonce` claim, and Keycloak generally respects that.
-        // A backwards compatibility claim mapper can be enabled to still include nonce claims in
-        // refresh tokens, but this is not required from a security perspective. If the mapper is
-        // enabled, also enabling nonce claims in ID tokens returned from a refresh, we again
-        // validate against the initial nonce value, as this value is only regenerated on logout.
-        let expected_nonce = nonce_mgr.nonce().read_untracked();
-        let nonce_validation_required =
-            nonce_validation_requested && token_data.grant_type != GrantType::RefreshToken;
-        let nonce_validation = match (nonce_validation_requested, nonce_validation_required) {
-            (true, true) => NonceValidation::Required {
-                expected_nonce: expected_nonce.as_str(),
-            },
-            (true, false) => NonceValidation::IfPresent {
-                expected_nonce: expected_nonce.as_str(),
-            },
-            (false, _) => NonceValidation::Disabled,
-        };
+            // Do not require a nonce in the ID token when the token data source was a refresh.
+            // As stated in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>,
+            // refresh tokens SHOULD NOT have a `nonce` claim, and Keycloak generally respects that.
+            // A backwards compatibility claim mapper can be enabled to still include nonce claims in
+            // refresh tokens, but this is not required from a security perspective. If the mapper is
+            // enabled, also enabling nonce claims in ID tokens returned from a refresh, we again
+            // validate against the initial nonce value, as this value is only regenerated on logout.
+            let expected_nonce = nonce_mgr.nonce().read_untracked();
+            let nonce_validation_required =
+                nonce_validation_requested && token_data.grant_type != GrantType::RefreshToken;
+            let nonce_validation = match (nonce_validation_requested, nonce_validation_required) {
+                (true, true) => NonceValidation::Required {
+                    expected_nonce: expected_nonce.as_str(),
+                },
+                (true, false) => NonceValidation::IfPresent {
+                    expected_nonce: expected_nonce.as_str(),
+                },
+                (false, _) => NonceValidation::Disabled,
+            };
 
-        let result;
+            let result: Result<KeycloakIdTokenClaims, IdTokenClaimsError>;
 
-        let first_try = token_validation::validate(
-            &token_data,
-            &jwk_set.jwk_set,
-            expected_audiences.as_deref(),
-            expected_issuers.as_deref(),
-            nonce_validation,
-        );
+            let first_try = token_validation::validate(
+                &token_data,
+                &jwk_set.jwk_set,
+                expected_audiences.as_deref(),
+                expected_issuers.as_deref(),
+                nonce_validation,
+            );
 
-        if first_try.is_ok() {
-            result = first_try;
-        } else {
-            // If validation with the current JWK set fails, we should not try to validate with a
-            // missing old set. This would just lead to a `NoJwkSet` error being ultimately stored,
-            // hiding the real reason why validation failed in the first place.
-            if let Some(jwk_set_old) = jwk_set_mgr.jwk_set_old.read().as_ref() {
-                let second_try = token_validation::validate(
-                    &token_data,
-                    &jwk_set_old.jwk_set,
-                    expected_audiences.as_deref(),
-                    expected_issuers.as_deref(),
-                    nonce_validation,
-                );
-                result = second_try;
-            } else {
+            if first_try.is_ok() {
                 result = first_try;
+            } else {
+                // If validation with the current JWK set fails, we should not try to validate with a
+                // missing old set. This would just lead to a `NoJwkSet` error being ultimately stored,
+                // hiding the real reason why validation failed in the first place.
+                if let Some(jwk_set_old) = jwk_set_mgr.jwk_set_old.read().as_ref() {
+                    let second_try = token_validation::validate(
+                        &token_data,
+                        &jwk_set_old.jwk_set,
+                        expected_audiences.as_deref(),
+                        expected_issuers.as_deref(),
+                        nonce_validation,
+                    );
+                    result = second_try;
+                } else {
+                    result = first_try;
+                }
             }
-        }
 
-        tracing::trace!(?result, "ID token validation result");
-        result
-    });
+            tracing::trace!(?result, "ID token validation result");
+            result
+        });
 
     let (last_refresh_from_error, set_last_refresh_from_error) =
         signal::<Option<OffsetDateTime>>(None);
@@ -368,11 +421,11 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             // - the refresh succeeds but
             // - the 401 error cannot be resolved with the refresh.
             http::StatusCode::UNAUTHORIZED => {
-                if last_refresh_from_error
-                    .get_untracked()
-                    .filter(|it| (OffsetDateTime::now_utc() - *it).whole_seconds() > 1)
-                    .is_some()
-                {
+                // If we never attempted a refresh before (is_none).
+                if last_refresh_from_error.get_untracked().is_none_or(
+                    // If the last error is old.
+                    |it| (OffsetDateTime::now_utc() - it).whole_seconds() > 1,
+                ) {
                     token_mgr.refresh_token(OnRefreshError::DropToken);
                     set_last_refresh_from_error.set(Some(OffsetDateTime::now_utc()));
                 }
@@ -382,32 +435,35 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    let (pending_hydration, set_pending_hydration) =
-        signal(options.read_value().delay_during_hydration);
-    if options.read_value().delay_during_hydration {
-        request_animation_frame(move || {
-            set_pending_hydration.set(false);
-        });
-    }
-
     // Create a persistent `Authenticated` state that doesn't get recreated on every evaluation of
     // our `state` memo.
     // We ensure the assumptions made here (`expect`s) are upheld by only providing this
     // `Authenticated` state as context (through `provide_context`) when the user really is
     // authenticated.
     let authenticated = StoredValue::new(Authenticated {
-        access_token: Signal::derive(move || {
-            token_mgr
-                .token
-                .read()
-                .as_ref()
-                .map(|it| it.access_token.clone())
-                .expect("access_token signal should only be read when authenticated")
+        access_token: Memo::new(move |prev: Option<&AccessToken>| {
+            match token_mgr.token.read().as_ref().map(|it| &it.access_token) {
+                None => match prev {
+                    None => {
+                        panic!("access_token signal should only be read when authenticated");
+                    }
+                    Some(prev) => prev.clone(),
+                },
+                Some(access_token) => access_token.clone(),
+            }
         }),
-        id_token_claims: Signal::derive(move || {
-            verified_and_decoded_id_token
-                .get()
-                .expect("id_token_claims signal should only be read when authenticated")
+        id_token_claims: Memo::new(move |prev: Option<&KeycloakIdTokenClaims>| {
+            match verified_and_decoded_id_token.read().as_ref() {
+                Err(err) => match prev {
+                    None => {
+                        panic!(
+                            "id_token_claims signal should only be read when authenticated: {err:?}"
+                        );
+                    }
+                    Some(prev) => prev.clone(),
+                },
+                Ok(token) => token.clone(),
+            }
         }),
         auth_error_reporter,
     });
@@ -421,7 +477,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     // Auth state derived from token data or potential errors.
     // Using persistent `authenticated` and `not_authenticated` values with inner signals prevents
-    // unnecessary rerenders of the children passed to ShowWhenAuthenticated when tokens refresh.
+    // unnecessary rerenders of the children passed to `Authenticated` when tokens refresh.
     let state = Memo::new(move |_| {
         let token = token_mgr.token;
 
@@ -429,7 +485,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         let has_token = token.read().is_some();
         let has_verified_and_decoded_id_token = verified_and_decoded_id_token.read().is_ok();
 
-        if pending_hydration.get() || pending_login.get() {
+        // Hydration-safety. Force server and client to render the same initial view.
+        if hydration_manager.in_hydration_window.get() || pending_login.get() {
             tracing::trace!("Switching to: KeycloakAuthState::Indeterminate");
             KeycloakAuthState::Indeterminate
         } else if has_token
@@ -444,7 +501,12 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         }
     });
 
-    KeycloakAuth {
+    let is_authenticated = Signal::derive(move || match state.read().deref() {
+        KeycloakAuthState::Authenticated(_) => true,
+        KeycloakAuthState::NotAuthenticated { .. } | KeycloakAuthState::Indeterminate => false,
+    });
+
+    let auth = KeycloakAuth {
         options,
         derived_urls,
         login_url: login::create_login_url_signal(
@@ -458,15 +520,11 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             end_session_endpoint,
             token_mgr.token,
             options,
-            pending_hydration.into(),
             csrf_mgr.logout_token(),
         )
         .into(),
         state: state.into(),
-        is_authenticated: Signal::derive(move || match state.read().deref() {
-            KeycloakAuthState::Authenticated(_) => true,
-            KeycloakAuthState::NotAuthenticated { .. } | KeycloakAuthState::Indeterminate => false,
-        }),
+        is_authenticated,
         suspicious_logout: suspicious_logout.into(),
         dismiss_suspicious_logout_warning,
         oidc_config_manager: oidc_mgr,
@@ -475,5 +533,37 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         token_manager: token_mgr,
         csrf_token_manager: csrf_mgr,
         nonce_manager: nonce_mgr,
-    }
+        hydration_manager,
+    };
+
+    // TODO: Make this configurable.
+    Effect::new(move |_| {
+        if let Err(err) = verified_and_decoded_id_token.read().as_ref() {
+            match err {
+                IdTokenClaimsError::NoToken | IdTokenClaimsError::NoJwkSet => {
+                    /* Ignored. We are just missing some data. */
+                }
+                IdTokenClaimsError::Validation { .. }
+                | IdTokenClaimsError::NonceMismatch
+                | IdTokenClaimsError::MissingNonce => {
+                    // Note: This will end our session when the ID token expires. The specification
+                    // states in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>
+                    // that re-issued ID tokens must always use the original ID token expiration
+                    // time, meaning that refreshes won't help us.
+
+                    // Note: It does not seem to be enough to just drop token data at this point,
+                    // as the Keycloak session might still be present. This could lead to the user
+                    // repeatedly starting the login flow without ever getting logged in (trusted)
+                    // on our end as we repeatedly just throw away the received token.
+                    tracing::warn!(
+                        ?err,
+                        "ID token could not be verified. Ending session to force reauthentication."
+                    );
+                    auth.end_session();
+                }
+            }
+        }
+    });
+
+    auth
 }

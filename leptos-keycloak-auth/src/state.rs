@@ -1,10 +1,8 @@
 use crate::authenticated_client::AuthenticatedClient;
 use crate::config::Options;
 use crate::error::KeycloakAuthError;
-use crate::internal::csrf_token_manager::CsrfTokenManager;
-use crate::internal::nonce_manager::NonceManager;
 use crate::token_claims::KeycloakIdTokenClaims;
-use crate::token_validation::KeycloakIdTokenClaimsError;
+use crate::token_validation::IdTokenClaimsError;
 use crate::{logout, AccessToken};
 use leptos::prelude::*;
 use leptos_router::hooks::{use_navigate, use_url};
@@ -42,7 +40,7 @@ pub struct KeycloakAuth {
     /// It may be None until OIDC discovery happened and the URL could be computed.
     pub logout_url: Signal<Option<Url>>,
 
-    pub state: Signal<KeycloakAuthState>,
+    pub(crate) state: Signal<KeycloakAuthState>,
 
     /// Derived signal stating `true` when `state` is of the `Authenticated` variant.
     pub is_authenticated: Signal<bool>,
@@ -73,10 +71,13 @@ pub struct KeycloakAuth {
     pub(crate) token_manager: crate::internal::token_manager::TokenManager,
 
     #[allow(unused)]
-    pub(crate) csrf_token_manager: CsrfTokenManager,
+    pub(crate) csrf_token_manager: crate::internal::csrf_token_manager::CsrfTokenManager,
 
     #[allow(unused)]
-    pub(crate) nonce_manager: NonceManager,
+    pub(crate) nonce_manager: crate::internal::nonce_manager::NonceManager,
+
+    #[allow(unused)]
+    pub(crate) hydration_manager: crate::internal::hydration_manager::HydrationManager,
 }
 
 /// Get the current URL (origin + path). Uses a tracking access to the current url.
@@ -87,69 +88,15 @@ pub struct KeycloakAuth {
 /// # Panics
 /// Panics if the current URL cannot be parsed as a valid URL. This should not occur
 /// in normal usage as the URL is constructed from the current route.
-///
-/// # Example
-/// ```no_run
-/// use leptos_keycloak_auth::{expect_keycloak_auth, to_current_url};
-///
-/// let auth = expect_keycloak_auth();
-/// auth.set_post_login_redirect_url(to_current_url());
-/// ```
 #[must_use]
-pub fn to_current_url() -> Url {
+pub fn current_url() -> Url {
     let current = use_url().get();
-    let current = format!("{}{}", current.origin(), current.path());
-    Url::parse(&current).unwrap()
-}
-
-/// Get the current URL (origin + path) without creating a reactive dependency.
-///
-/// This function gets the current URL value without tracking it for reactive updates.
-/// Use this when you need the current URL but don't want to create a reactive dependency
-/// that would cause re-renders when the URL changes.
-///
-/// # Returns
-/// A [`Url`] representing the current page's origin and path (query and fragment are excluded).
-///
-/// # Panics
-/// Panics if the current URL cannot be parsed as a valid URL. This should not occur
-/// in normal usage as the URL is constructed from the current route.
-///
-/// # Example
-/// ```no_run
-/// use leptos_keycloak_auth::{expect_keycloak_auth, to_current_url_untracked};
-///
-/// let auth = expect_keycloak_auth();
-/// auth.set_post_login_redirect_url(to_current_url_untracked());
-/// ```
-#[must_use]
-pub fn to_current_url_untracked() -> Url {
-    let current = use_url().get_untracked();
+    // TODO: Why ignore search() / hash()?
     let current = format!("{}{}", current.origin(), current.path());
     Url::parse(&current).unwrap()
 }
 
 impl KeycloakAuth {
-    /// Update the URL to which you want to be redirected after a successful login.
-    ///
-    /// This will lead to a reactive change in the `login_url` signal.
-    ///
-    /// You can use [`to_current_url`](to_current_url) to get the current url of the page.
-    pub fn set_post_login_redirect_url(&self, url: Url) {
-        self.options
-            .with_value(|it| it.post_login_redirect_url.set(url));
-    }
-
-    /// Update the URL to which you want to be redirected after a successful logout.
-    ///
-    /// This will lead to a reactive change in the `logout_url` signal.
-    ///
-    /// You can use [`to_current_url`](to_current_url) to get the current url of the page.
-    pub fn set_post_logout_redirect_url(&self, url: Url) {
-        self.options
-            .with_value(|it| it.post_logout_redirect_url.set(url));
-    }
-
     /// Update the `expected_audiences` used when validating the ID token.
     ///
     /// This will lead to a reactive re-validation of the ID token.
@@ -182,8 +129,8 @@ impl KeycloakAuth {
     ///
     /// Useful for debugging purposes.
     pub fn state_pretty_printer(&self) -> impl Fn() -> String + use<> {
-        let state = self.state;
-        move || state.read().deref().pretty_printer()()
+        let state = self.state();
+        move || state.read().pretty_printer()()
     }
 
     /// End the current session of the user by programmatically performing a logout against the\
@@ -192,7 +139,12 @@ impl KeycloakAuth {
     /// See also `end_session_and_go_to` if you want to immediately move to a different path after
     /// the logout was performed.
     pub fn end_session(&self) {
-        self.end_session_and_go_to(to_current_url_untracked());
+        self.end_session_and_go_to(
+            self.options
+                .read_value()
+                .post_logout_redirect_url
+                .get_untracked(),
+        );
     }
 
     /// End the current session and navigate to a specified path.
@@ -210,33 +162,51 @@ impl KeycloakAuth {
     /// # Example
     /// ```no_run
     /// use url::Url;
-    /// use leptos_keycloak_auth::{expect_keycloak_auth};
+    /// use leptos_keycloak_auth::{use_keycloak_auth};
     ///
-    /// let auth = expect_keycloak_auth();
+    /// let auth = use_keycloak_auth();
     /// auth.end_session_and_go_to(Url::parse("/").unwrap());
     /// ```
     pub fn end_session_and_go_to(&self, path: Url) {
-        match (
+        let navigation_target = match (
             self.derived_urls.end_session_endpoint.get_untracked(),
             // We MUST clone here, as the `token_manager.forget()` will later clear the token data!
             self.token_manager.token.get_untracked(),
         ) {
-            (Ok(end_session_endpoint), Some(token)) => {
-                self.token_manager.forget();
-                let logout_url = logout::create_logout_url(
-                    end_session_endpoint,
-                    path,
-                    Some(token.id_token.as_str()),
-                    &self.csrf_token_manager.logout_token().read_untracked(),
-                );
-
-                let navigate = use_navigate();
-                navigate(logout_url.as_ref(), NavigateOptions::default());
-            }
+            (Ok(end_session_endpoint), Some(token)) => logout::create_logout_url(
+                end_session_endpoint,
+                path,
+                Some(token.id_token.as_str()),
+                &self.csrf_token_manager.logout_token().read_untracked(),
+            ),
             _ => {
-                let navigate = use_navigate();
-                navigate(path.as_str(), NavigateOptions::default());
+                self.forget_session();
+                path
             }
+        };
+        #[cfg(feature = "ssr")]
+        {
+            unimplemented!(
+                "The `end_session` and `end_session_and_go_to` fn's are not implemented in SSR yet. Ensure that these are only called on the client. If you see this in your logs, there is a bug."
+            );
+
+            // Note: When full SSR support is implemented:
+            // // Let's use the redirect utility from our specific server integration,
+            // // e.g., leptos_axum::redirect.
+            // tracing::trace!(
+            //     "Redirecting to '{}' using leptos_axum.",
+            //     navigation_target.as_str()
+            // );
+            // leptos_axum::redirect(navigation_target.as_str());
+        }
+        #[cfg(not(feature = "ssr"))]
+        {
+            let navigate = use_navigate();
+            tracing::trace!(
+                "Redirecting to '{}' using leptos_router.",
+                navigation_target.as_str()
+            );
+            navigate(navigation_target.as_str(), NavigateOptions::default());
         }
     }
 
@@ -279,13 +249,41 @@ impl KeycloakAuth {
     }
 
     #[cfg(feature = "internals")]
-    pub fn csrf_token_manager(&self) -> &CsrfTokenManager {
+    pub fn csrf_token_manager(&self) -> &crate::internal::csrf_token_manager::CsrfTokenManager {
         &self.csrf_token_manager
     }
 
     #[cfg(feature = "internals")]
-    pub fn nonce_manager(&self) -> &NonceManager {
+    pub fn nonce_manager(&self) -> &crate::internal::nonce_manager::NonceManager {
         &self.nonce_manager
+    }
+
+    /// Returns the authentication state signal.
+    ///
+    /// This signal is hydration-safe - during the hydration window (on client before hydration
+    /// completes), it returns `KeycloakAuthState::Indeterminate`. After hydration completes,
+    /// it returns the true authentication state.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use leptos::prelude::*;
+    /// use leptos_keycloak_auth::{use_keycloak_auth, KeycloakAuthState};
+    ///
+    /// #[component]
+    /// fn Component() -> impl IntoView {
+    ///     let auth = use_keycloak_auth();
+    ///     view! {
+    ///         { move || match auth.state().get() {
+    ///             KeycloakAuthState::Authenticated(_) => view! { <p>"Logged in"</p> },
+    ///             KeycloakAuthState::NotAuthenticated(_)
+    ///                 | KeycloakAuthState::Indeterminate => view! { <p>"Not logged in"</p> },
+    ///         }}
+    ///     }
+    /// }
+    /// ```
+    #[must_use]
+    pub fn state(&self) -> Signal<KeycloakAuthState> {
+        self.state
     }
 }
 
@@ -405,12 +403,12 @@ pub struct Authenticated {
     /// Contains user information like name, email and roles.
     ///
     /// NOTE: Roles will only be contained if activated in the Keycloak admin UI!
-    pub id_token_claims: Signal<KeycloakIdTokenClaims>,
+    pub id_token_claims: Memo<KeycloakIdTokenClaims>,
 
     /// Access token to be used in an authorization header.
     /// Guaranteed to not be expired.
     /// This is a signal, as we refresh the token regularly and automatically in the background.
-    pub access_token: Signal<AccessToken>,
+    pub access_token: Memo<AccessToken>,
 
     pub(crate) auth_error_reporter: Callback<http::StatusCode, RequestAction>,
 }
@@ -451,10 +449,10 @@ impl Authenticated {
     ///
     /// # Example
     /// ```no_run
-    /// use leptos_keycloak_auth::{expect_authenticated};
+    /// use leptos_keycloak_auth::{use_authenticated};
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let authenticated = expect_authenticated();
+    /// let authenticated = use_authenticated();
     /// let client = authenticated.client();
     /// let response = client.get("https://api.example.com/protected-resource").await?;
     /// # Ok(())
@@ -480,10 +478,10 @@ impl Authenticated {
     /// # Example
     /// ```no_run
     /// use std::time::Duration;
-    /// use leptos_keycloak_auth::expect_authenticated;
+    /// use leptos_keycloak_auth::use_authenticated;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let authenticated = expect_authenticated();
+    /// let authenticated = use_authenticated();
     /// let custom_client = reqwest::Client::builder()
     ///     .timeout(Duration::from_secs(30))
     ///     .build()?;
@@ -514,9 +512,9 @@ impl Authenticated {
     ///
     /// # Example
     /// ```no_run
-    /// use leptos_keycloak_auth::{expect_authenticated, Authenticated, RequestAction};
+    /// use leptos_keycloak_auth::{use_authenticated, Authenticated, RequestAction};
     ///
-    /// let authenticated = expect_authenticated();
+    /// let authenticated = use_authenticated();
     /// match authenticated.report_failed_http_request(http::StatusCode::UNAUTHORIZED) {
     ///     RequestAction::Retry => {
     ///         // Retry the request...
@@ -555,7 +553,7 @@ pub struct NotAuthenticated {
     ///
     /// Use this to debug why ID token validation failed (e.g., invalid signature, wrong audience,
     /// expired token, etc.).
-    pub last_id_token_error: Signal<Option<KeycloakIdTokenClaimsError>>,
+    pub last_id_token_error: Signal<Option<IdTokenClaimsError>>,
 
     /// Reactive signal containing the last general authentication error, if any.
     ///

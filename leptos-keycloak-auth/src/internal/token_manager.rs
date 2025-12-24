@@ -169,7 +169,7 @@ impl TokenManager {
                 }
             };
 
-            let on_refresh_error = Callback::new(move |(err,)| {
+            let on_refresh_error = Callback::new(move |err: RequestError| {
                 match on_refresh_error {
                     OnRefreshError::DoNothing => {
                         // Even if we haven't gotten an external request to always drop the token

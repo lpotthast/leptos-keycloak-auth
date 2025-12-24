@@ -1,6 +1,6 @@
 use crate::request::GrantType;
 use crate::response::SuccessTokenResponse;
-use crate::DiscoveryEndpoint;
+use crate::{AccessToken, DiscoveryEndpoint};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use url::Url;
@@ -13,7 +13,7 @@ pub struct TokenData {
 
     // pub id_token_decoded: IdToken,
     /// Access token. Allows access to resources requiring authentication unless expired.
-    pub(crate) access_token: String,
+    pub(crate) access_token: AccessToken,
 
     /// Point in time when the `access_token` expires.
     #[serde(with = "time::serde::rfc3339")]
