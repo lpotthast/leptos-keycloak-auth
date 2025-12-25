@@ -1,7 +1,8 @@
 use crate::DiscoveryEndpoint;
 use leptos::prelude::{RwSignal, Signal};
+use snafu::Snafu;
 use std::time::Duration as StdDuration;
-use url::Url;
+use url::{PathSegmentsMut, Url};
 
 /// Specifies how much lifetime must remain for a token to not be considered "nearly expired".
 ///
@@ -255,7 +256,7 @@ pub(crate) struct ValidationOptionsInternal {
 /// client ID, and other related data.
 #[derive(Debug, Clone)]
 pub(crate) struct Options {
-    pub(crate) keycloak_server_url: Url,
+    pub(crate) keycloak_server_url: BaseUrl,
     pub(crate) realm: String,
     pub(crate) client_id: String,
     pub(crate) post_login_redirect_url: Signal<Url>,
@@ -268,7 +269,10 @@ pub(crate) struct Options {
 impl Options {
     pub(crate) fn new(options: UseKeycloakAuthOptions) -> Self {
         Self {
-            keycloak_server_url: options.keycloak_server_url,
+            keycloak_server_url: options
+                .keycloak_server_url
+                .expect_base_url()
+                .expect("`keycloak_server_url` to be a base URL."),
             realm: options.realm,
             client_id: options.client_id,
             post_login_redirect_url: options.post_login_redirect_url,
@@ -284,9 +288,49 @@ impl Options {
 
     pub(crate) fn discovery_endpoint(&self) -> DiscoveryEndpoint {
         let mut url = self.keycloak_server_url.clone();
-        url.path_segments_mut()
-            .expect("no cannot-be-a-base url")
-            .extend(&["realms", &self.realm, ".well-known", "openid-configuration"]);
-        url
+        url.path_segments_mut().extend(&[
+            "realms",
+            &self.realm,
+            ".well-known",
+            "openid-configuration",
+        ]);
+        url.into_inner()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct BaseUrl(Url);
+
+impl BaseUrl {
+    pub fn path_segments_mut(&mut self) -> PathSegmentsMut<'_> {
+        self.0
+            .path_segments_mut()
+            .expect("Unreachable. This type is only constructed with base URLs.")
+    }
+
+    pub fn into_inner(self) -> Url {
+        self.0
+    }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(display(
+    "'{}' must not be a cannot-be-a-base URL. This URL must be usable as a base to prefix other relative urls with. Did you specify a 'data:' or 'mailto:' address?",
+    url.as_str()
+))]
+pub struct NotABaseUrlError {
+    url: Url,
+}
+
+trait UrlExt {
+    fn expect_base_url(self) -> Result<BaseUrl, NotABaseUrlError>;
+}
+
+impl UrlExt for Url {
+    fn expect_base_url(self) -> Result<BaseUrl, NotABaseUrlError> {
+        if self.cannot_be_a_base() {
+            return Err(NotABaseUrlError { url: self });
+        }
+        Ok(BaseUrl(self))
     }
 }
