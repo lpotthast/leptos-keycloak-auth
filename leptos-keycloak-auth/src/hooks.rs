@@ -1,6 +1,6 @@
 use crate::request::GrantType;
 use crate::token_validation::NonceValidation;
-use crate::{AccessToken, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, internal};
+use crate::{internal, AccessToken, Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
 
 /// Get access to the current authentication state.
@@ -172,8 +172,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use crate::token_claims::KeycloakIdTokenClaims;
     use crate::token_validation::IdTokenClaimsError;
     use crate::{
-        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated, RequestAction, login,
-        logout, token_validation,
+        login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
+        NotAuthenticated, RequestAction,
     };
     use leptos::callback::Callback;
     use leptos::prelude::*;
@@ -275,20 +275,17 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 CallbackResponse::SuccessfulLogout(logout_response) => {
                     tracing::trace!(?logout_response, "Logout callback received");
 
-                    // Validate CSRF token to detection potentially malicious logout not controlled
+                    // Note: This currently ignores the response's `destroy_session`.
+
+                    // Validate CSRF token to detect potentially malicious logouts not controlled
                     // by us.
                     let is_suspicious_logout =
                         if options.read_value().advanced.logout_csrf_detection {
-                            !csrf_mgr.validate_logout_token(
-                                logout_response.state.as_deref().unwrap_or_default(),
-                            )
+                            !csrf_mgr.validate_logout_token(logout_response.state.as_deref())
                         } else {
                             tracing::debug!("Logout CSRF detection is disabled");
                             false
                         };
-
-                    // Note: This currently ignores the response's `destroy_session`.
-
                     // Store suspicious logout flag for user notification.
                     set_suspicious_logout.set(is_suspicious_logout);
 
@@ -297,7 +294,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // We have to use `request_animation_frame` here, as setting the token to `None` would
                     // otherwise lead to an immediate execution of all reactive primitives depending on this.
                     // This includes our `Authenticated` state (and all component trees rendered under
-                    // a `ShowWhenAuthenticated`). But `Authenticated` expects a token to be present!
+                    // an `<Authenticated>`). But `Authenticated` expects a token to be present!
                     // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
                     // no token is present) first!
                     request_animation_frame(move || {
