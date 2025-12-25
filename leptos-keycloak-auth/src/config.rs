@@ -57,7 +57,14 @@ impl LifeLeft {
     #[must_use]
     pub fn nearly_expired(self, lifetime: StdDuration, left: StdDuration) -> bool {
         match self {
-            LifeLeft::Percentage(p) => (left.as_secs_f64() / lifetime.as_secs_f64()) <= p,
+            LifeLeft::Percentage(p) => {
+                let lifetime = lifetime.as_secs_f64();
+                if lifetime == 0.0 {
+                    true
+                } else {
+                    (left.as_secs_f64() / lifetime) <= p
+                }
+            }
             LifeLeft::Duration(d) => left <= d,
         }
     }
@@ -332,5 +339,23 @@ impl UrlExt for Url {
             return Err(NotABaseUrlError { url: self });
         }
         Ok(BaseUrl(self))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::LifeLeft;
+    use assertr::prelude::*;
+    use std::time::Duration;
+
+    mod life_left {
+        use super::*;
+
+        #[test]
+        fn nearly_expired_can_handle_zero_lifetime_when_computing_percentage() {
+            let ll = LifeLeft::Percentage(0.25);
+            let result = ll.nearly_expired(Duration::ZERO, Duration::from_secs(10));
+            assert_that(result).is_true();
+        }
     }
 }
