@@ -6,19 +6,19 @@ use snafu::{OptionExt, ResultExt, Snafu};
 #[derive(Debug, Clone, PartialEq, Snafu)]
 pub enum JwtValidationError {
     #[snafu(display(
-        "JwtValidationError: Could not decode JWT header. Input may have the wrong format"
+        "JwtValidationError: Could not decode JWT header. Input may have the wrong format."
     ))]
     DecodeHeader { source: jsonwebtoken::errors::Error },
 
     #[snafu(display(
-        "JwtValidationError: Could not find a JWK which would match the tokens 'kid': {token_kid:?}"
+        "JwtValidationError: Could not find a JWK which would match the token's 'kid': {token_kid:?}."
     ))]
     NoMatchingJwk { token_kid: Option<String> },
 
-    #[snafu(display("JwtValidationError: Could not construct DecodingKey from JWK"))]
+    #[snafu(display("JwtValidationError: Could not construct DecodingKey from JWK."))]
     JwkToDecodingKey { source: jsonwebtoken::errors::Error },
 
-    #[snafu(display("JwtValidationError: Could not decode JWT"))]
+    #[snafu(display("JwtValidationError: Could not decode JWT."))]
     Decode { source: jsonwebtoken::errors::Error },
 }
 

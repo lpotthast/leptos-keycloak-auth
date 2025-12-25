@@ -133,7 +133,7 @@ impl KeycloakAuth {
         move || state.read().pretty_printer()()
     }
 
-    /// End the current session of the user by programmatically performing a logout against the\
+    /// End the current session of the user by programmatically performing a logout against the
     /// Keycloak server on behalf of the user.
     ///
     /// See also `end_session_and_go_to` if you want to immediately move to a different path after
