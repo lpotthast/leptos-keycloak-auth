@@ -66,11 +66,11 @@ pub fn AuthProvider(
     #[prop(default = vec![])]
     scope: Vec<String>,
 
-    /// Expected audiences for ID token validation (defaults to [client_id]).
+    /// Expected audiences for ID token validation (defaults to `["<client_id>"]`).
     #[prop(optional)]
     expected_audiences: Option<Vec<String>>,
 
-    /// Expected issuers for ID token validation (defaults to ["<server>/realms/<realm>"]).
+    /// Expected issuers for ID token validation (defaults to `["<server>/realms/<realm>"]`).
     #[prop(optional)]
     expected_issuers: Option<Vec<String>>,
 

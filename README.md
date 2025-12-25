@@ -69,7 +69,7 @@ use leptos::prelude::*;
 use leptos_router::{path, components::*};
 use leptos_keycloak_auth::components::*;
 use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::hooks::use_keycloak_auth;
+use leptos_keycloak_auth::use_keycloak_auth;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -82,7 +82,6 @@ pub fn App() -> impl IntoView {
             >
                 <Routes fallback=|| view! { "Page not found." }>
                     <Route path=path!("/") view=HomePage/>
-                    <Route path=path!("/protected") view=ProtectedPage/>
                 </Routes>
             </AuthProvider>
         </Router>
@@ -95,31 +94,33 @@ pub fn HomePage() -> impl IntoView {
         <h1>"Welcome"</h1>
         <MaybeAuthenticated
             authenticated=|auth| view! {
-                <p>"Hello, " { auth.id_token_claims.read().name }</p>
+                <p>"Hello, " { auth.id_token_claims.read().name.clone() }</p>
+                <LogoutButton/>
             }
-            unauthenticated=|| view! { <LoginButton/> }
+            unauthenticated=|_| view! { 
+                <LoginButton/>
+            }
         />
-    }
-}
-
-#[component]
-pub fn ProtectedPage() -> impl IntoView {
-    view! {
-        <Authenticated fallback=|| view! { <LoginButton/> }>
-            {|auth| view! {
-                <p>"Welcome, " { auth.id_token_claims.read().name }</p>
-            }}
-        </Authenticated>
     }
 }
 
 #[component]
 pub fn LoginButton() -> impl IntoView {
     let auth = use_keycloak_auth();
-    let login_url = move || auth.login_url.get().map(|u| u.to_string()).unwrap_or_default();
+    let login_url = move || auth.login_url.get().map(|url: Url| url.to_string()).unwrap_or_default();
     let login_url_unavailable = move || auth.login_url.get().is_none();
     view! {
         <a href=login_url aria-disabled=login_url_unavailable>"Log In"</a>
+    }
+}
+
+#[component]
+pub fn LogoutButton() -> impl IntoView {
+    let auth = use_keycloak_auth();
+    let logout_url = move || auth.logout_url.get().map(|url: Url| url.to_string()).unwrap_or_default();
+    let logout_url_unavailable = move || auth.login_url.get().is_none();
+    view! {
+        <a href=logout_url aria-disabled=logout_url_unavailable>"Log out"</a>
     }
 }
 ```
@@ -165,21 +166,25 @@ Q: My app does not compile due to `getrandom` not compiling for the wasm target.
 
 A: Add this to your projects Cargo.toml
 
-      [target.'cfg(target_arch = "wasm32")'.dependencies]
-      js-sys = "0.3"
-      getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
-      getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+```toml
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+```
 
 Q: My app no longer compiles using an Apple Silicon chip (M1 or upwards) after including this crate.
 
 A: This crate depends on `jsonwebtoken` which depends on `ring` which needs to compile C code in its build-script.
 MacOS comes with its own (rather quirky) version of Clang, which often leads to weird issues. Make sure to use Clang
 provided through the `llvm` installation. Follow these
-instructions: https://github.com/briansmith/ring/issues/1824#issuecomment-2059955073
+instructions: <https://github.com/briansmith/ring/issues/1824#issuecomment-2059955073>
 
-      brew install llvm
+```shell
+brew install llvm
 
-      echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc
+```
 
 ## Acknowledgements
 
