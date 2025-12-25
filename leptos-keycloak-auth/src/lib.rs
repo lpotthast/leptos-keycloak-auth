@@ -1,5 +1,5 @@
+#![doc = include_str!("../README.md")]
 #![allow(clippy::single_match_else)]
-#![doc = include_str!("../../README.md")]
 // Without this annotation, building with the `ssr` feature enabled would result in a multitude
 // of "unused" warnings, as the main entrypoint, `init_keycloak_auth`, just returns a stub
 // without touching much of this libraries code, leaving most code unused.
