@@ -38,9 +38,12 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
         // with the fact that we use the NO_PAD config.
         let bytes_needed = (LENGTH * 3) / 4;
 
-        let result = (0..bytes_needed)
-            .map(|_i| CHARSET[rng.random_range(0..CHARSET.len())] as char)
-            .collect::<String>();
+        let mut result = String::with_capacity(bytes_needed);
+        for next_char in
+            (0..bytes_needed).map(|_i| CHARSET[rng.random_range(0..CHARSET.len())] as char)
+        {
+            result.push(next_char);
+        }
 
         let code_verifier = URL_SAFE_NO_PAD.encode(&result);
 
