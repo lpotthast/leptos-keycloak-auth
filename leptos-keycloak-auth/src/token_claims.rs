@@ -1,5 +1,8 @@
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::any::type_name;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use time::OffsetDateTime;
 
 /// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>
@@ -159,6 +162,30 @@ pub struct KeycloakIdTokenClaims {
 
 impl From<StandardIdTokenClaims> for KeycloakIdTokenClaims {
     fn from(mut raw: StandardIdTokenClaims) -> Self {
+        fn get_field_from<T: Debug + Default + DeserializeOwned>(
+            remaining: &mut HashMap<String, serde_json::value::Value>,
+            name: &str,
+        ) -> T {
+            match remaining.remove(name) {
+                None => {
+                    let default = T::default();
+                    tracing::warn!(
+                        "Could not find '{name}' in ID token claims. Using {}'s default value: {default:?}",
+                        type_name::<T>()
+                    );
+                    default
+                }
+                Some(field) => serde_json::from_value::<T>(field).unwrap_or_else(|err| {
+                    let default = T::default();
+                    tracing::warn!(
+                        "Could not deserialize ID token claim '{name}' as type {type_name}: {err:?}. Using {type_name}'s default value: {default:?}",
+                        type_name = type_name::<T>()
+                    );
+                    default
+                }),
+            }
+        }
+
         Self {
             issuer: raw.iss,
             subject_identifier: raw.sub,
@@ -182,42 +209,15 @@ impl From<StandardIdTokenClaims> for KeycloakIdTokenClaims {
             auth_context_class_reference: raw.acr,
             authentication_methods_references: raw.amr,
             authorized_party: raw.azp,
-            email_verified: raw.remaining
-                .remove("email_verified")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            name: raw.remaining
-                .remove("name")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            preferred_username: raw.remaining
-                .remove("preferred_username")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            given_name: raw.remaining
-                .remove("given_name")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            family_name: raw.remaining
-                .remove("family_name")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            email: raw.remaining
-                .remove("email")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            realm_access: raw.remaining
-                .remove("realm_access")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            resource_access: raw.remaining
-                .remove("resource_access")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
-            additional_claims: raw.remaining
-                .remove("additional_claims")
-                .and_then(|it| serde_json::from_value(it).ok())
-                .unwrap_or_default(),
+            email_verified: get_field_from::<bool>(&mut raw.remaining, "email_verified"),
+            name: get_field_from::<String>(&mut raw.remaining, "name"),
+            preferred_username: get_field_from::<String>(&mut raw.remaining, "preferred_username"),
+            given_name: get_field_from::<String>(&mut raw.remaining, "given_name"),
+            family_name: get_field_from::<String>(&mut raw.remaining, "family_name"),
+            email: get_field_from::<String>(&mut raw.remaining, "email"),
+            realm_access: get_field_from::<Option<RealmAccess>>(&mut raw.remaining, "realm_access"),
+            resource_access: get_field_from::<Option<ResourceAccess>>(&mut raw.remaining, "resource_access"),
+            additional_claims: get_field_from::<HashMap<String, serde_json::Value>>(&mut raw.remaining, "additional_claims"),
         }
     }
 }
