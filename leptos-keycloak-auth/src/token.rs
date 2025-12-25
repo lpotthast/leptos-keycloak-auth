@@ -22,7 +22,7 @@ pub struct TokenData {
     /// Refresh token. May be used to obtain a new access token without user intervention.
     pub(crate) refresh_token: String,
 
-    /// Point in time when the `refresh_toke` expires.
+    /// Point in time when the `refresh_token` expires.
     #[serde(with = "time::serde::rfc3339::option")]
     pub(crate) refresh_expires_at: Option<OffsetDateTime>,
 
