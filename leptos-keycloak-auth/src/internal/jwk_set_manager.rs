@@ -145,7 +145,7 @@ impl JwkSetManager {
                         ));
                     }
                     Err(err) => {
-                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known jet. Skipping update...");
+                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known yet. Skipping update...");
                     }
                 }
             }
