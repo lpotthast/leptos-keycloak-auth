@@ -93,7 +93,7 @@ pub fn current_url() -> Url {
     let current = use_url().get();
     // TODO: Why ignore search() / hash()?
     let current = format!("{}{}", current.origin(), current.path());
-    Url::parse(&current).unwrap()
+    Url::parse(&current).expect("Valid url constructed from `use_url` information.")
 }
 
 impl KeycloakAuth {
