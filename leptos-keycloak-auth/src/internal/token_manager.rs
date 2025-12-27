@@ -12,6 +12,7 @@ use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
 use leptos_use::{use_interval, UseIntervalReturn};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::time::Duration as StdDuration;
 
@@ -23,6 +24,28 @@ pub(crate) enum OnRefreshError {
 
     /// Drop the token, effectively logging the user out.
     DropToken,
+}
+
+/// Session version identifier. Internally represented using a numeric value.
+///
+/// This type is not orderable by design to prevent any potential issues due to numeric overflows.
+/// We only ever need to compare two potentially different version for equality, which will still
+/// work when overflown.
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub struct SessionVersion(u64);
+
+impl SessionVersion {
+    const ZERO: SessionVersion = SessionVersion(0);
+
+    pub fn increment(self) -> Self {
+        SessionVersion(self.0 + 1)
+    }
+}
+
+impl Default for SessionVersion {
+    fn default() -> Self {
+        Self::ZERO
+    }
 }
 
 /// Manages the lifecycle of OAuth tokens including storage, expiry tracking, and automatic refresh.
@@ -46,8 +69,26 @@ pub struct TokenManager {
     /// May contain an expired access and / or refresh token.
     pub token: Signal<Option<TokenData>>,
 
-    /// Setter for the currently known token data.
-    pub(crate) set_token: Callback<Option<TokenData>>,
+    /// Which authentication session we are currently in.
+    ///
+    /// Incrementing the version creates a boundary that allows us to invalidate operations which
+    /// originated from the previous version.
+    ///
+    /// ## When to INCREMENT:
+    /// - On login response (NEW session, or error)
+    /// - On refresh response (RENEWED session, or error)
+    /// - On logout (NO session)
+    /// - Weh auth state gets forgotten (NO session)
+    ///
+    /// ## When NOT to increment:
+    /// - On automatic expiration (through time passing):
+    ///   We might already have a refresh request in-flight!
+    pub session_version: Signal<SessionVersion>,
+
+    /// Update the token data, automatically incrementing the session version.
+    /// This is the only way to update tokens, ensuring session version increments to invalidate
+    /// any stale async operations from a previous authentication session.
+    update_token: Callback<Option<TokenData>>,
 
     /// Duration for which the access token is valid, as configured in Keycloak's realm settings.
     pub access_token_lifetime: Signal<StdDuration>,
@@ -94,7 +135,7 @@ impl Debug for TokenManager {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TokenManager")
             .field("token", &self.token)
-            .field("set_token", &self.set_token)
+            .field("session_version", &self.session_version)
             .field("access_token_lifetime", &self.access_token_lifetime)
             .field("access_token_expires_in", &self.access_token_expires_in)
             .field(
@@ -153,19 +194,37 @@ impl TokenManager {
             move || None,
         );
 
+        let UseStorageReturn {
+            read: session_version,
+            write: set_session_version,
+            remove: _remove_session_version_storage,
+            ..
+        } = use_storage_with_options_and_error_handler::<SessionVersion, JsonSerdeCodec>(
+            StorageType::Local,
+            "leptos_keycloak_auth__session_version",
+            move || SessionVersion::ZERO,
+        );
+
+        let update_token = Callback::new(move |val: Option<TokenData>| {
+            set_session_version.run(session_version.get_untracked().increment());
+            set_token.run(val);
+        });
+
         // Immediately forget the previously cached value when the discovery endpoint changed!
         if let Some(source) = token.get_untracked().map(|it| it.source)
             && source != options.read_value().discovery_endpoint()
         {
             tracing::trace!("Current token came from old discovery endpoint. Dropping it.");
-            set_token.run(None);
+            update_token.run(None);
         }
 
-        let handle_token = Callback::new(move |val| set_token.run(val));
-
         // Note: Only call this after the OIDC config was loaded. Otherwise, no refresh can happen!
-        let refresh_token_action =
-            action::create_refresh_token_action(options, handle_token, handle_req_error);
+        let refresh_token_action = action::create_refresh_token_action(
+            options,
+            update_token,
+            handle_req_error,
+            session_version,
+        );
 
         let trigger_refresh = Callback::new(move |(on_refresh_error,)| {
             let token_endpoint = match token_endpoint.read_untracked().as_ref() {
@@ -342,13 +401,17 @@ impl TokenManager {
 
             if access_token_expired && refresh_token_expired {
                 // The token became unusable and can safely be forgotten.
+                // Don't increment `session_version` here. If a refresh is in-flight and succeeds
+                // (server accepted the just-expired token), we WANT that fresh response to be
+                // processed to keep the user logged in!
                 set_token.run(None);
             }
         });
 
         Self {
             token,
-            set_token,
+            session_version,
+            update_token,
             access_token_lifetime: access_token_lifetime.into(),
             access_token_expires_in: access_token_expires_in.into(),
             access_token_nearly_expired: access_token_nearly_expired.into(),
@@ -406,6 +469,6 @@ impl TokenManager {
     /// OIDC server. If the user tried to log in again, his session would most likely be restored.
     pub(crate) fn forget(&self) {
         tracing::trace!("Dropping all token data");
-        self.set_token.run(None);
+        self.update_token.run(None);
     }
 }

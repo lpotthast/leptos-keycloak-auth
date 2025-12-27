@@ -472,6 +472,9 @@ fn DebugStateInner() -> impl IntoView {
                 "token_data: " {move || format!("{:#?}", auth.token_manager().token.get())}
             </div>
             <div>
+                "session_version: " {move || format!("{:#?}", auth.token_manager().session_version.get())}
+            </div>
+            <div>
                 "access_token_lifetime: " {move || format!("{:?}", auth.token_manager().access_token_lifetime.get())}
             </div>
             <div>
@@ -494,9 +497,6 @@ fn DebugStateInner() -> impl IntoView {
             </div>
             <div>
                 "refresh_token_expired: " {move || format!("{:?}", auth.token_manager().refresh_token_expired.get())}
-            </div>
-            <div>
-                "token_endpoint: " {move || format!("{:?}", auth.token_manager().token_endpoint.get())}
             </div>
         </div>
     }
