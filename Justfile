@@ -52,3 +52,5 @@ upgrade: # "-" prefixes allow for non-zero status codes!
 clippy: # "-" prefixes allow for non-zero status codes!
   -cargo clippy --tests --manifest-path ./leptos-keycloak-auth/Cargo.toml -- -Dclippy::all -Dclippy::pedantic
   -cargo clippy --tests --manifest-path ./test-frontend/Cargo.toml -- -Dclippy::all -Dclippy::pedantic
+  -cargo clippy --tests --manifest-path ./leptos-keycloak-auth/Cargo.toml --features ssr -- -Dclippy::all -Dclippy::pedantic
+  -cargo clippy --tests --manifest-path ./test-frontend/Cargo.toml --features ssr -- -Dclippy::all -Dclippy::pedantic

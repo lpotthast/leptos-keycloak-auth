@@ -38,6 +38,20 @@ pub struct JwkSetManager {
 }
 
 impl JwkSetManager {
+    #[cfg(feature = "ssr")]
+    pub(crate) fn new() -> Self {
+        Self {
+            jwk_set: Signal::default(),
+            set_jwk_set: { Callback::new(|_| {}) },
+            jwk_set_old: Signal::default(),
+            set_jwk_set_old: { Callback::new(|_| {}) },
+            jwk_set_age: Signal::default(),
+            jwk_set_expires_in: Signal::default(),
+            jwk_set_too_old: Signal::default(),
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
     pub(crate) fn new(
         options: StoredValue<Options>,
         jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,

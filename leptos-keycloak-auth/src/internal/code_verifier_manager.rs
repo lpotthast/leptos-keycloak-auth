@@ -22,6 +22,18 @@ pub struct CodeVerifierManager {
 }
 
 impl CodeVerifierManager {
+    #[cfg(feature = "ssr")]
+    pub(crate) fn new() -> Self {
+        let code_verifier = Signal::from(crate::code_verifier::CodeVerifier::generate());
+
+        Self {
+            code_verifier,
+            set_code_verifier: { Callback::new(|_| {}) },
+            code_challenge: Memo::new(move |_| code_verifier.read().to_code_challenge()),
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
     pub(crate) fn new() -> Self {
         // We keep the code_verifier, used for the code-to-token-exchange in session storage.
         // We cannot keep the code_verifier completely in-memory, as our authorization flow includes

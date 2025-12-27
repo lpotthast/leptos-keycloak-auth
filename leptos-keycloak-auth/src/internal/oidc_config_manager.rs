@@ -34,6 +34,18 @@ pub struct OidcConfigManager {
 }
 
 impl OidcConfigManager {
+    #[cfg(feature = "ssr")]
+    pub(crate) fn new() -> Self {
+        Self {
+            oidc_config: Signal::default(),
+            set_oidc_config: { Callback::new(|_| {}) },
+            oidc_config_age: Signal::default(),
+            oidc_config_expires_in: Signal::default(),
+            oidc_config_too_old: Signal::default(),
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
     pub(crate) fn new(
         options: StoredValue<Options>,
         handle_req_error: Callback<Option<RequestError>>,

@@ -116,6 +116,26 @@ impl Debug for TokenManager {
 }
 
 impl TokenManager {
+    #[cfg(feature = "ssr")]
+    pub(crate) fn new() -> Self {
+        Self {
+            token: Signal::default(),
+            session_version: Signal::default(),
+            update_token: Callback::new(|_| {}),
+            access_token_lifetime: Signal::default(),
+            access_token_expires_in: Signal::default(),
+            access_token_nearly_expired: Signal::default(),
+            access_token_expired: Signal::default(),
+            refresh_token_lifetime: Signal::default(),
+            refresh_token_expires_in: Signal::default(),
+            refresh_token_nearly_expired: Signal::default(),
+            refresh_token_expired: Signal::default(),
+            trigger_refresh: Callback::new(|_| ()),
+            trigger_exchange_code_for_token: Callback::new(|_| ()),
+        }
+    }
+
+    #[cfg(not(feature = "ssr"))]
     #[allow(clippy::too_many_lines)]
     pub(crate) fn new(
         options: StoredValue<Options>,
