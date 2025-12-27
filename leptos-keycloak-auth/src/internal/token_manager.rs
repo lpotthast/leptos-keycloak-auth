@@ -124,11 +124,14 @@ pub struct TokenManager {
     /// - `refresh_token_nearly_expired` will always report `true`
     pub refresh_token_expired: Signal<bool>,
 
-    pub(crate) exchange_code_for_token_action: Action<ExchangeCodeForTokenInput, ()>,
+    trigger_exchange_code_for_token: Callback<(
+        AuthorizationCode,
+        CodeVerifier<128>,
+        Option<SessionState>,
+        Callback<()>,
+    )>,
 
-    pub token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
-
-    pub(crate) trigger_refresh: Callback<(OnRefreshError,)>,
+    trigger_refresh: Callback<(OnRefreshError,)>,
 }
 
 impl Debug for TokenManager {
@@ -151,7 +154,6 @@ impl Debug for TokenManager {
             )
             .field("refresh_token_expired", &self.refresh_token_expired)
             .field("exchange_code_for_token_action", &"...")
-            .field("token_endpoint", &self.token_endpoint)
             .finish_non_exhaustive()
     }
 }
@@ -295,6 +297,38 @@ impl TokenManager {
             refresh_token_action.dispatch((token_endpoint, refresh_token, on_refresh_error));
         });
 
+        let exchange_code_for_token_action =
+            action::create_exchange_code_for_token_action(options, update_token, handle_req_error);
+
+        let trigger_exchange_code_for_token = Callback::new(
+            move |(auth_code, code_verifier, session_state, finally): (
+                AuthorizationCode,
+                CodeVerifier<128>,
+                Option<SessionState>,
+                Callback<()>,
+            )| {
+                let token_endpoint = match token_endpoint.read_untracked().as_ref() {
+                    Ok(token_endpoint) => token_endpoint.clone(),
+                    Err(err) => {
+                        tracing::error!(
+                            ?err,
+                            "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config."
+                        );
+                        finally.run(());
+                        return;
+                    }
+                };
+
+                exchange_code_for_token_action.dispatch(ExchangeCodeForTokenInput {
+                    token_endpoint,
+                    auth_code,
+                    code_verifier,
+                    session_state,
+                    finally,
+                });
+            },
+        );
+
         let access_token_lifetime = Memo::new(move |_| {
             token.read().as_ref().map_or(StdDuration::ZERO, |it| {
                 it.estimated_access_token_lifetime().to_std_duration()
@@ -420,12 +454,7 @@ impl TokenManager {
             refresh_token_expires_in: refresh_token_expires_in.into(),
             refresh_token_nearly_expired: refresh_token_nearly_expired.into(),
             refresh_token_expired: refresh_token_expired.into(),
-            exchange_code_for_token_action: action::create_exchange_code_for_token_action(
-                options,
-                handle_token,
-                handle_req_error,
-            ),
-            token_endpoint,
+            trigger_exchange_code_for_token,
             trigger_refresh,
         }
     }
@@ -438,26 +467,12 @@ impl TokenManager {
         session_state: Option<SessionState>,
         finally: Callback<()>,
     ) {
-        let token_endpoint = match self.token_endpoint.read_untracked().as_ref() {
-            Ok(token_endpoint) => token_endpoint.clone(),
-            Err(err) => {
-                tracing::error!(
-                    ?err,
-                    "Unexpected error: Could not exchange auth code for token, as no token_endpoint is known yet. Should not have been reached. If a successful login was possible, we should have received a token endpoint from the OIDC config."
-                );
-                finally.run(());
-                return;
-            }
-        };
-
-        self.exchange_code_for_token_action
-            .dispatch(ExchangeCodeForTokenInput {
-                token_endpoint,
-                auth_code,
-                code_verifier,
-                session_state,
-                finally,
-            });
+        self.trigger_exchange_code_for_token.run((
+            auth_code,
+            code_verifier,
+            session_state,
+            finally,
+        ));
     }
 
     pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
