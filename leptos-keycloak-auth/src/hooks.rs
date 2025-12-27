@@ -105,10 +105,6 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     let options = Options::new(options);
     let options = StoredValue::new(options);
 
-    let code_verifier = Signal::from(crate::code_verifier::CodeVerifier::generate());
-
-    let hydration_manager = internal::hydration_manager::HydrationManager::new();
-
     KeycloakAuth {
         options,
         derived_urls: DerivedUrls::new(Signal::from(None)),
@@ -116,47 +112,15 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         logout_url: Signal::from(None),
         state: Signal::from(KeycloakAuthState::Indeterminate),
         is_authenticated: Signal::from(false),
-        oidc_config_manager: internal::oidc_config_manager::OidcConfigManager {
-            oidc_config: Default::default(),
-            set_oidc_config: { Callback::new(|_| {}) },
-            oidc_config_age: Default::default(),
-            oidc_config_expires_in: Default::default(),
-            oidc_config_too_old: Default::default(),
-        },
-        jwk_set_manager: internal::jwk_set_manager::JwkSetManager {
-            jwk_set: Default::default(),
-            set_jwk_set: { Callback::new(|_| {}) },
-            jwk_set_old: Default::default(),
-            set_jwk_set_old: { Callback::new(|_| {}) },
-            jwk_set_age: Default::default(),
-            jwk_set_expires_in: Default::default(),
-            jwk_set_too_old: Default::default(),
-        },
-        code_verifier_manager: internal::code_verifier_manager::CodeVerifierManager {
-            code_verifier,
-            set_code_verifier: { Callback::new(|_| {}) },
-            code_challenge: Memo::new(move |_| code_verifier.read().to_code_challenge()),
-        },
-        token_manager: internal::token_manager::TokenManager {
-            token: Default::default(),
-            set_token: { Callback::new(|_| {}) },
-            access_token_lifetime: Default::default(),
-            access_token_expires_in: Default::default(),
-            access_token_nearly_expired: Default::default(),
-            access_token_expired: Default::default(),
-            refresh_token_lifetime: Default::default(),
-            refresh_token_expires_in: Default::default(),
-            refresh_token_nearly_expired: Default::default(),
-            refresh_token_expired: Default::default(),
-            exchange_code_for_token_action: Action::new(|_| async move {}),
-            token_endpoint: Signal::from(Err(internal::derived_urls::DerivedUrlError::NoConfig)),
-            trigger_refresh: Callback::new(|_| ()),
-        },
+        oidc_config_manager: internal::oidc_config_manager::OidcConfigManager::new(),
+        jwk_set_manager: internal::jwk_set_manager::JwkSetManager::new(),
+        code_verifier_manager: internal::code_verifier_manager::CodeVerifierManager::new(),
+        token_manager: internal::token_manager::TokenManager::new(),
         csrf_token_manager: internal::csrf_token_manager::CsrfTokenManager::new(),
         nonce_manager: internal::nonce_manager::NonceManager::new(),
         suspicious_logout: Signal::from(false),
-        dismiss_suspicious_logout_warning: Callback::new(|_| ()),
-        hydration_manager,
+        dismiss_suspicious_logout_warning: Callback::new(|()| ()),
+        hydration_manager: internal::hydration_manager::HydrationManager::new(),
     }
 }
 
