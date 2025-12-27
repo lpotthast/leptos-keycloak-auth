@@ -4,7 +4,7 @@ Secure Leptos applications using Keycloak.
 
 ## Features
 
-- OpenID Connect discovery
+- `OpenID Connect` discovery
 - Authorization code flow with PKCE, Nonce validation, and Logout validation
 - ID token verification
 - ID token introspection
@@ -176,7 +176,7 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 Q: My app no longer compiles using an Apple Silicon chip (M1 or upwards) after including this crate.
 
 A: This crate depends on `jsonwebtoken` which depends on `ring` which needs to compile C code in its build-script.
-MacOS comes with its own (rather quirky) version of Clang, which often leads to weird issues. Make sure to use Clang
+macOS comes with its own (rather quirky) version of Clang, which often leads to weird issues. Make sure to use Clang
 provided through the `llvm` installation. Follow these
 instructions: <https://github.com/briansmith/ring/issues/1824#issuecomment-2059955073>
 
