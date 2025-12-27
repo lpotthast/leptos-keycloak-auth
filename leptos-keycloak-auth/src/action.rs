@@ -1,11 +1,12 @@
 use crate::code_verifier::CodeVerifier;
 use crate::config::Options;
+use crate::internal::token_manager::SessionVersion;
 use crate::internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp};
 use crate::{
-    AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint, RefreshToken, SessionState,
+    request::{self, RequestError}, token::TokenData, AuthorizationCode, DiscoveryEndpoint, JwkSetEndpoint,
+    RefreshToken,
+    SessionState,
     TokenEndpoint,
-    request::{self, RequestError},
-    token::TokenData,
 };
 use leptos::prelude::*;
 use time::OffsetDateTime;
@@ -119,11 +120,16 @@ pub(crate) fn create_exchange_code_for_token_action(
 /// We call callbacks using `try_run` to mitigate any "has been disposed" panics should refresh
 /// happen in parallel with another action, e.g. a logout triggered by the user or code.
 /// In such a case, we could have already disposed these callbacks.
+///
+/// The `session_version` parameter is used to detect race conditions between token refresh and
+/// logouts. If the session version changes between dispatch and callback, the refresh result is
+/// discarded.
 #[allow(clippy::type_complexity)]
 pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
     on_success: Callback<Option<TokenData>>,
     on_error: Callback<Option<RequestError>>,
+    session_version: Signal<SessionVersion>,
 ) -> Action<
     (
         TokenEndpoint,
@@ -142,16 +148,35 @@ pub(crate) fn create_refresh_token_action(
             let client_id = options.read_value().client_id.clone();
             let refresh_token = refresh_token.clone();
             let on_refresh_error = *on_refresh_error;
+
+            // Capture current session version (at dispatch time) to detect race conditions.
+            let expected_version = session_version.get_untracked();
+
             async move {
                 leptos::task::spawn_local(async move {
-                    match request::refresh_token(
+                    let response = request::refresh_token(
                         token_endpoint,
                         &client_id,
                         &refresh_token,
                         options.read_value().discovery_endpoint(),
                     )
-                    .await
-                    {
+                    .await;
+
+                    let current_version = session_version.get_untracked();
+
+                    // Only consume the response if session version hasn't changed.
+                    // This would, for example, catch a logout that happened while the refresh
+                    // request was still in-flight.
+                    if current_version != expected_version {
+                        tracing::debug!(
+                            ?expected_version,
+                            ?current_version,
+                            "Discarding stale token refresh response."
+                        );
+                        return;
+                    }
+
+                    match response {
                         Ok(refreshed_token) => {
                             on_success.try_run(Some(refreshed_token));
                         }

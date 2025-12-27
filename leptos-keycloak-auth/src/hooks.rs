@@ -262,6 +262,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                     // We have to make sure that the state is switched to `NotAuthenticated` (by observing that
                     // no token is present) first!
                     request_animation_frame(move || {
+                        // forget() handles generation increment to invalidate in-flight refreshes.
                         token_mgr.forget();
 
                         // We should recreate the code_verifier to have a new one for the next login phase.
