@@ -100,33 +100,33 @@ ssr = [
 ]
 
 [dependencies]
-axum = { version = "0.8.7", optional = true }
-axum-server = { version = "0.8.0", features = ["tls-rustls"], optional = true }
-console_error_panic_hook = "0.1.7"
-dotenv_codegen = "0.15.0"
-dotenvy = "0.15.7"
-indoc = "2.0.7"
-leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to-leptos-0.8" }
-leptos = { version = "0.8.15", features = [] }
-leptos-keycloak-auth = { path = "../leptos-keycloak-auth", features = ["internals"] }
-leptos-routes = "0.3.1"
-leptos-use = "0.17.0"
-leptos_axum = { version = "0.8.7", optional = true }
-leptos_meta = { version = "0.8.5", features = [] }
-leptos_router = { version = "0.8.11", features = [] }
-serde = "1.0.228"
-tokio = { version = "1.48.0", features = ["rt-multi-thread"], optional = true }
-tower = { version = "0.5.2", optional = true }
-tower-http = { version = "0.6.8", features = ["fs"], optional = true }
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", optional = true }
-tracing-wasm = { version = "0.2.1", optional = true }
-wasm-bindgen = "0.2.106"
+axum = { version = "0.8.8", default-features = false, features = [], optional = true }
+axum-server = { version = "0.8.0", default-features = false, features = ["tls-rustls"], optional = true }
+console_error_panic_hook = { version = "0.1.7", default-features = false, features = [] }
+dotenv_codegen = { version = "0.15.0", default-features = false, features = [] }
+dotenvy = { version = "0.15.7", default-features = false, features = [] }
+indoc = { version = "2.0.7", default-features = false, features = [] }
+leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to-leptos-0.8", default-features = false, features = ["atoms", "components", "themes"] }
+leptos = { version = "0.8.15", default-features = false, features = [] }
+leptos-keycloak-auth = { path = "../leptos-keycloak-auth", default-features = false, features = ["internals"] }
+leptos-routes = { version = "0.3.1", default-features = false, features = [] }
+leptos-use = { version = "0.17.0", default-features = false, features = [] }
+leptos_axum = { version = "0.8.7", default-features = false, features = ["default"], optional = true }
+leptos_meta = { version = "0.8.5", default-features = false, features = [] }
+leptos_router = { version = "0.8.11", default-features = false, features = [] }
+serde = { version = "1.0.228", default-features = false, features = [] }
+tokio = { version = "1.48.0", default-features = false, features = ["rt-multi-thread"], optional = true }
+tower = { version = "0.5.2", default-features = false, features = [], optional = true }
+tower-http = { version = "0.6.8", default-features = false, features = ["fs"], optional = true }
+tracing = { version = "0.1.44", default-features = false, features = [] }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt", "registry", "ansi"], optional = true }
+tracing-wasm = { version = "0.2.1", default-features = false, features = [], optional = true }
+wasm-bindgen = { version = "0.2.106", default-features = false, features = [] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
-getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
-js-sys = "0.3"
+getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", default-features = false, features = ["wasm_js"] }
+js-sys = { version = "0.3", default-features = false, features = [] }
 
 [profile.dev]
 # Potential to opt-in on higher optimization for our code.
