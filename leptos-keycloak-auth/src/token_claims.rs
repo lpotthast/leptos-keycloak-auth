@@ -169,7 +169,7 @@ impl From<StandardIdTokenClaims> for KeycloakIdTokenClaims {
             match remaining.remove(name) {
                 None => {
                     let default = T::default();
-                    tracing::warn!(
+                    tracing::debug!(
                         "Could not find '{name}' in ID token claims. Using {}'s default value: {default:?}",
                         type_name::<T>()
                     );
