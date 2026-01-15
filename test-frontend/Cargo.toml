@@ -110,18 +110,18 @@ leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to
 leptos = { version = "0.8.15", default-features = false, features = [] }
 leptos-keycloak-auth = { path = "../leptos-keycloak-auth", default-features = false, features = ["internals"] }
 leptos-routes = { version = "0.3.1", default-features = false, features = [] }
-leptos-use = { version = "0.17.0", default-features = false, features = [] }
+leptos-use = { version = "0.18.0", default-features = false, features = [] }
 leptos_axum = { version = "0.8.7", default-features = false, features = ["default"], optional = true }
 leptos_meta = { version = "0.8.5", default-features = false, features = [] }
 leptos_router = { version = "0.8.11", default-features = false, features = [] }
 serde = { version = "1.0.228", default-features = false, features = [] }
-tokio = { version = "1.48.0", default-features = false, features = ["rt-multi-thread"], optional = true }
-tower = { version = "0.5.2", default-features = false, features = [], optional = true }
+tokio = { version = "1.49.0", default-features = false, features = ["rt-multi-thread"], optional = true }
+tower = { version = "0.5.3", default-features = false, features = [], optional = true }
 tower-http = { version = "0.6.8", default-features = false, features = ["fs"], optional = true }
 tracing = { version = "0.1.44", default-features = false, features = [] }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt", "registry", "ansi"], optional = true }
 tracing-wasm = { version = "0.2.1", default-features = false, features = [], optional = true }
-wasm-bindgen = { version = "0.2.106", default-features = false, features = [] }
+wasm-bindgen = { version = "0.2.108", default-features = false, features = [] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = ["js"] }

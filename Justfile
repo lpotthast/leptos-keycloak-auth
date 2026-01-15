@@ -10,6 +10,7 @@ install-tools:
   cargo install --locked cargo-upgrades
   cargo install --locked cargo-edit
   cargo install --locked cargo-msrv
+  cargo install -f wasm-bindgen-cli --version 0.2.108
 
 # Find the minimum supported rust version
 find-msrv:
