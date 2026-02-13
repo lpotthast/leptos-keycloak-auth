@@ -3,6 +3,7 @@
     <words>
       <w>backchannel</w>
       <w>pkce</w>
+      <w>reqwest</w>
     </words>
   </dictionary>
 </component>
