@@ -1,10 +1,13 @@
-use crate::pages::keycloak_login::KeycloakLogin;
-use crate::pages::my_account::MyAccount;
-use crate::ui_tests::UiTest;
-use crate::{pages, PASSWORD, USERNAME};
-use assertr::prelude::*;
 use std::time::Duration;
+
+use assertr::prelude::*;
 use thirtyfour::{TimeoutConfiguration, WebDriver};
+
+use crate::{
+    PASSWORD, USERNAME, pages,
+    pages::{keycloak_login::KeycloakLogin, my_account::MyAccount},
+    ui_tests::UiTest,
+};
 
 pub struct AuthFlow {}
 

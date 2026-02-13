@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     Extension, Json, Router,
     response::{IntoResponse, Response},
@@ -9,18 +11,19 @@ use axum_keycloak_auth::{
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
 };
-use http::header::{ACCEPT, AUTHORIZATION};
-use http::{Method, StatusCode};
+use http::{
+    Method, StatusCode,
+    header::{ACCEPT, AUTHORIZATION},
+};
 use serde::Serialize;
-use std::time::Duration;
 use tokio::{net::TcpListener, task::JoinHandle};
 use tower::ServiceBuilder;
-use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::sensitive_headers::{
-    SetSensitiveRequestHeadersLayer, SetSensitiveResponseHeadersLayer,
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    sensitive_headers::{SetSensitiveRequestHeadersLayer, SetSensitiveResponseHeadersLayer},
+    timeout::TimeoutLayer,
+    trace::{DefaultMakeSpan, TraceLayer},
 };
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing::{Level, Span};
 use url::Url;
 

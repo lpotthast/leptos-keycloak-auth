@@ -1,15 +1,15 @@
-use crate::ui_tests::test_01_auth_flow::AuthFlow;
-use crate::ui_tests::UiTest;
 use chrome_for_testing_manager::prelude::*;
 use keycloak::{
+    KeycloakAdmin,
     types::{
         ClientRepresentation, CredentialRepresentation, RealmRepresentation, RoleRepresentation,
         RolesRepresentation, UserRepresentation,
     },
-    KeycloakAdmin,
 };
 use keycloak_container::KeycloakContainer;
 use thirtyfour::prelude::*;
+
+use crate::ui_tests::{UiTest, test_01_auth_flow::AuthFlow};
 
 mod backend;
 mod common;

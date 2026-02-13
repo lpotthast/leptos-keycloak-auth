@@ -1,7 +1,7 @@
-use crate::pages::BaseActions;
-use crate::{KEYCLOAK_UUID, USERNAME};
 use assertr::prelude::*;
 use thirtyfour::{By, WebDriver};
+
+use crate::{KEYCLOAK_UUID, USERNAME, pages::BaseActions};
 
 pub struct MyAccount<'d> {
     pub driver: &'d WebDriver,

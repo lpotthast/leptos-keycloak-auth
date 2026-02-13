@@ -1,7 +1,7 @@
-use crate::pages::BaseActions;
-use assertr::assert_that;
-use assertr::prelude::*;
+use assertr::{assert_that, prelude::*};
 use thirtyfour::{By, WebDriver};
+
+use crate::pages::BaseActions;
 
 pub struct Root<'d> {
     pub driver: &'d WebDriver,

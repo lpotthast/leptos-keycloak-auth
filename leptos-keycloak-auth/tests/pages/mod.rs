@@ -1,5 +1,4 @@
-use thirtyfour::prelude::ElementWaitable;
-use thirtyfour::{By, WebDriver};
+use thirtyfour::{By, WebDriver, prelude::ElementWaitable};
 
 pub mod keycloak_login;
 pub mod my_account;

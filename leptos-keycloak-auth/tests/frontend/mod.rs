@@ -1,9 +1,12 @@
-use std::env;
-use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::process::Command;
-use tokio_process_tools::broadcast::BroadcastOutputStream;
-use tokio_process_tools::{Inspector, LineParsingOptions, Next, Process, TerminateOnDrop};
+use std::{env, time::Duration};
+
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    process::Command,
+};
+use tokio_process_tools::{
+    Inspector, LineParsingOptions, Next, Process, TerminateOnDrop, broadcast::BroadcastOutputStream,
+};
 
 pub struct Frontend {
     #[expect(unused)]

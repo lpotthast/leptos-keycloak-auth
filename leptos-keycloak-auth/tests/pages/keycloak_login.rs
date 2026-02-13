@@ -1,6 +1,7 @@
-use crate::pages::BaseActions;
 use assertr::prelude::*;
 use thirtyfour::{By, WebDriver};
+
+use crate::pages::BaseActions;
 
 pub(crate) struct KeycloakLogin<'d> {
     pub driver: &'d WebDriver,
