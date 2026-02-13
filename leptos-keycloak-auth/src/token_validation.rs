@@ -155,3 +155,22 @@ fn validate_and_decode_base64_encoded_token(
 
     Ok(raw_claims)
 }
+
+#[cfg(test)]
+mod tests {
+    use assertr::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn validate_token_data_presence_none_returns_no_token_error() {
+        let result = validate_token_data_presence(None);
+        assert_that(result.unwrap_err()).is_equal_to(IdTokenClaimsError::NoToken);
+    }
+
+    #[test]
+    fn validate_jwk_set_presence_none_returns_no_jwk_set_error() {
+        let result = validate_jwk_set_presence(None);
+        assert_that(result.unwrap_err()).is_equal_to(IdTokenClaimsError::NoJwkSet);
+    }
+}
