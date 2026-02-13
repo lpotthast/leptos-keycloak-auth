@@ -88,7 +88,7 @@ pub struct TokenManager {
     /// Update the token data, automatically incrementing the session version.
     /// This is the only way to update tokens, ensuring session version increments to invalidate
     /// any stale async operations from a previous authentication session.
-    update_token: Callback<Option<TokenData>>,
+    pub(crate) update_token: Callback<Option<TokenData>>,
 
     /// Duration for which the access token is valid, as configured in Keycloak's realm settings.
     pub access_token_lifetime: Signal<StdDuration>,
@@ -264,13 +264,13 @@ impl TokenManager {
                                         "The known refresh_token is not valid. Dropping the refresh token. No additional refreshes will be performed."
                                     );
                                     // Drop all token data, including our access_token.
-                                    set_token.run(None);
+                                    update_token.run(None);
                                 } else if error_response.is_session_not_active() {
                                     tracing::trace!(
                                         "The known refresh_token might be valid but the user has no Keycloak session anymore. User was logged out. Dropping the refresh_token. No additional refreshes will be performed."
                                     );
                                     // Drop all token data, including our access_token.
-                                    set_token.run(None);
+                                    update_token.run(None);
                                 } else if error_response.error
                                     == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
                                 {
@@ -278,7 +278,7 @@ impl TokenManager {
                                         "Received an unexpected `invalid_grant` error. Did Keycloak's error messages change? If you see this, report at `https://github.com/lpotthast/leptos-keycloak-auth/issues`."
                                     );
                                     // Drop all token data, including our access_token.
-                                    set_token.run(None);
+                                    update_token.run(None);
                                 } else {
                                     tracing::warn!(
                                         "Token refresh failed due to unexpected Keycloak error response: {error_response:?}"
@@ -288,7 +288,7 @@ impl TokenManager {
                         }
                     }
                     OnRefreshError::DropToken => {
-                        set_token.run(None);
+                        update_token.run(None);
                     }
                 }
                 err
