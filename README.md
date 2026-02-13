@@ -19,13 +19,14 @@ This library has to create random numbers. It uses the `rand` crate for this. `r
 For `wasm32-unknown-unknown`, the target of our hydrating client, a special `getrandom` wasm backend must be specified.
 
 1. With the current set of dependencies, two versions of `getrandom` will be in the dependency tree. We have to enable
-   `getrandom`s wasm related features on both to mitigate any compile errors. Add this to the Cargo.toml of your
-   application.
+   `getrandom`s WASM related features on all versions used (check with `cargo tree`) to mitigate any compile errors.
+   Add this to the Cargo.toml of your application.
    ```toml
    [target.'cfg(target_arch = "wasm32")'.dependencies]
    js-sys = "0.3"
    getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
    getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+   getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
    ```
 2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
@@ -162,7 +163,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 
 ## Troubleshooting
 
-Q: My app does not compile due to `getrandom` not compiling for the wasm target.
+Q: My app does not compile due to `getrandom` not compiling for the WASM target.
 
 A: Add this to your projects Cargo.toml
 
@@ -171,6 +172,7 @@ A: Add this to your projects Cargo.toml
 js-sys = "0.3"
 getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 ```
 
 Q: My app no longer compiles using an Apple Silicon chip (M1 or upwards) after including this crate.
