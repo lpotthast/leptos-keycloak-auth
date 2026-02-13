@@ -38,7 +38,7 @@ impl SessionVersion {
     const ZERO: SessionVersion = SessionVersion(0);
 
     pub fn increment(self) -> Self {
-        SessionVersion(self.0 + 1)
+        SessionVersion(self.0.wrapping_add(1))
     }
 }
 
@@ -485,5 +485,30 @@ impl TokenManager {
     pub(crate) fn forget(&self) {
         tracing::trace!("Dropping all token data");
         self.update_token.run(None);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use assertr::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn session_version_default_is_zero() {
+        assert_that(SessionVersion::default()).is_equal_to(SessionVersion::ZERO);
+        assert_that(SessionVersion::ZERO).is_equal_to(SessionVersion(0));
+    }
+
+    #[test]
+    fn session_version_increment() {
+        let v = SessionVersion(0);
+        assert_that(v.increment()).is_equal_to(SessionVersion(1));
+    }
+
+    #[test]
+    fn session_version_increment_wraps_around() {
+        let v = SessionVersion(u64::MAX);
+        assert_that(v.increment()).is_equal_to(SessionVersion(0));
     }
 }
