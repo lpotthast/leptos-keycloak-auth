@@ -22,33 +22,33 @@ base64 = { version = "0.22.1", default-features = false, features = ["std"] }
 codee = { version = "0.3.5", default-features = false, features = ["json_serde"] }
 http = { version = "1.4.0", default-features = false, features = [] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_std"] }
-jsonwebtoken = { version = "10.2.0", default-features = false, features = ["rust_crypto"] }
+jsonwebtoken = { version = "10.3.0", default-features = false, features = ["rust_crypto"] }
 leptos = { version = "0.8.15", default-features = false, features = [] }
 leptos-use = { version = "0.18.0", default-features = false, features = ["use_interval", "storage"] }
 leptos_router = { version = "0.8.11", default-features = false, features = [] }
-rand = { version = "0.9.2", default-features = false, features = ["std", "std_rng", "thread_rng"] }
-reqwest = { version = "0.13.1", default-features = false, features = ["json", "charset", "rustls", "http2", "form"] }
+rand = { version = "0.10.0", default-features = false, features = ["std", "std_rng", "thread_rng"] }
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "charset", "rustls", "http2", "form"] }
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.149", default-features = false, features = ["std"] }
 sha2 = { version = "0.10.9", default-features = false, features = [] }
 snafu = { version = "0.8.9", default-features = false, features = ["std"] }
-time = { version = "0.3.45", default-features = false, features = ["wasm-bindgen", "serde", "std", "formatting", "parsing"] }
+time = { version = "0.3.47", default-features = false, features = ["wasm-bindgen", "serde", "std", "formatting", "parsing"] }
 tracing = { version = "0.1.44", default-features = false, features = [] }
 url = { version = "2.5.8", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
-anyhow = { version = "1.0.100", default-features = false, features = [] }
+anyhow = { version = "1.0.101", default-features = false, features = [] }
 assertr = { version = "0.4.3", default-features = false, features = ["std"] }
 axum = { version = "0.8.8", default-features = false, features = ["tokio", "http1", "http2", "tracing", "json"] }
 axum-keycloak-auth = { version = "0.8.3", default-features = false, features = [] }
 chrome-for-testing-manager = { version = "0.6.0", default-features = false, features = ["thirtyfour"] }
 http = { version = "1.4.0", default-features = false, features = [] }
 keycloak = { git = "https://github.com/lpotthast/keycloak-rs", branch = "update-to-reqwest-0.13", default-features = false, features = ["tags-all"] }
-testcontainers = { version = "0.26.3", default-features = false, features = ["aws-lc-rs"] }
+testcontainers = { version = "0.27.0", default-features = false, features = ["aws-lc-rs"] }
 thirtyfour = { version = "0.36.1", default-features = false, features = ["component", "reqwest", "rustls-tls"] }
 tokio = { version = "1.49.0", default-features = false, features = ["rt", "rt-multi-thread"] }
 tokio-process-tools = { version = "0.7.2", default-features = false, features = [] }
 tower = { version = "0.5.3", default-features = false, features = [] }
 tower-http = { version = "0.6.8", default-features = false, features = ["trace", "timeout", "sensitive-headers", "cors"] }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt", "registry", "ansi"] }
-uuid = { version = "1.19.0", default-features = false, features = ["v7", "serde"] }
+uuid = { version = "1.20.0", default-features = false, features = ["v7", "serde"] }
