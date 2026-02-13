@@ -42,10 +42,11 @@ impl Default for Nonce {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use assertr::assert_that;
-    use assertr::prelude::*;
     use std::collections::HashSet;
+
+    use assertr::{assert_that, prelude::*};
+
+    use super::*;
 
     #[test]
     fn generate_nonce_on_creation() {
