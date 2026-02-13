@@ -8,8 +8,8 @@ impl CsrfToken {
     /// Generate a new cryptographically secure CSRF token using 32 bytes of random data,
     /// base64 url encoded as a 43 character string.
     pub fn new() -> Self {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-        use rand::Rng;
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use rand::RngExt;
 
         let mut rng = rand::rng();
         let bytes: [u8; 32] = rng.random();
