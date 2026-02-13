@@ -3,13 +3,12 @@ use leptos_routes::routes;
 #[allow(clippy::module_inception)]
 #[routes(with_views, fallback = "|| view! { \"Page not found.\" }")]
 pub mod routes {
-    use crate::app::Home;
-    use crate::app::Login;
-    use crate::app::MainLayout;
-    use crate::app::MyAccount;
-    use leptos_keycloak_auth::components::EndSession;
-    use leptos_keycloak_auth::components::MaybeAuthenticated;
-    use leptos_keycloak_auth::url::Url;
+    use leptos_keycloak_auth::{
+        components::{EndSession, MaybeAuthenticated},
+        url::Url,
+    };
+
+    use crate::app::{Home, Login, MainLayout, MyAccount};
 
     #[route("/", layout = "MainLayout", fallback = "Home")]
     pub mod root {

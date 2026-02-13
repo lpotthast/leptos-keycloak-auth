@@ -1,4 +1,4 @@
-use leptos_keycloak_auth::{use_authenticated, AuthenticatedClient};
+use leptos_keycloak_auth::{AuthenticatedClient, use_authenticated};
 
 pub mod user_service;
 

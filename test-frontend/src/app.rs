@@ -1,17 +1,21 @@
 #![allow(clippy::must_use_candidate)]
 
-use crate::routes::routes;
-use crate::services::user_service::UserService;
-use leptonic::atoms::button::LinkTarget;
-use leptonic::components::prelude::*;
-use leptos::prelude::*;
-use leptos_keycloak_auth::components::{AuthProvider, DebugState, MaybeAuthenticated, WithAuth};
-use leptos_keycloak_auth::url::Url;
-use leptos_keycloak_auth::{use_authenticated, use_keycloak_auth};
-use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
-use leptos_router::components::{Outlet, Router};
-use leptos_router::hooks::use_location;
 use std::sync::atomic::{AtomicU32, Ordering};
+
+use leptonic::{atoms::button::LinkTarget, components::prelude::*};
+use leptos::prelude::*;
+use leptos_keycloak_auth::{
+    components::{AuthProvider, DebugState, MaybeAuthenticated, WithAuth},
+    url::Url,
+    use_authenticated, use_keycloak_auth,
+};
+use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_router::{
+    components::{Outlet, Router},
+    hooks::use_location,
+};
+
+use crate::{routes::routes, services::user_service::UserService};
 
 #[must_use]
 pub fn shell(options: LeptosOptions, keycloak_port: u16) -> impl IntoView {

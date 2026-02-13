@@ -1,5 +1,6 @@
-use dotenv_codegen::dotenv;
 use std::sync::LazyLock;
+
+use dotenv_codegen::dotenv;
 
 pub static ENVIRONMENT: LazyLock<Environment> = LazyLock::new(|| Environment {
     api_protocol: dotenv!("API_PROTOCOL"),

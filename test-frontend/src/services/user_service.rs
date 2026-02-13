@@ -1,6 +1,6 @@
-use crate::environment::ENVIRONMENT;
-use crate::services::BaseService;
 use leptos::prelude::*;
+
+use crate::{environment::ENVIRONMENT, services::BaseService};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct WhoAmIResponse {
