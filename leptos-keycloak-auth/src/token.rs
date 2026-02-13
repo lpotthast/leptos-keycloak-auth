@@ -1,9 +1,8 @@
-use crate::request::GrantType;
-use crate::response::SuccessTokenResponse;
-use crate::{AccessToken, DiscoveryEndpoint};
 use serde::{Deserialize, Serialize};
 use time::{Duration, OffsetDateTime};
 use url::Url;
+
+use crate::{AccessToken, DiscoveryEndpoint, request::GrantType, response::SuccessTokenResponse};
 
 /// A structure representing the storage of authentication tokens.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

@@ -1,13 +1,15 @@
-use crate::{
-    oidc::OidcConfig,
-    response::{ErrorResponse, TokenResponse},
-    token::TokenData,
-    DiscoveryEndpoint,
-};
+use std::{collections::HashMap, time::Duration as StdDuration};
+
 use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+
+use crate::{
+    DiscoveryEndpoint,
+    oidc::OidcConfig,
+    response::{ErrorResponse, TokenResponse},
+    token::TokenData,
+};
 
 #[derive(Debug, Snafu)]
 pub enum RequestError {

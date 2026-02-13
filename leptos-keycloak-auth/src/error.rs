@@ -1,5 +1,6 @@
-use crate::request::RequestError;
 use snafu::Snafu;
+
+use crate::request::RequestError;
 
 /// An enumeration representing various authentication-related errors.
 #[derive(Debug, Snafu)]

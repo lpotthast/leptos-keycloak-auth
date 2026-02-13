@@ -1,8 +1,6 @@
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::any::type_name;
-use std::collections::HashMap;
-use std::fmt::Debug;
+use std::{any::type_name, collections::HashMap, fmt::Debug};
+
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use time::OffsetDateTime;
 
 /// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>

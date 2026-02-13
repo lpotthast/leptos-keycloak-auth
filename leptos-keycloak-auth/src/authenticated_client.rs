@@ -1,6 +1,7 @@
-use crate::{Authenticated, RequestAction};
 use http::StatusCode;
-use leptos::prelude::ReadUntracked;
+use leptos::prelude::{Callable, ReadUntracked};
+
+use crate::Authenticated;
 
 /// HTTP client with automatic access token injection and token refresh on 401 responses.
 ///

@@ -1,7 +1,9 @@
-use crate::request::GrantType;
-use crate::token_validation::NonceValidation;
-use crate::{internal, AccessToken, Authenticated, KeycloakAuth, UseKeycloakAuthOptions};
 use leptos::prelude::*;
+
+use crate::{
+    internal, request::GrantType, token_validation::NonceValidation, AccessToken, Authenticated, KeycloakAuth,
+    UseKeycloakAuthOptions,
+};
 
 /// Get access to the current authentication state.
 ///

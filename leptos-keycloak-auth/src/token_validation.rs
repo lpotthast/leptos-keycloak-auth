@@ -1,7 +1,10 @@
-use crate::internal::JwkSetWithTimestamp;
-use crate::token::TokenData;
-use crate::token_claims::{KeycloakIdTokenClaims, StandardIdTokenClaims};
 use snafu::{OptionExt, ResultExt, Snafu};
+
+use crate::{
+    internal::JwkSetWithTimestamp,
+    token::TokenData,
+    token_claims::{KeycloakIdTokenClaims, StandardIdTokenClaims},
+};
 
 #[derive(Debug, Clone, PartialEq, Snafu)]
 pub enum JwtValidationError {

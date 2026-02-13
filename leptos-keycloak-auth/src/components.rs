@@ -1,12 +1,12 @@
-use crate::config::{AdvancedOptions, IdTokenValidationOptions, UseKeycloakAuthOptions};
-use crate::{
-    current_url, init_keycloak_auth, try_use_keycloak_auth, use_keycloak_auth, KeycloakAuth,
-    KeycloakAuthState,
-};
-use leptos::either::EitherOf3;
-use leptos::prelude::*;
+use leptos::{either::EitherOf3, prelude::*};
 use leptos_router::NavigateOptions;
 use url::Url;
+
+use crate::{
+    KeycloakAuth, KeycloakAuthState,
+    config::{AdvancedOptions, IdTokenValidationOptions, UseKeycloakAuthOptions},
+    current_url, init_keycloak_auth, try_use_keycloak_auth, use_keycloak_auth,
+};
 
 /// Initialize Keycloak authentication and provide it to child components.
 ///

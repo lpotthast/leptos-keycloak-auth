@@ -1,10 +1,13 @@
+use std::{
+    fmt::Debug,
+    sync::{Arc, LazyLock},
+};
+
 use codee::{CodecError, Decoder, Encoder};
 use leptos::prelude::*;
 use leptos_use::storage::{
-    use_storage_with_options, StorageType, UseStorageError, UseStorageOptions,
+    StorageType, UseStorageError, UseStorageOptions, use_storage_with_options,
 };
-use std::fmt::Debug;
-use std::sync::{Arc, LazyLock};
 
 pub(crate) struct UseStorageReturn<T, Remover>
 where

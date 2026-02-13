@@ -31,10 +31,11 @@ impl Default for CsrfToken {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use assertr::assert_that;
-    use assertr::prelude::*;
     use std::collections::HashSet;
+
+    use assertr::{assert_that, prelude::*};
+
+    use super::*;
 
     #[test]
     fn generate_logout_token_on_creation() {

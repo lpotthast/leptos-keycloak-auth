@@ -1,8 +1,10 @@
-use crate::DiscoveryEndpoint;
+use std::time::Duration as StdDuration;
+
 use leptos::prelude::{RwSignal, Signal};
 use snafu::Snafu;
-use std::time::Duration as StdDuration;
 use url::{PathSegmentsMut, Url};
+
+use crate::DiscoveryEndpoint;
 
 /// Specifies how much lifetime must remain for a token to not be considered "nearly expired".
 ///
@@ -344,9 +346,11 @@ impl UrlExt for Url {
 
 #[cfg(test)]
 mod tests {
-    use crate::LifeLeft;
-    use assertr::prelude::*;
     use std::time::Duration;
+
+    use assertr::prelude::*;
+
+    use crate::LifeLeft;
 
     mod life_left {
         use super::*;

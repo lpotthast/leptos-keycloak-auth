@@ -43,17 +43,16 @@ pub mod reqwest {
 
 #[cfg(feature = "internals")]
 pub mod internals {
-    pub use crate::code_verifier::CodeChallenge;
-    pub use crate::code_verifier::CodeVerifier;
-    pub use crate::internal::code_verifier_manager::CodeVerifierManager;
-    pub use crate::internal::csrf_token_manager::CsrfTokenManager;
-    pub use crate::internal::derived_urls::DerivedUrls;
-    pub use crate::internal::jwk_set_manager::JwkSetManager;
-    pub use crate::internal::nonce_manager::NonceManager;
-    pub use crate::internal::oidc_config_manager::OidcConfigManager;
-    pub use crate::internal::token_manager::TokenManager;
-    pub use crate::nonce::Nonce;
-    pub use crate::token::TokenData;
+    pub use crate::{
+        code_verifier::{CodeChallenge, CodeVerifier},
+        internal::{
+            code_verifier_manager::CodeVerifierManager, csrf_token_manager::CsrfTokenManager,
+            derived_urls::DerivedUrls, jwk_set_manager::JwkSetManager, nonce_manager::NonceManager,
+            oidc_config_manager::OidcConfigManager, token_manager::TokenManager,
+        },
+        nonce::Nonce,
+        token::TokenData,
+    };
 }
 
 type DiscoveryEndpoint = url::Url;

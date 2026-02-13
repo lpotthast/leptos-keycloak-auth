@@ -1,12 +1,13 @@
-use crate::code_verifier::CodeChallenge;
-use crate::config::Options;
-use crate::internal::derived_urls::DerivedUrlError;
-use crate::nonce::Nonce;
-use crate::AuthorizationEndpoint;
+use std::borrow::Cow;
+
 use itertools::Itertools;
 use leptos::prelude::*;
-use std::borrow::Cow;
 use url::Url;
+
+use crate::{
+    AuthorizationEndpoint, code_verifier::CodeChallenge, config::Options,
+    internal::derived_urls::DerivedUrlError, nonce::Nonce,
+};
 
 pub(crate) fn create_login_url_signal(
     authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
