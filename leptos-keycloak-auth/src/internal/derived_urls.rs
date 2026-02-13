@@ -1,11 +1,11 @@
-use crate::{
-    internal::OidcConfigWithTimestamp, AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint,
-    TokenEndpoint,
-};
-use leptos::prelude::Signal;
-use leptos::prelude::*;
+use leptos::prelude::{Signal, *};
 use snafu::{ResultExt, Snafu};
 use url::Url;
+
+use crate::{
+    AuthorizationEndpoint, EndSessionEndpoint, JwkSetEndpoint, TokenEndpoint,
+    internal::OidcConfigWithTimestamp,
+};
 
 #[derive(Debug, Clone, Snafu)]
 pub enum DerivedUrlError {

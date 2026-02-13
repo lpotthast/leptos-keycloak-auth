@@ -1,8 +1,11 @@
-use crate::nonce::Nonce;
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
+
+use crate::{
+    nonce::Nonce,
+    storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
+};
 
 /// Manages [`Nonce`](Nonce)'s  for `OpenID Connect` ID token validation.
 ///

@@ -1,13 +1,15 @@
-use crate::config::Options;
-use crate::internal::derived_urls::DerivedUrls;
-use crate::internal::{track_age_of, OidcConfigWithTimestamp};
-use crate::request::RequestError;
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
+use std::{fmt::Debug, time::Duration as StdDuration};
+
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
-use std::fmt::Debug;
-use std::time::Duration as StdDuration;
+
+use crate::{
+    config::Options,
+    internal::{OidcConfigWithTimestamp, derived_urls::DerivedUrls, track_age_of},
+    request::RequestError,
+    storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
+};
 
 /// Manages OIDC discovery configuration with automatic fetching and caching.
 ///

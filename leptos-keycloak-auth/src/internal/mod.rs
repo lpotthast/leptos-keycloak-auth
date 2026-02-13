@@ -1,11 +1,12 @@
-use crate::oidc::OidcConfig;
-use crate::time_ext::TimeDurationExt;
-use leptos::prelude::*;
-use leptos_use::{use_interval, UseIntervalReturn};
-use serde::{Deserialize, Serialize};
 use std::time::Duration as StdDuration;
+
+use leptos::prelude::*;
+use leptos_use::{UseIntervalReturn, use_interval};
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use url::Url;
+
+use crate::{oidc::OidcConfig, time_ext::TimeDurationExt};
 
 pub(crate) mod code_verifier_manager;
 pub(crate) mod csrf_token_manager;

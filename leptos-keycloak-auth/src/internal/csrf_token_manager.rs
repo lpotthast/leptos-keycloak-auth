@@ -1,8 +1,11 @@
-use crate::csrf_token::CsrfToken;
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
+
+use crate::{
+    csrf_token::CsrfToken,
+    storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
+};
 
 /// Manages CSRF tokens for operations to detect CSRF attacks.
 ///
@@ -113,9 +116,9 @@ impl Default for CsrfTokenManager {
 
 #[cfg(test)]
 mod tests {
+    use assertr::{assert_that, prelude::*};
+
     use super::*;
-    use assertr::assert_that;
-    use assertr::prelude::*;
 
     fn cut() -> CsrfTokenManager {
         let (token, set_token) = signal(CsrfToken::new());

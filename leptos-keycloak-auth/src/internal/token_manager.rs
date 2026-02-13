@@ -1,20 +1,25 @@
-use crate::action::ExchangeCodeForTokenInput;
-use crate::code_verifier::CodeVerifier;
-use crate::config::Options;
-use crate::internal::derived_urls::DerivedUrlError;
-use crate::request::RequestError;
-use crate::response::{KnownOidcErrorCode, OidcErrorCode};
-use crate::storage::{use_storage_with_options_and_error_handler, UseStorageReturn};
-use crate::time_ext::TimeDurationExt;
-use crate::token::TokenData;
-use crate::{action, AuthorizationCode, SessionState, TokenEndpoint};
+use std::{
+    fmt::{Debug, Formatter},
+    time::Duration as StdDuration,
+};
+
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_use::storage::StorageType;
-use leptos_use::{use_interval, UseIntervalReturn};
+use leptos_use::{storage::StorageType, use_interval, UseIntervalReturn};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
-use std::time::Duration as StdDuration;
+
+use crate::{
+    action, action::ExchangeCodeForTokenInput, code_verifier::CodeVerifier, config::Options,
+    internal::derived_urls::DerivedUrlError,
+    request::RequestError,
+    response::{KnownOidcErrorCode, OidcErrorCode},
+    storage::{use_storage_with_options_and_error_handler, UseStorageReturn},
+    time_ext::TimeDurationExt,
+    token::TokenData,
+    AuthorizationCode,
+    SessionState,
+    TokenEndpoint,
+};
 
 /// Strategy for handling token refresh failures.
 #[derive(Debug, Clone, Copy)]
