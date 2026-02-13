@@ -31,7 +31,7 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
-   leptos-keycloak-auth = "0.12"
+   leptos-keycloak-auth = "0.13"
    
    [features]
    hydrate = [ 
@@ -153,7 +153,7 @@ You can than still run the UI test by entering `y` and pressing enter or canceli
 | 0.1           | 0.6                       |
 | 0.2           | 0.6                       |
 | 0.3 - 0.6     | 0.7                       |
-| 0.7 - 0.12    | 0.8                       |
+| 0.7 - 0.13    | 0.8                       |
 
 ## MSRV
 
