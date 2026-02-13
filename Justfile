@@ -24,7 +24,10 @@ sort:
 # Run `cargo fmt` for every crate.
 fmt:
   cargo fmt --all --manifest-path ./leptos-keycloak-auth/Cargo.toml
+  cargo +nightly fmt --all --manifest-path ./leptos-keycloak-auth/Cargo.toml -- --unstable-features --config imports_granularity=Crate,group_imports=StdExternalCrate
   cargo fmt --all --manifest-path ./test-frontend/Cargo.toml
+  cargo +nightly fmt --all --manifest-path ./test-frontend/Cargo.toml -- --unstable-features --config imports_granularity=Crate,group_imports=StdExternalCrate
+
 
 leptosfmt:
   leptosfmt ./leptos-keycloak-auth/src/*
