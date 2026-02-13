@@ -148,8 +148,11 @@ impl JwkSetManager {
         });
 
         // Fetch a token from the OIDC provider using an authorization code and an optional session state.
-        let retrieve_jwk_set_action =
-            action::create_retrieve_jwk_set_action(handle_jwk_set, handle_req_error);
+        let retrieve_jwk_set_action = action::create_retrieve_jwk_set_action(
+            handle_jwk_set,
+            handle_req_error,
+            options.read_value().advanced.request_timeout,
+        );
 
         // Obtain the JWK set. Updating any previously stored config.
         Effect::new(move |_| {

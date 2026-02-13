@@ -420,8 +420,8 @@ impl AuthenticatedClient {
 
     /// Performs a request while automatically setting the `access_token` as an AUTHORIZATION header.
     ///
-    /// Handles responses failing with a 401 status code (UNAUTHORIZED), by triggering
-    /// a background token refresh and silently retrying the request afterwards.
+    /// Handles responses failing with a 401 status code (UNAUTHORIZED) by directly refreshing
+    /// the access token and retrying the request once.
     ///
     /// # Errors
     /// Returns an error if the request fails due to network issues, invalid URL, or other `reqwest`
@@ -447,12 +447,11 @@ impl AuthenticatedClient {
             // - the token rotation/invalidation happened due to a security event.
             // - the users session was terminated server-side.
             // - the token was blacklisted for suspicious activity.
-            // We should try to refresh the token and retry the request.
-            // If that try fails as well, we deem the user unauthenticated
-            // and consider him logged out in the process.
-            match self.auth.report_failed_http_request(resp.status()) {
-                RequestAction::Retry => {
-                    // New token is now available. Retry the request.
+            // We directly refresh the token and retry the request once.
+
+            match self.auth.refresh_context.try_refresh().await {
+                Some(Ok(())) => {
+                    // Retry the request with the fresh token.
                     let req2 = self.create_request(
                         method,
                         url,
@@ -462,8 +461,14 @@ impl AuthenticatedClient {
                     let resp2 = self.client.execute(req2).await?;
                     Ok(resp2)
                 }
-                RequestAction::Fail => {
-                    // Nothing to do here. Request cannot be retried.
+                Some(Err(err)) => {
+                    tracing::warn!(?err, "Token refresh on 401 failed. Logging user out.");
+                    // Drop token data — effectively logs the user out.
+                    self.auth.refresh_context.update_token.run(None);
+                    Ok(resp)
+                }
+                None => {
+                    // Can't refresh — no refresh token, no endpoint, or stale session.
                     Ok(resp)
                 }
             }

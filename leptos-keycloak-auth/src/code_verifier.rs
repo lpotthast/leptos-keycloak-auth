@@ -54,7 +54,7 @@ impl<const LENGTH: usize> CodeVerifier<LENGTH> {
 
     /// Create a `CodeChallenge` from the verifier. Keep this verifier around for later validation.
     pub(crate) fn to_code_challenge(&self) -> CodeChallenge {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
         use sha2::Digest;
 
         let mut hasher = sha2::Sha256::new();
@@ -144,8 +144,9 @@ impl CodeChallenge {
 
 #[cfg(test)]
 mod test {
-    use super::{CodeChallengeMethod, CodeVerifier};
     use assertr::prelude::*;
+
+    use super::{CodeChallengeMethod, CodeVerifier};
 
     #[test]
     fn test_43() {

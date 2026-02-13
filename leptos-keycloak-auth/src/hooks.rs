@@ -99,10 +99,11 @@ pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
 #[cfg(feature = "ssr")]
 fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
-    use crate::config::Options;
-    use crate::internal::derived_urls::DerivedUrls;
-    use crate::{KeycloakAuth, KeycloakAuthState};
     use leptos::prelude::*;
+
+    use crate::{
+        config::Options, internal::derived_urls::DerivedUrls, KeycloakAuth, KeycloakAuthState,
+    };
 
     let options = Options::new(options);
     let options = StoredValue::new(options);
@@ -129,24 +130,28 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 #[cfg(not(feature = "ssr"))]
 #[allow(clippy::too_many_lines)]
 fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
-    use crate::config::Options;
-    use crate::error::KeycloakAuthError;
-    use crate::internal::derived_urls::DerivedUrls;
-    use crate::internal::token_manager::OnRefreshError;
-    use crate::request::RequestError;
-    use crate::response::CallbackResponse;
-    use crate::token_claims::KeycloakIdTokenClaims;
-    use crate::token_validation::IdTokenClaimsError;
-    use crate::{
-        login, logout, token_validation, Authenticated, KeycloakAuth, KeycloakAuthState,
-        NotAuthenticated, RequestAction,
-    };
-    use leptos::callback::Callback;
-    use leptos::prelude::*;
-    use leptos_router::NavigateOptions;
-    use leptos_router::hooks::{use_navigate, use_query};
     use std::ops::Deref;
+
+    use leptos::{callback::Callback, prelude::*};
+    use leptos_router::{
+        hooks::{use_navigate, use_query},
+        NavigateOptions,
+    };
     use time::OffsetDateTime;
+
+    use crate::{
+        config::Options, error::KeycloakAuthError, internal::{derived_urls::DerivedUrls, token_manager::OnRefreshError}, login,
+        logout,
+        request::RequestError,
+        response::CallbackResponse,
+        state::RefreshContext, token_claims::KeycloakIdTokenClaims,
+        token_validation,
+        token_validation::IdTokenClaimsError,
+        Authenticated,
+        KeycloakAuth,
+        KeycloakAuthState,
+        NotAuthenticated,
+    };
 
     let options = Options::new(options);
     let options = StoredValue::new(options);
@@ -375,27 +380,19 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     let (last_refresh_from_error, set_last_refresh_from_error) =
         signal::<Option<OffsetDateTime>>(None);
-    let auth_error_reporter = Callback::new(move |status_code: http::StatusCode| {
+    let on_http_error = Callback::new(move |status_code: http::StatusCode| {
         // Should the user report that a request using the current access token failed,
         // this may mean that the token was revoked.
-        // We can try to refresh the token.
-        match status_code {
-            // NOTE: This MUST NOT lead to an infinite loop of refreshed and failed requests.
-            // Which may happen if
-            // - the refresh succeeds but
-            // - the 401 error cannot be resolved with the refresh.
-            http::StatusCode::UNAUTHORIZED => {
-                // If we never attempted a refresh before (is_none).
-                if last_refresh_from_error.get_untracked().is_none_or(
-                    // If the last error is old.
-                    |it| (OffsetDateTime::now_utc() - it).whole_seconds() > 1,
-                ) {
-                    token_mgr.refresh_token(OnRefreshError::DropToken);
-                    set_last_refresh_from_error.set(Some(OffsetDateTime::now_utc()));
-                }
-                RequestAction::Fail
+        // We trigger a background token refresh (the AuthenticatedClient handles retry).
+        if status_code == http::StatusCode::UNAUTHORIZED {
+            // If we never attempted a refresh before (is_none).
+            if last_refresh_from_error.get_untracked().is_none_or(
+                // If the last error is old.
+                |it| (OffsetDateTime::now_utc() - it).whole_seconds() > 1,
+            ) {
+                token_mgr.refresh_token(OnRefreshError::DropToken);
+                set_last_refresh_from_error.set(Some(OffsetDateTime::now_utc()));
             }
-            _ => RequestAction::Fail,
         }
     });
 
@@ -409,7 +406,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             match token_mgr.token.read().as_ref().map(|it| &it.access_token) {
                 None => match prev {
                     None => {
-                        panic!("access_token signal should only be read when authenticated");
+                        tracing::error!(
+                            "access_token memo evaluated without token data and no previous value. This is a bug in leptos-keycloak-auth."
+                        );
+                        unreachable!("access_token signal should only be read when authenticated");
                     }
                     Some(prev) => prev.clone(),
                 },
@@ -420,8 +420,12 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             match verified_and_decoded_id_token.read().as_ref() {
                 Err(err) => match prev {
                     None => {
-                        panic!(
-                            "id_token_claims signal should only be read when authenticated: {err:?}"
+                        tracing::error!(
+                            ?err,
+                            "id_token_claims memo evaluated without valid token and no previous value. This is a bug in leptos-keycloak-auth."
+                        );
+                        unreachable!(
+                            "id_token_claims signal should only be read when authenticated"
                         );
                     }
                     Some(prev) => prev.clone(),
@@ -429,7 +433,15 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 Ok(token) => token.clone(),
             }
         }),
-        auth_error_reporter,
+        on_http_error,
+        refresh_context: RefreshContext {
+            token_data: token_mgr.token,
+            token_endpoint,
+            options,
+            update_token: token_mgr.update_token,
+            request_timeout: options.read_value().advanced.request_timeout,
+            session_version: token_mgr.session_version,
+        },
     });
 
     // Create a persistent `NotAuthenticated` state. Same reasoning as above.

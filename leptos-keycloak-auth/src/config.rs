@@ -235,6 +235,13 @@ pub struct AdvancedOptions {
     ///
     /// Defaults to `true`.
     pub nonce_validation: bool,
+
+    /// Timeout for internal HTTP requests (OIDC discovery, JWK set retrieval, token exchange,
+    /// token refresh). This does NOT affect requests made through `AuthenticatedClient`, where
+    /// the user controls the `reqwest::Client` configuration.
+    ///
+    /// Defaults to 30 seconds.
+    pub request_timeout: StdDuration,
 }
 
 impl Default for AdvancedOptions {
@@ -250,6 +257,7 @@ impl Default for AdvancedOptions {
             max_jwk_set_age: StdDuration::from_secs(60 * 5),
             logout_csrf_detection: true,
             nonce_validation: true,
+            request_timeout: StdDuration::from_secs(30),
         }
     }
 }
@@ -360,6 +368,76 @@ mod tests {
             let ll = LifeLeft::Percentage(0.25);
             let result = ll.nearly_expired(Duration::ZERO, Duration::from_secs(10));
             assert_that(result).is_true();
+        }
+
+        #[test]
+        fn percentage_not_expired_when_plenty_of_time_left() {
+            let ll = LifeLeft::Percentage(0.25);
+            // 60 min lifetime, 30 min left = 50% > 25%
+            let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(1800));
+            assert_that(result).is_false();
+        }
+
+        #[test]
+        fn percentage_expired_when_little_time_left() {
+            let ll = LifeLeft::Percentage(0.25);
+            // 60 min lifetime, 10 min left = ~16.7% < 25%
+            let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(600));
+            assert_that(result).is_true();
+        }
+
+        #[test]
+        fn percentage_boundary_at_exactly_threshold() {
+            let ll = LifeLeft::Percentage(0.25);
+            // 100s lifetime, 25s left = exactly 25% => <=, so it's "nearly expired"
+            let result = ll.nearly_expired(Duration::from_secs(100), Duration::from_secs(25));
+            assert_that(result).is_true();
+        }
+
+        #[test]
+        fn duration_not_expired_when_plenty_of_time_left() {
+            let ll = LifeLeft::Duration(Duration::from_secs(60));
+            let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(120));
+            assert_that(result).is_false();
+        }
+
+        #[test]
+        fn duration_expired_when_little_time_left() {
+            let ll = LifeLeft::Duration(Duration::from_secs(60));
+            let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(30));
+            assert_that(result).is_true();
+        }
+
+        #[test]
+        fn duration_boundary_at_exactly_threshold() {
+            let ll = LifeLeft::Duration(Duration::from_secs(60));
+            let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(60));
+            assert_that(result).is_true();
+        }
+
+        #[test]
+        fn zero_time_left_is_always_nearly_expired() {
+            let percentage = LifeLeft::Percentage(0.25);
+            assert_that(percentage.nearly_expired(Duration::from_secs(100), Duration::ZERO))
+                .is_true();
+
+            let duration = LifeLeft::Duration(Duration::from_secs(60));
+            assert_that(duration.nearly_expired(Duration::from_secs(100), Duration::ZERO))
+                .is_true();
+        }
+    }
+
+    mod advanced_options {
+        use std::time::Duration;
+
+        use assertr::prelude::*;
+
+        use crate::AdvancedOptions;
+
+        #[test]
+        fn default_request_timeout_is_30_seconds() {
+            let opts = AdvancedOptions::default();
+            assert_that(opts.request_timeout).is_equal_to(Duration::from_secs(30));
         }
     }
 }

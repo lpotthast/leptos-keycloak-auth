@@ -16,12 +16,14 @@ use crate::{
 pub(crate) fn create_retrieve_oidc_config_action(
     set_oidc_config_wt: Callback<Option<OidcConfigWithTimestamp>>,
     set_req_error: Callback<Option<RequestError>>,
+    timeout: StdDuration,
 ) -> Action<(DiscoveryEndpoint,), ()> {
     Action::new(move |(discovery_endpoint,): &(DiscoveryEndpoint,)| {
         let discovery_endpoint = discovery_endpoint.clone();
         async move {
             leptos::task::spawn_local(async move {
-                let result = request::retrieve_oidc_config(discovery_endpoint.clone()).await;
+                let result =
+                    request::retrieve_oidc_config(discovery_endpoint.clone(), timeout).await;
                 match result {
                     Ok(oidc_config) => {
                         set_oidc_config_wt.run(Some(OidcConfigWithTimestamp {
@@ -43,6 +45,7 @@ pub(crate) fn create_retrieve_oidc_config_action(
 pub(crate) fn create_retrieve_jwk_set_action(
     set_jwk_set_wt: Callback<Option<JwkSetWithTimestamp>>,
     set_req_error: Callback<Option<RequestError>>,
+    timeout: StdDuration,
 ) -> Action<(JwkSetEndpoint, DiscoveryEndpoint), ()> {
     Action::new(
         move |(jwk_set_endpoint, discovery_endpoint): &(JwkSetEndpoint, DiscoveryEndpoint)| {
@@ -50,7 +53,7 @@ pub(crate) fn create_retrieve_jwk_set_action(
             let discovery_endpoint = discovery_endpoint.clone();
             async move {
                 leptos::task::spawn_local(async move {
-                    let result = request::retrieve_jwk_set(jwk_set_endpoint).await;
+                    let result = request::retrieve_jwk_set(jwk_set_endpoint, timeout).await;
                     match result {
                         Ok(jwk_set) => {
                             set_jwk_set_wt.run(Some(JwkSetWithTimestamp {
@@ -91,6 +94,7 @@ pub(crate) fn create_exchange_code_for_token_action(
         let code_verifier = input.code_verifier.code_verifier().to_owned();
         let session_state = input.session_state.clone();
         let finally = input.finally;
+        let timeout = options.read_value().advanced.request_timeout;
         async move {
             leptos::task::spawn_local(async move {
                 let result = request::exchange_code_for_token(
@@ -101,6 +105,7 @@ pub(crate) fn create_exchange_code_for_token_action(
                     &code_verifier,
                     session_state.as_deref(),
                     options.read_value().discovery_endpoint(),
+                    timeout,
                 )
                 .await;
                 match result {
@@ -115,6 +120,42 @@ pub(crate) fn create_exchange_code_for_token_action(
             });
         }
     })
+}
+
+/// Performs a token refresh with session version protection.
+///
+/// Returns `None` if the session version changed during the refresh (stale response).
+/// Returns `Some(Ok(..))` on success and `Some(Err(..))` when the refresh request fails.
+pub(crate) async fn refresh_token_with_session_check(
+    token_endpoint: TokenEndpoint,
+    client_id: &str,
+    refresh_token: &str,
+    discovery_endpoint: DiscoveryEndpoint,
+    timeout: StdDuration,
+    expected_session_version: SessionVersion,
+    session_version: Signal<SessionVersion>,
+) -> Option<Result<TokenData, RequestError>> {
+    let response = request::refresh_token(
+        token_endpoint,
+        client_id,
+        refresh_token,
+        discovery_endpoint,
+        timeout,
+    )
+    .await;
+
+    let current_version = session_version.get_untracked();
+
+    if current_version != expected_session_version {
+        tracing::debug!(
+            ?expected_session_version,
+            ?current_version,
+            "Discarding stale token refresh response."
+        );
+        return None;
+    }
+
+    Some(response)
 }
 
 /// Leptos action to call the token endpoint to perform a token refresh.
@@ -150,43 +191,33 @@ pub(crate) fn create_refresh_token_action(
             let client_id = options.read_value().client_id.clone();
             let refresh_token = refresh_token.clone();
             let on_refresh_error = *on_refresh_error;
+            let timeout = options.read_value().advanced.request_timeout;
 
             // Capture current session version (at dispatch time) to detect race conditions.
             let expected_version = session_version.get_untracked();
 
             async move {
                 leptos::task::spawn_local(async move {
-                    let response = request::refresh_token(
+                    match refresh_token_with_session_check(
                         token_endpoint,
                         &client_id,
                         &refresh_token,
                         options.read_value().discovery_endpoint(),
+                        timeout,
+                        expected_version,
+                        session_version,
                     )
-                    .await;
-
-                    let current_version = session_version.get_untracked();
-
-                    // Only consume the response if session version hasn't changed.
-                    // This would, for example, catch a logout that happened while the refresh
-                    // request was still in-flight.
-                    if current_version != expected_version {
-                        tracing::debug!(
-                            ?expected_version,
-                            ?current_version,
-                            "Discarding stale token refresh response."
-                        );
-                        return;
-                    }
-
-                    match response {
-                        Ok(refreshed_token) => {
+                    .await
+                    {
+                        Some(Ok(refreshed_token)) => {
                             on_success.try_run(Some(refreshed_token));
                         }
-                        Err(err) => {
+                        Some(Err(err)) => {
                             if let Some(err) = on_refresh_error.try_run(err) {
                                 on_error.try_run(Some(err));
                             }
                         }
+                        None => { /* stale, already logged */ }
                     }
                 });
             }

@@ -25,13 +25,17 @@ pub enum RequestError {
 
 pub(crate) async fn retrieve_jwk_set(
     jwk_set_endpoint: impl IntoUrl,
+    timeout: StdDuration,
 ) -> Result<jsonwebtoken::jwk::JwkSet, RequestError> {
     #[derive(Deserialize)]
     pub struct RawJwkSet {
         pub keys: Vec<serde_json::Value>,
     }
-    let raw_set = reqwest::Client::new()
+    let raw_set = reqwest::Client::builder()
+        .build()
+        .expect("reqwest::Client builder should not fail")
         .get(jwk_set_endpoint)
+        .timeout(timeout)
         .send()
         .await
         .context(SendSnafu {})?
@@ -50,9 +54,13 @@ pub(crate) async fn retrieve_jwk_set(
 
 pub(crate) async fn retrieve_oidc_config(
     discovery_endpoint: impl IntoUrl,
+    timeout: StdDuration,
 ) -> Result<OidcConfig, RequestError> {
-    reqwest::Client::new()
+    reqwest::Client::builder()
+        .build()
+        .expect("reqwest::Client builder should not fail")
         .get(discovery_endpoint)
+        .timeout(timeout)
         .send()
         .await
         .context(SendSnafu {})?
@@ -83,6 +91,7 @@ impl GrantType {
 /// Exchange a previously received authorization code for a token.
 ///
 /// The fact that this is the initial token response is stored in `TokenDate`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn exchange_code_for_token(
     token_endpoint: impl IntoUrl,
     client_id: &str,
@@ -91,6 +100,7 @@ pub(crate) async fn exchange_code_for_token(
     code_verifier: &str,
     session_state: Option<&str>,
     discovery_endpoint: DiscoveryEndpoint,
+    timeout: StdDuration,
 ) -> Result<TokenData, RequestError> {
     let mut params: HashMap<&str, &str> = HashMap::new();
     params.insert("grant_type", GrantType::AuthorizationCode.as_str());
@@ -106,6 +116,7 @@ pub(crate) async fn exchange_code_for_token(
         &params,
         GrantType::AuthorizationCode,
         discovery_endpoint,
+        timeout,
     )
     .await
 }
@@ -119,6 +130,7 @@ pub(crate) async fn refresh_token(
     client_id: &str,
     refresh_token: &str,
     discovery_endpoint: DiscoveryEndpoint,
+    timeout: StdDuration,
 ) -> Result<TokenData, RequestError> {
     let params = [
         ("grant_type", GrantType::RefreshToken.as_str()),
@@ -130,6 +142,7 @@ pub(crate) async fn refresh_token(
         &params,
         GrantType::RefreshToken,
         discovery_endpoint,
+        timeout,
     )
     .await
 }
@@ -139,10 +152,14 @@ async fn request_token<T: Serialize + ?Sized>(
     params: &T,
     grant_type: GrantType,
     discovery_endpoint: DiscoveryEndpoint,
+    timeout: StdDuration,
 ) -> Result<TokenData, RequestError> {
-    match reqwest::Client::new()
+    match reqwest::Client::builder()
+        .build()
+        .expect("reqwest::Client builder should not fail")
         .post(token_endpoint)
         .form(&params)
+        .timeout(timeout)
         .send()
         .await
         .context(SendSnafu {})?

@@ -351,7 +351,8 @@ impl KeycloakAuthState {
             KeycloakAuthState::Authenticated(Authenticated {
                 access_token,
                 id_token_claims,
-                auth_error_reporter: _,
+                on_http_error: _,
+                refresh_context: _,
             }) => {
                 #[derive(Debug)]
                 #[expect(unused)]
@@ -396,6 +397,62 @@ impl KeycloakAuthState {
     }
 }
 
+/// Context needed by `AuthenticatedClient` to perform a direct token refresh.
+#[derive(Clone, Copy)]
+pub(crate) struct RefreshContext {
+    pub(crate) token_data: Signal<Option<TokenData>>,
+    pub(crate) token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
+    pub(crate) options: StoredValue<Options>,
+    pub(crate) update_token: Callback<Option<TokenData>>,
+    pub(crate) request_timeout: StdDuration,
+    pub(crate) session_version: Signal<SessionVersion>,
+}
+
+impl Debug for RefreshContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RefreshContext")
+            .field("request_timeout", &self.request_timeout)
+            .finish_non_exhaustive()
+    }
+}
+
+impl RefreshContext {
+    /// Attempt to refresh the token using the current refresh token and token endpoint. Automatically publishes the new token data (when refresh succeeded to the reactive system).
+    ///
+    /// Returns `None` when a refresh is impossible (no refresh token or no token endpoint),
+    /// or when the session version changed during the refresh (stale response).
+    /// Returns `Some(Ok(()))` on success and `Some(Err(..))` when the refresh request fails.
+    pub(crate) async fn try_refresh(&self) -> Option<Result<(), RequestError>> {
+        let refresh_token = self
+            .token_data
+            .read_untracked()
+            .as_ref()
+            .map(|t| t.refresh_token.clone())?;
+
+        let new_token = action::refresh_token_with_session_check(
+            self.token_endpoint.read_untracked().as_ref().ok()?.clone(),
+            &self.options.read_value().client_id,
+            &refresh_token,
+            self.options.read_value().discovery_endpoint(),
+            self.request_timeout,
+            self.session_version.get_untracked(),
+            self.session_version,
+        )
+        .await;
+
+        match new_token {
+            None => None,
+            Some(new_token) => match new_token {
+                Ok(new_token) => {
+                    self.update_token.run(Some(new_token));
+                    Some(Ok(()))
+                }
+                Err(err) => Some(Err(err)),
+            },
+        }
+    }
+}
+
 /// State only accessible when the user is authenticated.
 ///
 /// You can call `client` to receive an `AuthenticatedClient` (using a `reqwest::Client` in
@@ -414,29 +471,23 @@ pub struct Authenticated {
     /// This is a signal, as we refresh the token regularly and automatically in the background.
     pub access_token: Memo<AccessToken>,
 
-    pub(crate) auth_error_reporter: Callback<http::StatusCode, RequestAction>,
+    /// Callback invoked when an HTTP request fails. Triggers a background token refresh
+    /// on 401 responses (with debouncing to prevent rapid-fire refreshes).
+    /// Always returns `Fail` — the `AuthenticatedClient` handles retry internally.
+    pub(crate) on_http_error: Callback<http::StatusCode>,
+
+    /// Context for direct token refresh in `AuthenticatedClient`.
+    pub(crate) refresh_context: RefreshContext,
 }
 
 impl PartialEq for Authenticated {
     fn eq(&self, other: &Self) -> bool {
-        // Only excluding auth_error_reporter.
+        // Excluding on_http_error and refresh_context (not relevant for equality).
         self.id_token_claims == other.id_token_claims && self.access_token == other.access_token
     }
 }
 
 impl Eq for Authenticated {}
-
-/// Action to take after reporting a failed HTTP request.
-///
-/// Returned by [`Authenticated::report_failed_http_request`] to indicate whether
-/// the request should be retried (e.g., after refreshing tokens) or marked as failed.
-pub enum RequestAction {
-    /// Indicates that the request should be retried as updated tokens are now available.
-    Retry,
-
-    /// Indicates that the request should be marked as ultimately failed.
-    Fail,
-}
 
 impl Authenticated {
     /// Create an authenticated HTTP client with automatic token injection.
@@ -499,38 +550,27 @@ impl Authenticated {
         AuthenticatedClient::new(client, *self)
     }
 
-    /// Report a failed HTTP request to trigger token refresh logic.
+    /// Report a failed HTTP request to trigger a background token refresh.
     ///
-    /// Call this method when you receive a 401 Unauthorized response from your API to determine
-    /// whether the request should be retried after refreshing tokens.
+    /// Call this method when you receive a 401 Unauthorized response from your API. This triggers
+    /// a background refresh of the access token (with debouncing to prevent rapid-fire refreshes).
     ///
-    /// This is primarily used internally by [`AuthenticatedClient`], but is exposed for advanced
-    /// use cases where you're making requests manually.
+    /// Note: This does NOT retry the request. The `AuthenticatedClient` handles retry internally.
+    /// For manual request handling, call this to trigger the refresh, then re-read `access_token`
+    /// for subsequent requests.
     ///
     /// # Parameters
     /// - `status_code`: The HTTP status code received from the failed request.
     ///
-    /// # Returns
-    /// [`RequestAction::Retry`] if tokens were refreshed and the request should be retried,
-    /// or [`RequestAction::Fail`] if the request should be marked as failed.
-    ///
     /// # Example
     /// ```no_run
-    /// use leptos_keycloak_auth::{use_authenticated, Authenticated, RequestAction};
+    /// use leptos_keycloak_auth::use_authenticated;
     ///
     /// let authenticated = use_authenticated();
-    /// match authenticated.report_failed_http_request(http::StatusCode::UNAUTHORIZED) {
-    ///     RequestAction::Retry => {
-    ///         // Retry the request...
-    ///     }
-    ///     RequestAction::Fail => {
-    ///         // Handle the failure...
-    ///     }
-    /// }
+    /// authenticated.handle_http_error(http::StatusCode::UNAUTHORIZED);
     /// ```
-    #[must_use]
-    pub fn report_failed_http_request(&self, status_code: http::StatusCode) -> RequestAction {
-        self.auth_error_reporter.run(status_code)
+    pub fn handle_http_error(&self, status_code: http::StatusCode) {
+        self.on_http_error.run(status_code);
     }
 }
 

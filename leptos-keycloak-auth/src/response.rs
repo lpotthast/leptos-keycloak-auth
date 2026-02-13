@@ -129,14 +129,29 @@ impl ErrorResponse {
     /// Check if this represents an invalid or expired refresh token.
     pub fn is_invalid_refresh_token(&self) -> bool {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
-            && self.error_description.as_deref().unwrap_or_default() == "Invalid refresh token"
+            && self
+                .error_description
+                .as_deref()
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("Invalid refresh token")
     }
 
     /// Check if this represents a "Session not active" error.
     /// In that case, any still known refresh token can be dropped, as the user was logged out.
     pub fn is_session_not_active(&self) -> bool {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
-            && self.error_description.as_deref().unwrap_or_default() == "Session not active"
+            && self
+                .error_description
+                .as_deref()
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("Session not active")
+    }
+
+    /// Check if this error likely indicates the session has ended, regardless of the specific
+    /// error description. Any `invalid_grant` error suggests the session or token is no longer
+    /// valid. Use this as a fallback when the specific error description is not recognized.
+    pub fn is_likely_session_ended(&self) -> bool {
+        self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
     }
 }
 
@@ -235,9 +250,9 @@ impl leptos_router::params::Params for CallbackResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::response::{KnownOidcErrorCode, OidcErrorCode};
-    use assertr::assert_that;
-    use assertr::prelude::PartialEqAssertions;
+    use assertr::{assert_that, prelude::*};
+
+    use crate::response::{ErrorResponse, KnownOidcErrorCode, OidcErrorCode};
 
     #[test]
     fn deserialize_known_error_code() {
@@ -251,5 +266,104 @@ mod tests {
         let error = "some_unknown_error";
         let parsed = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")).unwrap();
         assert_that(parsed).is_equal_to(OidcErrorCode::Unknown(error.to_owned()));
+    }
+
+    fn make_error_response(description: &str) -> ErrorResponse {
+        ErrorResponse {
+            error: OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant),
+            error_description: Some(description.to_string()),
+            error_uri: None,
+        }
+    }
+
+    #[test]
+    fn is_invalid_refresh_token_exact_match() {
+        let err = make_error_response("Invalid refresh token");
+        assert_that(err.is_invalid_refresh_token()).is_true();
+    }
+
+    #[test]
+    fn is_invalid_refresh_token_case_insensitive() {
+        let err = make_error_response("invalid refresh token");
+        assert_that(err.is_invalid_refresh_token()).is_true();
+
+        let err = make_error_response("INVALID REFRESH TOKEN");
+        assert_that(err.is_invalid_refresh_token()).is_true();
+
+        let err = make_error_response("Invalid Refresh Token");
+        assert_that(err.is_invalid_refresh_token()).is_true();
+    }
+
+    #[test]
+    fn is_invalid_refresh_token_wrong_description() {
+        let err = make_error_response("Token is not active");
+        assert_that(err.is_invalid_refresh_token()).is_false();
+    }
+
+    #[test]
+    fn is_invalid_refresh_token_no_description() {
+        let err = ErrorResponse {
+            error: OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant),
+            error_description: None,
+            error_uri: None,
+        };
+        assert_that(err.is_invalid_refresh_token()).is_false();
+    }
+
+    #[test]
+    fn is_invalid_refresh_token_wrong_error_code() {
+        let err = ErrorResponse {
+            error: OidcErrorCode::Known(KnownOidcErrorCode::InvalidClient),
+            error_description: Some("Invalid refresh token".to_string()),
+            error_uri: None,
+        };
+        assert_that(err.is_invalid_refresh_token()).is_false();
+    }
+
+    #[test]
+    fn is_session_not_active_exact_match() {
+        let err = make_error_response("Session not active");
+        assert_that(err.is_session_not_active()).is_true();
+    }
+
+    #[test]
+    fn is_session_not_active_case_insensitive() {
+        let err = make_error_response("session not active");
+        assert_that(err.is_session_not_active()).is_true();
+
+        let err = make_error_response("SESSION NOT ACTIVE");
+        assert_that(err.is_session_not_active()).is_true();
+    }
+
+    #[test]
+    fn is_session_not_active_wrong_description() {
+        let err = make_error_response("Invalid refresh token");
+        assert_that(err.is_session_not_active()).is_false();
+    }
+
+    #[test]
+    fn is_likely_session_ended_any_invalid_grant() {
+        let err = make_error_response("Some completely unknown message");
+        assert_that(err.is_likely_session_ended()).is_true();
+    }
+
+    #[test]
+    fn is_likely_session_ended_false_for_other_codes() {
+        let err = ErrorResponse {
+            error: OidcErrorCode::Known(KnownOidcErrorCode::InvalidClient),
+            error_description: Some("whatever".to_string()),
+            error_uri: None,
+        };
+        assert_that(err.is_likely_session_ended()).is_false();
+    }
+
+    #[test]
+    fn is_likely_session_ended_false_for_unknown_codes() {
+        let err = ErrorResponse {
+            error: OidcErrorCode::Unknown("custom_error".to_string()),
+            error_description: Some("whatever".to_string()),
+            error_uri: None,
+        };
+        assert_that(err.is_likely_session_ended()).is_false();
     }
 }

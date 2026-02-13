@@ -96,6 +96,7 @@ impl OidcConfigManager {
         let retrieve_oidc_config_action = crate::action::create_retrieve_oidc_config_action(
             Callback::new(move |val| set_oidc_config.run(val)),
             handle_req_error,
+            options.read_value().advanced.request_timeout,
         );
 
         Effect::new(move |_| {
