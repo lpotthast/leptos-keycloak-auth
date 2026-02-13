@@ -5,20 +5,20 @@ use std::{
 
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
-use leptos_use::{storage::StorageType, use_interval, UseIntervalReturn};
+use leptos_use::{UseIntervalReturn, storage::StorageType, use_interval};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    action, action::ExchangeCodeForTokenInput, code_verifier::CodeVerifier, config::Options,
+    AuthorizationCode, SessionState, TokenEndpoint, action,
+    action::ExchangeCodeForTokenInput,
+    code_verifier::CodeVerifier,
+    config::Options,
     internal::derived_urls::DerivedUrlError,
     request::RequestError,
     response::{KnownOidcErrorCode, OidcErrorCode},
-    storage::{use_storage_with_options_and_error_handler, UseStorageReturn},
+    storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
     time_ext::TimeDurationExt,
     token::TokenData,
-    AuthorizationCode,
-    SessionState,
-    TokenEndpoint,
 };
 
 /// Strategy for handling token refresh failures.

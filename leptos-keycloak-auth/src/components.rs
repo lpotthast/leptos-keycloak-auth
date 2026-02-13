@@ -113,9 +113,7 @@ pub fn AuthProvider(
         advanced: advanced.unwrap_or_default(),
     });
 
-    view! {
-        { children() }
-    }
+    view! { {children()} }
 }
 
 /// Small convenience component that calls [`use_keycloak_auth`](use_keycloak_auth) for you
@@ -380,8 +378,8 @@ pub fn DebugState() -> impl IntoView {
     view! {
         <div style="width: 100%; overflow: auto;">
             <MaybeAuthenticated
-                authenticated=move |_| view! { <DebugStateInner/> }
-                unauthenticated=move |_| view! { <DebugStateInner/> }
+                authenticated=move |_| view! { <DebugStateInner /> }
+                unauthenticated=move |_| view! { <DebugStateInner /> }
             />
         </div>
     }
@@ -395,37 +393,82 @@ fn DebugStateInner() -> impl IntoView {
     view! {
         <div style="width: 100%;">
             <h3>"Internal data: state"</h3>
-            <pre id="auth-state">
-                { move || auth_state.read()() }
-            </pre>
+            <pre id="auth-state">{move || auth_state.read()()}</pre>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: derived_urls"</h3>
             <div>
-                "jwks_endpoint: " {move || format!("{:?}", auth.derived_urls().jwks_endpoint.get().map(|url| url.to_string()).map_err(|err| err.to_string()))}
+                "jwks_endpoint: "
+                {move || {
+                    format!(
+                        "{:?}",
+                        auth
+                            .derived_urls()
+                            .jwks_endpoint
+                            .get()
+                            .map(|url| url.to_string())
+                            .map_err(|err| err.to_string()),
+                    )
+                }}
             </div>
             <div>
-                "authorization_endpoint: " {move || format!("{:?}", auth.derived_urls().authorization_endpoint.get().map(|url| url.to_string()).map_err(|err| err.to_string()))}
+                "authorization_endpoint: "
+                {move || {
+                    format!(
+                        "{:?}",
+                        auth
+                            .derived_urls()
+                            .authorization_endpoint
+                            .get()
+                            .map(|url| url.to_string())
+                            .map_err(|err| err.to_string()),
+                    )
+                }}
             </div>
             <div>
-                "token_endpoint: " {move || format!("{:?}", auth.derived_urls().token_endpoint.get().map(|url| url.to_string()).map_err(|err| err.to_string()))}
+                "token_endpoint: "
+                {move || {
+                    format!(
+                        "{:?}",
+                        auth
+                            .derived_urls()
+                            .token_endpoint
+                            .get()
+                            .map(|url| url.to_string())
+                            .map_err(|err| err.to_string()),
+                    )
+                }}
             </div>
             <div>
-                "end_session_endpoint: " {move || format!("{:?}", auth.derived_urls().end_session_endpoint.get().map(|url| url.to_string()).map_err(|err| err.to_string()))}
+                "end_session_endpoint: "
+                {move || {
+                    format!(
+                        "{:?}",
+                        auth
+                            .derived_urls()
+                            .end_session_endpoint
+                            .get()
+                            .map(|url| url.to_string())
+                            .map_err(|err| err.to_string()),
+                    )
+                }}
             </div>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: oidc_config_manager"</h3>
             <div>
-                "oidc_config_age: " {move || format!("{:?}", auth.oidc_config_manager().oidc_config_age.get())}
+                "oidc_config_age: "
+                {move || format!("{:?}", auth.oidc_config_manager().oidc_config_age.get())}
             </div>
             <div>
-                "oidc_config_expires_in: " {move || format!("{:?}", auth.oidc_config_manager().oidc_config_expires_in.get())}
+                "oidc_config_expires_in: "
+                {move || format!("{:?}", auth.oidc_config_manager().oidc_config_expires_in.get())}
             </div>
             <div>
-                "oidc_config_too_old: " {move || format!("{:?}", auth.oidc_config_manager().oidc_config_too_old.get())}
+                "oidc_config_too_old: "
+                {move || format!("{:?}", auth.oidc_config_manager().oidc_config_too_old.get())}
             </div>
         </div>
 
@@ -435,68 +478,78 @@ fn DebugStateInner() -> impl IntoView {
                 "jwk_set_age: " {move || format!("{:?}", auth.jwk_set_manager().jwk_set_age.get())}
             </div>
             <div>
-                "jwk_set_expires_in: " {move || format!("{:?}", auth.jwk_set_manager().jwk_set_expires_in.get())}
+                "jwk_set_expires_in: "
+                {move || format!("{:?}", auth.jwk_set_manager().jwk_set_expires_in.get())}
             </div>
             <div>
-                "jwk_set_too_old: " {move || format!("{:?}", auth.jwk_set_manager().jwk_set_too_old.get())}
+                "jwk_set_too_old: "
+                {move || format!("{:?}", auth.jwk_set_manager().jwk_set_too_old.get())}
             </div>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: code_verifier_manager"</h3>
             <div>
-                "code_verifier: " {move || format!("{:?}", auth.code_verifier_manager().code_verifier.get())}
+                "code_verifier: "
+                {move || format!("{:?}", auth.code_verifier_manager().code_verifier.get())}
             </div>
             <div>
-                "code_challenge: " {move || format!("{:?}", auth.code_verifier_manager().code_challenge.get())}
+                "code_challenge: "
+                {move || format!("{:?}", auth.code_verifier_manager().code_challenge.get())}
             </div>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: csrf_token_manager"</h3>
             <div>
-                "logout_token: " {move || format!("{:?}", auth.csrf_token_manager().logout_token().get())}
+                "logout_token: "
+                {move || format!("{:?}", auth.csrf_token_manager().logout_token().get())}
             </div>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: nonce_manager"</h3>
-            <div>
-                "nonce: " {move || format!("{:?}", auth.nonce_manager().nonce().get())}
-            </div>
+            <div>"nonce: " {move || format!("{:?}", auth.nonce_manager().nonce().get())}</div>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: token_manager"</h3>
+            <div>"token_data: " {move || format!("{:#?}", auth.token_manager().token.get())}</div>
             <div>
-                "token_data: " {move || format!("{:#?}", auth.token_manager().token.get())}
+                "session_version: "
+                {move || format!("{:#?}", auth.token_manager().session_version.get())}
             </div>
             <div>
-                "session_version: " {move || format!("{:#?}", auth.token_manager().session_version.get())}
+                "access_token_lifetime: "
+                {move || format!("{:?}", auth.token_manager().access_token_lifetime.get())}
             </div>
             <div>
-                "access_token_lifetime: " {move || format!("{:?}", auth.token_manager().access_token_lifetime.get())}
+                "access_token_expires_in: "
+                {move || format!("{:?}", auth.token_manager().access_token_expires_in.get())}
             </div>
             <div>
-                "access_token_expires_in: " {move || format!("{:?}", auth.token_manager().access_token_expires_in.get())}
+                "access_token_nearly_expired: "
+                {move || format!("{:?}", auth.token_manager().access_token_nearly_expired.get())}
             </div>
             <div>
-                "access_token_nearly_expired: " {move || format!("{:?}", auth.token_manager().access_token_nearly_expired.get())}
+                "access_token_expired: "
+                {move || format!("{:?}", auth.token_manager().access_token_expired.get())}
             </div>
             <div>
-                "access_token_expired: " {move || format!("{:?}", auth.token_manager().access_token_expired.get())}
+                "refresh_token_lifetime: "
+                {move || format!("{:?}", auth.token_manager().refresh_token_lifetime.get())}
             </div>
             <div>
-                "refresh_token_lifetime: " {move || format!("{:?}", auth.token_manager().refresh_token_lifetime.get())}
+                "refresh_token_expires_in: "
+                {move || format!("{:?}", auth.token_manager().refresh_token_expires_in.get())}
             </div>
             <div>
-                "refresh_token_expires_in: " {move || format!("{:?}", auth.token_manager().refresh_token_expires_in.get())}
+                "refresh_token_nearly_expired: "
+                {move || format!("{:?}", auth.token_manager().refresh_token_nearly_expired.get())}
             </div>
             <div>
-                "refresh_token_nearly_expired: " {move || format!("{:?}", auth.token_manager().refresh_token_nearly_expired.get())}
-            </div>
-            <div>
-                "refresh_token_expired: " {move || format!("{:?}", auth.token_manager().refresh_token_expired.get())}
+                "refresh_token_expired: "
+                {move || format!("{:?}", auth.token_manager().refresh_token_expired.get())}
             </div>
         </div>
     }

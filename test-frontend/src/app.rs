@@ -23,16 +23,16 @@ pub fn shell(options: LeptosOptions, keycloak_port: u16) -> impl IntoView {
         <!DOCTYPE html>
         <html lang="en">
             <head>
-                <meta charset="utf-8"/>
-                <meta name="viewport" content="width=device-width, initial-scale=1"/>
-                <meta name="keycloak-port" content={keycloak_port}/>
-                <link rel="preconnect" href="https://fonts.gstatic.com"/>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="keycloak-port" content=keycloak_port />
+                <link rel="preconnect" href="https://fonts.gstatic.com" />
                 <AutoReload options=options.clone() />
-                <HydrationScripts options/>
-                <MetaTags/>
+                <HydrationScripts options />
+                <MetaTags />
             </head>
             <body>
-                <App/>
+                <App />
             </body>
         </html>
     }
@@ -85,31 +85,29 @@ pub fn App() -> impl IntoView {
     KeycloakPort::provide();
 
     view! {
-        <Meta name="charset" content="UTF-8"/>
-        <Meta name="description" content="Leptonic SSR template"/>
-        <Meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-        <Meta name="theme-color" content="#8856e6"/>
+        <Meta name="charset" content="UTF-8" />
+        <Meta name="description" content="Leptonic SSR template" />
+        <Meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <Meta name="theme-color" content="#8856e6" />
 
-        <Stylesheet id="leptos" href="/pkg/frontend.css"/>
-        <Stylesheet href="https://fonts.googleapis.com/css?family=Roboto&display=swap"/>
+        <Stylesheet id="leptos" href="/pkg/frontend.css" />
+        <Stylesheet href="https://fonts.googleapis.com/css?family=Roboto&display=swap" />
 
-        <Title text="Leptonic SSR template"/>
+        <Title text="Leptonic SSR template" />
 
         <Root default_theme=LeptonicTheme::default()>
             <main style=r"
-                height: 100%;
-                width: 100%;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                padding: 1em;
-                background-color: antiquewhite;
-                overflow: auto;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1em;
+            background-color: antiquewhite;
+            overflow: auto;
             ">
                 <Router>
-                    <Init>
-                        { routes::generated_routes() }
-                    </Init>
+                    <Init>{routes::generated_routes()}</Init>
                 </Router>
             </main>
         </Root>
@@ -124,29 +122,36 @@ pub fn Init(children: Children) -> impl IntoView {
 
     view! {
         <AuthProvider
-            keycloak_server_url=Url::parse(&format!("http://localhost:{}", KeycloakPort::get().0)).expect("valid keycloak server url")
+            keycloak_server_url=Url::parse(&format!("http://localhost:{}", KeycloakPort::get().0))
+                .expect("valid keycloak server url")
             realm="test-realm"
             client="test-client"
         >
-            { children() }
+            {children()}
 
-            <WithAuth render=move |auth| view! {
-                <Modal show_when=auth.suspicious_logout>
-                    <ModalHeader attr:id="suspicious-logout-detected"><ModalTitle>"Suspicious Logout Detected"</ModalTitle></ModalHeader>
-                    <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
-                    <ModalFooter>
-                        <ButtonWrapper>
-                            <Button
-                                attr:id="dismiss"
-                                on_press=move |_| { auth.dismiss_suspicious_logout_warning.run(()); }
-                                color=ButtonColor::Primary
-                            >
-                                "Dismiss"
-                            </Button>
-                        </ButtonWrapper>
-                    </ModalFooter>
-                </Modal>
-            }/>
+            <WithAuth render=move |auth| {
+                view! {
+                    <Modal show_when=auth.suspicious_logout>
+                        <ModalHeader attr:id="suspicious-logout-detected">
+                            <ModalTitle>"Suspicious Logout Detected"</ModalTitle>
+                        </ModalHeader>
+                        <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
+                        <ModalFooter>
+                            <ButtonWrapper>
+                                <Button
+                                    attr:id="dismiss"
+                                    on_press=move |_| {
+                                        auth.dismiss_suspicious_logout_warning.run(());
+                                    }
+                                    color=ButtonColor::Primary
+                                >
+                                    "Dismiss"
+                                </Button>
+                            </ButtonWrapper>
+                        </ModalFooter>
+                    </Modal>
+                }
+            } />
         </AuthProvider>
     }
 }
@@ -158,17 +163,15 @@ pub fn MainLayout() -> impl IntoView {
     view! {
         <h2>"leptos-keycloak-auth - test-frontend"</h2>
 
-        <div>
-            "Keycloak port: " <span id="keycloak-port">{ keycloak_port.0 }</span>
-        </div>
+        <div>"Keycloak port: " <span id="keycloak-port">{keycloak_port.0}</span></div>
 
-        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;"/>
+        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;" />
 
         <Outlet />
 
-        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;"/>
+        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;" />
 
-        <DebugState attr:style="font-size: 0.6em;"/>
+        <DebugState attr:style="font-size: 0.6em;" />
     }
 }
 
@@ -243,23 +246,41 @@ pub fn MyAccount() -> impl IntoView {
     let who_am_i = Signal::derive(move || who_am_i.get().flatten());
 
     view! {
-        <h1 id="greeting">
-            "Hello, " { move || user_name.get() } "!"
-        </h1>
+        <h1 id="greeting">"Hello, " {move || user_name.get()} "!"</h1>
 
-        <div id="render-count">
-            "render count: " { RENDER_COUNT.load(Ordering::Acquire) }
-        </div>
+        <div id="render-count">"render count: " {RENDER_COUNT.load(Ordering::Acquire)}</div>
 
-        <Suspense fallback=|| view! { "" }>
-            { move || who_am_i.get().map(|who_am_i| view! {
-                <div>"username: " <span id="username">{ who_am_i.username.clone() }</span></div>
-                <div>"keycloak_uuid: " <span id="keycloak_uuid">{ who_am_i.keycloak_uuid.clone() }</span></div>
-                <div>"token_valid_for_whole_seconds: " <span id="token_valid_for_whole_seconds">{ who_am_i.token_valid_for_whole_seconds }</span></div>
-            }) }
+        <Suspense fallback=|| {
+            view! { "" }
+        }>
+            {move || {
+                who_am_i
+                    .get()
+                    .map(|who_am_i| {
+                        view! {
+                            <div>
+                                "username: " <span id="username">{who_am_i.username.clone()}</span>
+                            </div>
+                            <div>
+                                "keycloak_uuid: "
+                                <span id="keycloak_uuid">{who_am_i.keycloak_uuid.clone()}</span>
+                            </div>
+                            <div>
+                                "token_valid_for_whole_seconds: "
+                                <span id="token_valid_for_whole_seconds">
+                                    {who_am_i.token_valid_for_whole_seconds}
+                                </span>
+                            </div>
+                        }
+                    })
+            }}
         </Suspense>
 
-        <LinkButton attr:id="logout" href=move || logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
+        <LinkButton
+            attr:id="logout"
+            href=move || logout_url.get().unwrap_or_default()
+            disabled=logout_url_unavailable
+        >
             "Logout"
         </LinkButton>
 
@@ -271,11 +292,19 @@ pub fn MyAccount() -> impl IntoView {
             "Forget auth state"
         </Button>
 
-        <LinkButton attr:id="force-malicious-logout" href=move || malicious_logout_url.get().unwrap_or_default() disabled=logout_url_unavailable>
+        <LinkButton
+            attr:id="force-malicious-logout"
+            href=move || malicious_logout_url.get().unwrap_or_default()
+            disabled=logout_url_unavailable
+        >
             "Force malicious logout"
         </LinkButton>
 
-        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
+        <LinkButton
+            attr:id="back-to-root"
+            href=routes::Root.materialize()
+            attr:style="margin-top: 3em;"
+        >
             "Back to root"
         </LinkButton>
     }
@@ -288,7 +317,11 @@ pub fn Login() -> impl IntoView {
 
         <LoginButton />
 
-        <LinkButton attr:id="back-to-root" href=routes::Root.materialize() attr:style="margin-top: 3em;">
+        <LinkButton
+            attr:id="back-to-root"
+            href=routes::Root.materialize()
+            attr:style="margin-top: 3em;"
+        >
             "Back to root"
         </LinkButton>
     }

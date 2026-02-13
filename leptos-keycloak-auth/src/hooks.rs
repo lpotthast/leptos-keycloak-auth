@@ -1,8 +1,8 @@
 use leptos::prelude::*;
 
 use crate::{
-    internal, request::GrantType, token_validation::NonceValidation, AccessToken, Authenticated, KeycloakAuth,
-    UseKeycloakAuthOptions,
+    AccessToken, Authenticated, KeycloakAuth, UseKeycloakAuthOptions, internal, request::GrantType,
+    token_validation::NonceValidation,
 };
 
 /// Get access to the current authentication state.
@@ -102,7 +102,7 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use leptos::prelude::*;
 
     use crate::{
-        config::Options, internal::derived_urls::DerivedUrls, KeycloakAuth, KeycloakAuthState,
+        KeycloakAuth, KeycloakAuthState, config::Options, internal::derived_urls::DerivedUrls,
     };
 
     let options = Options::new(options);
@@ -134,23 +134,23 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     use leptos::{callback::Callback, prelude::*};
     use leptos_router::{
-        hooks::{use_navigate, use_query},
         NavigateOptions,
+        hooks::{use_navigate, use_query},
     };
     use time::OffsetDateTime;
 
     use crate::{
-        config::Options, error::KeycloakAuthError, internal::{derived_urls::DerivedUrls, token_manager::OnRefreshError}, login,
-        logout,
+        Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated,
+        config::Options,
+        error::KeycloakAuthError,
+        internal::{derived_urls::DerivedUrls, token_manager::OnRefreshError},
+        login, logout,
         request::RequestError,
         response::CallbackResponse,
-        state::RefreshContext, token_claims::KeycloakIdTokenClaims,
+        state::RefreshContext,
+        token_claims::KeycloakIdTokenClaims,
         token_validation,
         token_validation::IdTokenClaimsError,
-        Authenticated,
-        KeycloakAuth,
-        KeycloakAuthState,
-        NotAuthenticated,
     };
 
     let options = Options::new(options);

@@ -1,17 +1,23 @@
+use std::{fmt::Debug, ops::Deref, time::Duration as StdDuration};
+
 use leptos::prelude::*;
 use leptos_router::{
-    hooks::{use_navigate, use_url},
     NavigateOptions,
+    hooks::{use_navigate, use_url},
 };
-use std::fmt::Debug;
-use std::{ops::Deref, time::Duration as StdDuration};
 use url::Url;
 
 use crate::{
-    action, authenticated_client::AuthenticatedClient, config::Options, error::KeycloakAuthError, internal::derived_urls::DerivedUrlError,
-    internal::token_manager::SessionVersion, logout,
-    request::RequestError, token::TokenData, token_claims::KeycloakIdTokenClaims, token_validation::IdTokenClaimsError,
-    AccessToken, TokenEndpoint,
+    AccessToken, TokenEndpoint, action,
+    authenticated_client::AuthenticatedClient,
+    config::Options,
+    error::KeycloakAuthError,
+    internal::{derived_urls::DerivedUrlError, token_manager::SessionVersion},
+    logout,
+    request::RequestError,
+    token::TokenData,
+    token_claims::KeycloakIdTokenClaims,
+    token_validation::IdTokenClaimsError,
 };
 
 /// The global state this library tracks for you. Gives access to `login_url` and `logout_url`
