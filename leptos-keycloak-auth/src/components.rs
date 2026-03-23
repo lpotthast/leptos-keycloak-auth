@@ -135,7 +135,7 @@ pub fn AuthProvider(
 ///             client="my-client"
 ///         >
 ///             { children() }
-///     
+///
 ///             <WithAuth render=|auth| view! {
 ///                 // <Modal show_when=auth.suspicious_logout>
 ///                 //     <ModalHeader attr:id="suspicious-logout-detected"><ModalTitle>"Suspicious Logout Detected"</ModalTitle></ModalHeader>

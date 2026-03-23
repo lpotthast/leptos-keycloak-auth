@@ -9,7 +9,7 @@ use leptos_keycloak_auth::{
     url::Url,
     use_authenticated, use_keycloak_auth,
 };
-use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
+use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
     components::{Outlet, Router},
     hooks::use_location,

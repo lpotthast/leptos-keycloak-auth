@@ -1,11 +1,13 @@
-use crate::app::{Home, Login, MainLayout, MyAccountPage};
+use std::sync::LazyLock;
+
 use leptos::prelude::*;
 use leptos_keycloak_auth::{
     components::{EndSession, MaybeAuthenticated},
     url::Url,
 };
 use leptos_routes::routes;
-use std::sync::LazyLock;
+
+use crate::app::{Home, Login, MainLayout, MyAccountPage};
 
 const BASE_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("http://127.0.0.1:3000").unwrap());
 
