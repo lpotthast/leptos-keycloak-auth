@@ -9,7 +9,7 @@ use leptos_keycloak_auth::{
     url::Url,
     use_authenticated, use_keycloak_auth,
 };
-use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{provide_meta_context, Meta, MetaTags, Stylesheet, Title};
 use leptos_router::{
     components::{Outlet, Router},
     hooks::use_location,
@@ -107,7 +107,9 @@ pub fn App() -> impl IntoView {
             overflow: auto;
             ">
                 <Router>
-                    <Init>{routes::generated_routes()}</Init>
+                    <Init>
+                        {routes::route_tree()}
+                    </Init>
                 </Router>
             </main>
         </Root>
@@ -188,7 +190,7 @@ pub fn Home() -> impl IntoView {
             />
         </p>
 
-        <LinkButton attr:id="to-my-account" href=routes::root::MyAccount.materialize()>
+        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
             "My Account"
         </LinkButton>
     }
@@ -196,20 +198,20 @@ pub fn Home() -> impl IntoView {
 
 /// A component that expects to be rendered only when the user is authenticated.
 #[component]
-pub fn MyAccount() -> impl IntoView {
+pub fn MyAccountPage() -> impl IntoView {
     static RENDER_COUNT: AtomicU32 = AtomicU32::new(0);
 
     RENDER_COUNT.fetch_add(1, Ordering::Release);
 
     let location = use_location();
     Effect::new(move || {
-        if location.pathname.get() != routes::root::MyAccount.materialize() {
+        if location.pathname.get() != routes::MyAccount.materialize() {
             let msg = indoc::formatdoc! {"
                 Navigating away from '{path}'. Resetting RENDER_COUNT to 0.
                 We dont want to track the number of navigations to the path that renders this component.
                 We are only interested in spotting accidental rerenders while staying at the current location.
                 ",
-                path = routes::root::MyAccount.materialize()
+                path = routes::MyAccount.materialize()
             };
             tracing::info!("{msg}");
         }
