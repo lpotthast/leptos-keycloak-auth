@@ -2,7 +2,17 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use leptonic::{atoms::button::LinkTarget, components::prelude::*};
+use leptonic::{
+    CapturedElement, IntoAttrs,
+    atoms::{
+        button::Button,
+        dialog::{Dialog, DialogDescription, DialogTitle},
+        link::Link,
+        modal::{ModalBackdrop, ModalContent},
+        separator::Separator,
+    },
+    hooks::landmark::{LandmarkRole, UseLandmarkInput, UseLandmarkReturn, use_landmark},
+};
 use leptos::prelude::*;
 use leptos_keycloak_auth::{
     components::{AuthProvider, DebugState, MaybeAuthenticated, WithAuth},
@@ -26,7 +36,33 @@ pub fn shell(options: LeptosOptions, keycloak_port: u16) -> impl IntoView {
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="keycloak-port" content=keycloak_port />
-                <link rel="preconnect" href="https://fonts.gstatic.com" />
+                // What the page reports, read by the browser tests' health checks (each list
+                // separately): Rust panics (the panic hook logs them with `console.error` before
+                // the wasm traps), uncaught errors and unhandled rejections, every other
+                // `console.error`, and `console.warn`.
+                <script>
+                    "window.__panics = [];
+                    window.__uncaughtErrors = [];
+                    window.__consoleErrors = [];
+                    window.__consoleWarnings = [];
+                    window.addEventListener('error', e => window.__uncaughtErrors.push(String(e.message)));
+                    window.addEventListener('unhandledrejection', e => window.__uncaughtErrors.push(String(e.reason)));
+                    const consoleError = console.error.bind(console);
+                    console.error = (...args) => {
+                        const message = args.map(String).join(' ');
+                        if (message.includes('panicked at')) {
+                            window.__panics.push(message);
+                        } else {
+                            window.__consoleErrors.push(message);
+                        }
+                        consoleError(...args);
+                    };
+                    const consoleWarn = console.warn.bind(console);
+                    console.warn = (...args) => {
+                        window.__consoleWarnings.push(args.map(String).join(' '));
+                        consoleWarn(...args);
+                    };"
+                </script>
                 <AutoReload options=options.clone() />
                 <HydrationScripts options />
                 <MetaTags />
@@ -38,10 +74,10 @@ pub fn shell(options: LeptosOptions, keycloak_port: u16) -> impl IntoView {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct KeycloakPort(u16);
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct KeycloakServerUrl(Url);
 
-impl KeycloakPort {
+impl KeycloakServerUrl {
     fn provide() {
         #[cfg(feature = "ssr")]
         let keycloak_port = {
@@ -70,11 +106,13 @@ impl KeycloakPort {
                 .parse::<u16>()
                 .expect("keycloak-port should be a valid number")
         };
-        provide_context(KeycloakPort(keycloak_port));
+        let keycloak_server_url = Url::parse(&format!("http://localhost:{keycloak_port}"))
+            .expect("valid keycloak server url");
+        provide_context(KeycloakServerUrl(keycloak_server_url));
     }
 
     fn get() -> Self {
-        expect_context::<KeycloakPort>()
+        expect_context::<KeycloakServerUrl>()
     }
 }
 
@@ -82,37 +120,18 @@ impl KeycloakPort {
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
-    KeycloakPort::provide();
+    KeycloakServerUrl::provide();
 
     view! {
-        <Meta name="charset" content="UTF-8" />
-        <Meta name="description" content="Leptonic SSR template" />
-        <Meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <Meta name="theme-color" content="#8856e6" />
+        <Meta name="description" content="leptos-keycloak-auth test-frontend" />
 
         <Stylesheet id="leptos" href="/pkg/frontend.css" />
-        <Stylesheet href="https://fonts.googleapis.com/css?family=Roboto&display=swap" />
 
-        <Title text="Leptonic SSR template" />
+        <Title text="leptos-keycloak-auth test-frontend" />
 
-        <Root default_theme=LeptonicTheme::default()>
-            <main style=r"
-            height: 100%;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1em;
-            background-color: antiquewhite;
-            overflow: auto;
-            ">
-                <Router>
-                    <Init>
-                        {routes::route_tree()}
-                    </Init>
-                </Router>
-            </main>
-        </Root>
+        <Router>
+            <Init>{routes::route_tree()}</Init>
+        </Router>
     }
 }
 
@@ -124,8 +143,7 @@ pub fn Init(children: Children) -> impl IntoView {
 
     view! {
         <AuthProvider
-            keycloak_server_url=Url::parse(&format!("http://localhost:{}", KeycloakPort::get().0))
-                .expect("valid keycloak server url")
+            keycloak_server_url=KeycloakServerUrl::get().0
             realm="test-realm"
             client="test-client"
         >
@@ -133,47 +151,92 @@ pub fn Init(children: Children) -> impl IntoView {
 
             <WithAuth render=move |auth| {
                 view! {
-                    <Modal show_when=auth.suspicious_logout>
-                        <ModalHeader attr:id="suspicious-logout-detected">
-                            <ModalTitle>"Suspicious Logout Detected"</ModalTitle>
-                        </ModalHeader>
-                        <ModalBody>"We could not verify that you were logged out by us."</ModalBody>
-                        <ModalFooter>
-                            <ButtonWrapper>
-                                <Button
-                                    attr:id="dismiss"
-                                    on_press=move |_| {
-                                        auth.dismiss_suspicious_logout_warning.run(());
-                                    }
-                                    color=ButtonColor::Primary
-                                >
-                                    "Dismiss"
-                                </Button>
-                            </ButtonWrapper>
-                        </ModalFooter>
-                    </Modal>
+                    <ModalBackdrop
+                        is_open=auth.suspicious_logout
+                        set_open=move |open: bool| {
+                            if !open {
+                                auth.dismiss_suspicious_logout_warning.run(());
+                            }
+                        }
+                    >
+                        <ModalContent>
+                            <Dialog>
+                                <DialogTitle attr:id="suspicious-logout-detected">
+                                    "Suspicious Logout Detected"
+                                </DialogTitle>
+                                <DialogDescription>
+                                    "We could not verify that you were logged out by us."
+                                </DialogDescription>
+                                <div class="actions">
+                                    <Button
+                                        id="dismiss"
+                                        on_press=move |_| {
+                                            auth.dismiss_suspicious_logout_warning.run(());
+                                        }
+                                        attr:data-variant="primary"
+                                    >
+                                        "Dismiss"
+                                    </Button>
+                                </div>
+                            </Dialog>
+                        </ModalContent>
+                    </ModalBackdrop>
                 }
             } />
         </AuthProvider>
     }
 }
 
+/// A landmark of `role`, named `label`, around `children`. F6 and Shift+F6 move the focus
+/// between landmarks.
+#[component]
+fn Landmark(
+    role: LandmarkRole,
+    #[prop(into)] label: String,
+    #[prop(into, optional)] class: String,
+    children: Children,
+) -> impl IntoView {
+    let element = CapturedElement::new();
+    let UseLandmarkReturn { props } = use_landmark(UseLandmarkInput {
+        element,
+        role,
+        aria_label: Some(label).into(),
+        aria_labelledby: None,
+        focus: None,
+    });
+    view! {
+        <div {..props.into_attrs()} {..element.attr()} class=class>
+            {children()}
+        </div>
+    }
+}
+
 #[component]
 pub fn MainLayout() -> impl IntoView {
-    let keycloak_port = expect_context::<KeycloakPort>();
+    let keycloak_server_url = KeycloakServerUrl::get().0;
 
     view! {
-        <h2>"leptos-keycloak-auth - test-frontend"</h2>
+        <div class="page">
+            <Landmark role=LandmarkRole::Banner label="Header">
+                <h2>"leptos-keycloak-auth - test-frontend"</h2>
+                <div class="muted">
+                    "Keycloak: "
+                    <span id="keycloak-server-url">{keycloak_server_url.to_string()}</span>
+                </div>
+            </Landmark>
 
-        <div>"Keycloak port: " <span id="keycloak-port">{keycloak_port.0}</span></div>
+            <Separator />
 
-        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;" />
+            <Landmark role=LandmarkRole::Main label="Content" class="content">
+                <Outlet />
+            </Landmark>
 
-        <Outlet />
+            <Separator />
 
-        <div style="width: 100%; min-height: 1px; background-color:black; margin-top: 1em;" />
-
-        <DebugState attr:style="font-size: 0.6em;" />
+            <Landmark role=LandmarkRole::Region label="Debug state" class="debug-state">
+                <DebugState />
+            </Landmark>
+        </div>
     }
 }
 
@@ -190,9 +253,11 @@ pub fn Home() -> impl IntoView {
             />
         </p>
 
-        <LinkButton attr:id="to-my-account" href=routes::MyAccount.materialize()>
-            "My Account"
-        </LinkButton>
+        <div class="actions">
+            <Link href=routes::MyAccount.materialize() attr:id="to-my-account" classes="button">
+                "My Account"
+            </Link>
+        </div>
     }
 }
 
@@ -224,22 +289,19 @@ pub fn MyAccountPage() -> impl IntoView {
     let user_name = Signal::derive(move || authenticated.id_token_claims.read().name.clone());
     let logout_url = Signal::derive(move || auth.logout_url.get().map(|url| url.to_string()));
     let logout_url_unavailable = Signal::derive(move || logout_url.get().is_none());
+    // The logout URL without its `state` parameter, the CSRF token proving that we started the
+    // logout.
     let malicious_logout_url = Signal::derive(move || {
-        logout_url.get().map(|real| {
-            let mut parsed = real.parse::<Url>().expect("valid url");
-            let query_without_csrf_token = parsed
+        auth.logout_url.get().map(|mut url| {
+            let query_without_csrf_token = url
                 .query_pairs()
-                .filter(|(k, _v)| k != "state")
-                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .filter(|(key, _value)| key != "state")
+                .map(|(key, value)| (key.into_owned(), value.into_owned()))
                 .collect::<Vec<_>>();
-            {
-                let mut query_mut = parsed.query_pairs_mut();
-                query_mut.clear();
-                for (k, v) in query_without_csrf_token {
-                    query_mut.append_pair(&k, &v);
-                }
-            }
-            parsed.to_string()
+            url.query_pairs_mut()
+                .clear()
+                .extend_pairs(query_without_csrf_token);
+            url.to_string()
         })
     });
 
@@ -278,37 +340,48 @@ pub fn MyAccountPage() -> impl IntoView {
             }}
         </Suspense>
 
-        <LinkButton
-            attr:id="logout"
-            href=move || logout_url.get().unwrap_or_default()
-            disabled=logout_url_unavailable
-        >
-            "Logout"
-        </LinkButton>
+        <div class="actions">
+            <Link
+                href=move || logout_url.get().unwrap_or_default()
+                is_disabled=logout_url_unavailable
+                attr:id="logout"
+                classes="button"
+            >
+                "Logout"
+            </Link>
 
-        <Button attr:id="programmatic-logout" on_press=move |_| auth.end_session()>
-            "Programmatic Logout"
-        </Button>
+            <Button id="programmatic-logout" on_press=move |_| auth.end_session()>
+                "Programmatic Logout"
+            </Button>
 
-        <Button attr:id="forget-auth-state" on_press=move |_| auth.forget_session()>
-            "Forget auth state"
-        </Button>
+            <Button id="forget-auth-state" on_press=move |_| auth.forget_session()>
+                "Forget auth state"
+            </Button>
 
-        <LinkButton
-            attr:id="force-malicious-logout"
-            href=move || malicious_logout_url.get().unwrap_or_default()
-            disabled=logout_url_unavailable
-        >
-            "Force malicious logout"
-        </LinkButton>
+            <Link
+                href=move || malicious_logout_url.get().unwrap_or_default()
+                is_disabled=logout_url_unavailable
+                attr:id="force-malicious-logout"
+                classes="button"
+                attr:data-variant="danger"
+            >
+                "Force malicious logout"
+            </Link>
+        </div>
 
-        <LinkButton
-            attr:id="back-to-root"
-            href=routes::Root.materialize()
-            attr:style="margin-top: 3em;"
-        >
-            "Back to root"
-        </LinkButton>
+        <BackToRoot />
+    }
+}
+
+/// A link back to the root page.
+#[component]
+fn BackToRoot() -> impl IntoView {
+    view! {
+        <div class="actions back-to-root">
+            <Link href=routes::Root.materialize() attr:id="back-to-root" classes="button">
+                "Back to root"
+            </Link>
+        </div>
     }
 }
 
@@ -317,15 +390,11 @@ pub fn Login() -> impl IntoView {
     view! {
         <h1 id="unauthenticated">"Unauthenticated"</h1>
 
-        <LoginButton />
+        <div class="actions">
+            <LoginButton />
+        </div>
 
-        <LinkButton
-            attr:id="back-to-root"
-            href=routes::Root.materialize()
-            attr:style="margin-top: 3em;"
-        >
-            "Back to root"
-        </LinkButton>
+        <BackToRoot />
     }
 }
 
@@ -343,12 +412,13 @@ pub fn LoginButton() -> impl IntoView {
     });
 
     view! {
-        <LinkButton
+        <Link
             href=move || login_url.get()
-            target=LinkTarget::_Self
-            disabled=login_url_unavailable
+            is_disabled=login_url_unavailable
+            classes="button"
+            attr:data-variant="primary"
         >
             "Log in"
-        </LinkButton>
+        </Link>
     }
 }

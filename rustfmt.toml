@@ -1,0 +1,3 @@
+# Unstable options. They require formatting with nightly rustfmt (`just fmt`).
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"

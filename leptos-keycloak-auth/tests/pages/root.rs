@@ -1,49 +1,46 @@
-use assertr::{assert_that, prelude::*};
-use thirtyfour::{By, WebDriver};
+use assertr::{matchers::eq, prelude::*};
+use url::Url;
 
-use crate::pages::BaseActions;
+use crate::pages::Page;
 
 pub struct Root<'d> {
-    pub driver: &'d WebDriver,
-}
-
-impl BaseActions for Root<'_> {
-    fn driver(&self) -> &WebDriver {
-        self.driver
-    }
+    pub page: Page<'d>,
 }
 
 impl Root<'_> {
-    pub async fn goto(&self) -> anyhow::Result<()> {
-        tracing::info!("Navigating to frontend...");
-        self.driver.goto("http://127.0.0.1:3000").await?;
-        Ok(())
+    pub async fn goto(&self) {
+        self.page.goto_path("/").await;
     }
 
-    pub async fn wait_for_navigation(&self) -> anyhow::Result<()> {
-        tracing::info!("Wait for redirect to 'Root' page.");
-        assert_that(self.driver.current_url().await?.as_str())
-            .starts_with("http://127.0.0.1:3000/");
-        Ok(())
+    pub async fn wait_for_navigation(&self) {
+        let expected = Url::parse(&self.page.url("/")).expect("Parsing the root URL");
+        self.page.wait_for_url(eq(expected)).await;
+        self.page.wait_for_hydration().await;
     }
 
-    pub async fn read_keycloak_port(&self) -> anyhow::Result<u16> {
-        tracing::info!("Read keycloak port from frontend.");
-        let keycloak_port_div = self.driver.find(By::Id("keycloak-port")).await?;
-        let keycloak_port = keycloak_port_div.text().await?;
-        let keycloak_port = keycloak_port.trim().parse::<u16>()?;
-        Ok(keycloak_port)
+    pub async fn read_keycloak_server_url(&self) -> Url {
+        let keycloak_server_url = self
+            .page
+            .element_with_id("keycloak-server-url")
+            .await
+            .text()
+            .await
+            .expect("Reading the Keycloak server URL");
+        Url::parse(keycloak_server_url.trim()).expect("Parsing the Keycloak server URL")
     }
 
-    pub(crate) async fn check_not_logged_in(&self) -> anyhow::Result<()> {
-        let el = self.driver.find(By::Id("auth-state")).await?;
-        let text = el.text().await?;
-        assert_that(text).contains("You are not logged in.");
-        Ok(())
+    pub async fn expect_not_authenticated(&self) {
+        // The text settles once the app determined the auth state.
+        let auth_state = self.page.element_with_id("auth-state").await;
+        assert_that!(|| auth_state.text())
+            .with_subject_name("text of #auth-state")
+            .eventually_ok()
+            .giving_up_on_any_error()
+            .matches(eq("You are not logged in.".to_owned()))
+            .await;
     }
 
-    pub(crate) async fn click_on_my_account(&self) -> anyhow::Result<()> {
-        self.click_link_btn_with_title("My Account").await?;
-        Ok(())
+    pub async fn click_my_account(&self) {
+        self.page.click_link_btn_with_title("My Account").await;
     }
 }

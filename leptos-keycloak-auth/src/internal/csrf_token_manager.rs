@@ -27,7 +27,7 @@ pub struct CsrfTokenManager {
 impl CsrfTokenManager {
     /// Create a new CSRF manager.
     pub fn new() -> Self {
-        // We keep the logout_token, used for the logout source verification in session storage.
+        // We keep the logout_token, used for the logout source verification, in local storage.
         // We cannot keep it completely in-memory, as our logout flow includes
         // navigating away from our Leptos application to the Keycloak logout URL and then
         // being redirected back to our application, meaning that we do a full page reload!
@@ -40,9 +40,10 @@ impl CsrfTokenManager {
             remove: _remove_logout_token_from_storage,
             ..
         } = use_storage_with_options_and_error_handler::<CsrfToken, JsonSerdeCodec>(
-            // Forcing session storage, because this data point must be as secure as possible,
-            // and we do not care that we may lose the code from a page-refresh or tab-close.
-            StorageType::Session,
+            // Local storage, not session storage: A logout regenerates the logout token only in
+            // the tab receiving the logout callback. Other tabs must see the new value as well,
+            // instead of reusing the old one for their next logout.
+            StorageType::Local,
             "leptos_keycloak_auth__logout_token",
             move || {
                 tracing::trace!("Create initial logout csrf token");
@@ -116,7 +117,7 @@ impl Default for CsrfTokenManager {
 
 #[cfg(test)]
 mod tests {
-    use assertr::{assert_that, prelude::*};
+    use assertr::prelude::*;
 
     use super::*;
 
@@ -132,8 +133,8 @@ mod tests {
     #[test]
     fn validate_correct_logout_token() {
         let manager = cut();
-        assert_that(
-            manager.validate_logout_token(Some(manager.logout_token().get_untracked().as_str())),
+        assert_that!(
+            manager.validate_logout_token(Some(manager.logout_token().get_untracked().as_str()))
         )
         .is_true();
     }
@@ -141,24 +142,24 @@ mod tests {
     #[test]
     fn validate_no_logout_token() {
         let manager = cut();
-        assert_that(manager.validate_logout_token(None)).is_false();
+        assert_that!(manager.validate_logout_token(None)).is_false();
     }
 
     #[test]
     fn validate_unknown_logout_token() {
         let manager = cut();
-        assert_that(manager.validate_logout_token(Some("some_unknown_token"))).is_false();
+        assert_that!(manager.validate_logout_token(Some("some_unknown_token"))).is_false();
     }
 
     #[test]
     fn regenerate_creates_new_logout_token() {
         let manager = cut();
         let initial_token = manager.logout_token().get_untracked();
-        assert_that(manager.validate_logout_token(Some(initial_token.as_str()))).is_true();
+        assert_that!(manager.validate_logout_token(Some(initial_token.as_str()))).is_true();
         manager.regenerate();
         let new_token = manager.logout_token().get_untracked();
-        assert_that(manager.validate_logout_token(Some(initial_token.as_str()))).is_false();
-        assert_that(manager.validate_logout_token(Some(new_token.as_str()))).is_true();
-        assert_that(initial_token.as_str()).is_not_equal_to(new_token.as_str());
+        assert_that!(manager.validate_logout_token(Some(initial_token.as_str()))).is_false();
+        assert_that!(manager.validate_logout_token(Some(new_token.as_str()))).is_true();
+        assert_that!(initial_token.as_str()).is_not_equal_to(new_token.as_str());
     }
 }

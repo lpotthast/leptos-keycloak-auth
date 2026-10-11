@@ -9,7 +9,7 @@ use crate::{
 
 /// Manages PKCE code verifiers and challenges for secure authorization flows.
 ///
-/// Code verifiers are stored in session storage because the authorization flow involves
+/// Code verifiers are stored in local storage because the authorization flow involves
 /// navigating away from the application to Keycloak's login page and then being redirected
 /// back, which causes a full page reload.
 ///
@@ -38,7 +38,7 @@ impl CodeVerifierManager {
 
     #[cfg(not(feature = "ssr"))]
     pub(crate) fn new() -> Self {
-        // We keep the code_verifier, used for the code-to-token-exchange in session storage.
+        // We keep the code_verifier, used for the code-to-token-exchange, in local storage.
         // We cannot keep the code_verifier completely in-memory, as our authorization flow includes
         // navigating away from our Leptos application to the auth-providers login page and then
         // being redirected back to our application, meaning that we do a full reload!
@@ -52,9 +52,10 @@ impl CodeVerifierManager {
             remove: _remove_code_verifier_from_storage,
             ..
         } = use_storage_with_options_and_error_handler::<CodeVerifier<128>, JsonSerdeCodec>(
-            // Forcing session storage, because this data point must be as secure as possible,
-            // and we do not care that we may lose the code from a page-refresh or tab-close.
-            StorageType::Session,
+            // Local storage, not session storage: A logout regenerates the code verifier only in
+            // the tab receiving the logout callback. Other tabs must see the new value as well,
+            // instead of reusing the old one for their next login.
+            StorageType::Local,
             "leptos_keycloak_auth__code_verifier",
             move || CodeVerifier::<128>::generate(),
         );

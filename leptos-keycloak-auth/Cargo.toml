@@ -1,8 +1,8 @@
 [package]
 name = "leptos-keycloak-auth"
-version = "0.13.0"
+version = "0.14.0"
 edition = "2024"
-rust-version = "1.88.0"
+rust-version = "1.89.0"
 authors = ["Lukas Potthast <privat@lukas-potthast.de>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
@@ -13,42 +13,54 @@ keywords = ["leptos", "keycloak", "auth", "oidc", "oauth"]
 include = ["src/**/*", "LICENSE-*", "README.md"]
 
 [features]
+default = ["rustls"]
 ssr = []
 internals = []
 
+# TLS backend for requests from native (non-WASM) targets. Forwarded to `reqwest`, see the README.
+rustls = ["reqwest/rustls"]
+rustls-no-provider = ["reqwest/rustls-no-provider"]
+native-tls = ["reqwest/native-tls"]
+
 [dependencies]
-async-trait = { version = "0.1.89", default-features = false, features = [] }
-base64 = { version = "0.22.1", default-features = false, features = ["std"] }
+async-trait = { version = "0.1.92", default-features = false, features = [] }
+base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 codee = { version = "0.3.5", default-features = false, features = ["json_serde"] }
-http = { version = "1.4.0", default-features = false, features = [] }
-itertools = { version = "0.14.0", default-features = false, features = ["use_std"] }
-jsonwebtoken = { version = "10.3.0", default-features = false, features = ["rust_crypto"] }
-leptos = { version = "0.8.15", default-features = false, features = [] }
-leptos-use = { version = "0.18.0", default-features = false, features = ["use_interval", "storage"] }
-leptos_router = { version = "0.8.11", default-features = false, features = [] }
-rand = { version = "0.10.0", default-features = false, features = ["std", "std_rng", "thread_rng"] }
-reqwest = { version = "0.13.2", default-features = false, features = ["json", "charset", "rustls", "http2", "form"] }
-serde = { version = "1.0.228", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.149", default-features = false, features = ["std"] }
-sha2 = { version = "0.10.9", default-features = false, features = [] }
-snafu = { version = "0.8.9", default-features = false, features = ["std"] }
-time = { version = "0.3.47", default-features = false, features = ["wasm-bindgen", "serde", "std", "formatting", "parsing"] }
+futures = { version = "0.3.34", default-features = false, features = ["std"] }
+http = { version = "1.5.0", default-features = false, features = [] }
+itertools = { version = "0.15.0", default-features = false, features = ["use_std"] }
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto"] }
+leptos = { version = "0.8.22", default-features = false, features = [] }
+leptos-use = { version = "0.19.2", default-features = false, features = ["use_interval", "storage"] }
+leptos_router = { version = "0.8.17", default-features = false, features = [] }
+rand = { version = "0.10.3", default-features = false, features = ["std", "std_rng", "thread_rng"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "charset", "http2", "form"] }
+rootcause = { version = "0.13.0", default-features = false, features = [] }
+serde = { version = "1.0.229", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.152", default-features = false, features = ["std"] }
+sha2 = { version = "0.11.0", default-features = false, features = [] }
+thiserror = { version = "2.0.21", default-features = false, features = ["std"] }
+time = { version = "0.3.55", default-features = false, features = ["wasm-bindgen", "serde", "std", "formatting", "parsing"] }
 tracing = { version = "0.1.44", default-features = false, features = [] }
 url = { version = "2.5.8", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
-anyhow = { version = "1.0.101", default-features = false, features = [] }
-assertr = { version = "0.4.3", default-features = false, features = ["std"] }
-axum = { version = "0.8.8", default-features = false, features = ["tokio", "http1", "http2", "tracing", "json"] }
+assertr = { version = "0.8.0", default-features = false, features = ["std", "thirtyfour"] }
+axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "http2", "tracing", "json"] }
 axum-keycloak-auth = { version = "0.8.3", default-features = false, features = [] }
-chrome-for-testing-manager = { version = "0.6.0", default-features = false, features = ["thirtyfour"] }
-http = { version = "1.4.0", default-features = false, features = [] }
-keycloak = { git = "https://github.com/lpotthast/keycloak-rs", branch = "update-to-reqwest-0.13", default-features = false, features = ["tags-all"] }
-testcontainers = { version = "0.27.0", default-features = false, features = ["aws-lc-rs"] }
-thirtyfour = { version = "0.36.1", default-features = false, features = ["component", "reqwest", "rustls-tls"] }
-tokio = { version = "1.49.0", default-features = false, features = ["rt", "rt-multi-thread"] }
-tokio-process-tools = { version = "0.7.2", default-features = false, features = [] }
+browser-test = { version = "0.6.0", default-features = false, features = ["rustls"] }
+http = { version = "1.5.0", default-features = false, features = [] }
+keycloak = { version = "26.7.300", default-features = false, features = ["tags-all", "reqwest13"] }
+leptos-browser-test = { version = "0.4.0", default-features = false, features = [] }
+rootcause-backtrace = { version = "0.13.0", default-features = false, features = [] }
+rootcause-tracing = { version = "0.13.0", default-features = false, features = [] }
+testcontainers = { version = "0.28.0", default-features = false, features = ["aws-lc-rs"] }
+tokio = { version = "1.53.2", default-features = false, features = ["macros", "rt", "rt-multi-thread"] }
 tower = { version = "0.5.3", default-features = false, features = [] }
-tower-http = { version = "0.6.8", default-features = false, features = ["trace", "timeout", "sensitive-headers", "cors"] }
-tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt", "registry", "ansi"] }
-uuid = { version = "1.20.0", default-features = false, features = ["v7", "serde"] }
+tower-http = { version = "0.7.1", default-features = false, features = ["trace", "timeout", "cors"] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "registry", "ansi"] }
+uuid = { version = "1.28.0", default-features = false, features = ["v7", "serde"] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }

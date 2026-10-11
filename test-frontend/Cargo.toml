@@ -4,73 +4,23 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
-[package.metadata.leptonic]
-# REQUIRED: Leptonic's build-script will copy the Leptonic themes to this directory. Relative to your project root.
-style-dir = "style"
-
-# REQUIRED: Leptonic's build-script will copy static JS dependencies to this directory. Relative to your project root.
-# Leptonic's `<Root>` component expects JS files to be available at a "js" directory at runtime (for dynamic script includes). Specify a different prop value if you choose a non-stadard location here.
-js-dir = "public/js"
-
 [package.metadata.leptos]
-# The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
 output-name = "frontend"
-
-# The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site-root = "target/site"
-
-# The site-root relative folder where all compiled output (JS, WASM and CSS) is written
-# Defaults to pkg
 site-pkg-dir = "pkg"
-
-# [Optional] The source CSS file. If it ends with .sass or .scss then it will be compiled by dart-sass into CSS. The CSS is optimized by Lightning CSS before being written to <site-root>/<site-pkg>/app.css
 style-file = "style/main.scss"
-
-# Assets source dir. All files found here will be copied and synchronized to site-root.
-# The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
-#
-# Optional. Env: LEPTOS_ASSETS_DIR.
 assets-dir = "public"
-
-# The IP and port (ex: 127.0.0.1:3000) where the server serves the content. Use it in your server setup.
 site-addr = "127.0.0.1:3000"
-
-# The port to use for automatic reload monitoring
 reload-port = 3001
-
-# [Optional] Command to use when running end2end tests. It will run in the end2end dir.
-#   [Windows] for non-WSL use "npx.cmd playwright test"
-#   This binary name can be checked in Powershell with Get-Command npx
 end2end-cmd = "npx playwright test"
 end2end-dir = "end2end"
-
-#  The browserlist query used for optimizing the CSS.
 browserquery = "defaults"
-
-# The features to use when compiling the bin target
-#
-# Optional. Can be over-ridden with the command line parameter --bin-features
 bin-features = ["ssr"]
-
-# If the --no-default-features flag should be used when compiling the bin target
-#
-# Optional. Defaults to false.
 bin-default-features = false
-
-# The features to use when compiling the lib target
-#
-# Optional. Can be over-ridden with the command line parameter --lib-features
 lib-features = ["hydrate"]
-
-# If the --no-default-features flag should be used when compiling the lib target
-#
-# Optional. Defaults to false.
 lib-default-features = false
-
-# The profile to use for the lib target when compiling for release
-#
-# Optional. Defaults to "release".
 lib-profile-release = "wasm-release"
+bin-profile-release = "server-release"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -94,28 +44,28 @@ ssr = [
 ]
 
 [dependencies]
-axum = { version = "0.8.8", default-features = false, features = [], optional = true }
+axum = { version = "0.8.9", default-features = false, features = [], optional = true }
 axum-server = { version = "0.8.0", default-features = false, features = ["tls-rustls"], optional = true }
 console_error_panic_hook = { version = "0.1.7", default-features = false, features = [] }
 dotenv_codegen = { version = "0.15.0", default-features = false, features = [] }
 dotenvy = { version = "0.15.7", default-features = false, features = [] }
-indoc = { version = "2.0.7", default-features = false, features = [] }
-leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "migrate-to-leptos-0.8", default-features = false, features = ["atoms", "components", "themes"] }
-leptos = { version = "0.8.17", default-features = false, features = [] }
+indoc = { version = "2.0.8", default-features = false, features = [] }
+leptonic = { git = "https://github.com/lpotthast/leptonic", branch = "hooks", default-features = false, features = ["atoms"] }
+leptos = { version = "0.8.22", default-features = false, features = [] }
 leptos-keycloak-auth = { path = "../leptos-keycloak-auth", default-features = false, features = ["internals"] }
-leptos-routes = { version = "0.4.0", default-features = false, features = [] }
-leptos-use = { version = "0.18.3", default-features = false, features = [] }
-leptos_axum = { version = "0.8.8", default-features = false, features = ["default"], optional = true }
-leptos_meta = { version = "0.8.6", default-features = false, features = [] }
-leptos_router = { version = "0.8.12", default-features = false, features = [] }
-serde = { version = "1.0.228", default-features = false, features = [] }
-tokio = { version = "1.50.0", default-features = false, features = ["rt-multi-thread"], optional = true }
+leptos-routes = { version = "0.4.2", default-features = false, features = [] }
+leptos-use = { version = "0.19.2", default-features = false, features = [] }
+leptos_axum = { version = "0.8.10", default-features = false, features = ["default"], optional = true }
+leptos_meta = { version = "0.8.7", default-features = false, features = [] }
+leptos_router = { version = "0.8.17", default-features = false, features = [] }
+serde = { version = "1.0.229", default-features = false, features = [] }
+tokio = { version = "1.53.2", default-features = false, features = ["rt-multi-thread"], optional = true }
 tower = { version = "0.5.3", default-features = false, features = [], optional = true }
-tower-http = { version = "0.6.8", default-features = false, features = ["fs"], optional = true }
+tower-http = { version = "0.7.1", default-features = false, features = ["fs"], optional = true }
 tracing = { version = "0.1.44", default-features = false, features = [] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "registry", "ansi"], optional = true }
 tracing-wasm = { version = "0.2.1", default-features = false, features = [], optional = true }
-wasm-bindgen = { version = "0.2.114", default-features = false, features = [] }
+wasm-bindgen = { version = "0.2.129", default-features = false, features = [] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = ["js"] }
@@ -123,21 +73,34 @@ getrandom_03 = { package = "getrandom", version = "0.3", default-features = fals
 getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = ["wasm_js"] }
 js-sys = { version = "0.3", default-features = false, features = [] }
 
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+
+# Profiles as recommended by leptonic (its book's guide "Optimizing Compile Times & Binary Sizes").
+# The test-frontend is only built with `cargo leptos --release`, which selects them per target: see
+# `lib-profile-release` and `bin-profile-release` above. The server's profile builds on `dev`.
+
 [profile.dev]
-# Potential to opt-in on higher optimization for our code.
-# This may increase incremental compilation times, but will reduce binary size!
-opt-level = 0
+# Line tables keep panic locations and backtraces of our own code at a fraction of full debug info.
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
-# High optimization for our dependencies. This should increase wasm-filesize and performance drastically
-# whithout impacting our incremental compilation times.
-# It will lead to obscure error messages from third party libraries though. So comment this out when seeing lib errors.
-opt-level = 3
+# No debug info for dependencies: smaller target directories and faster links.
+# No `opt-level` here: profiles inheriting dev would inherit it, overriding their own for every dependency.
+debug = false
 
-# Defines a size-optimized profile for the WASM bundle in release mode
+# The wasm of release builds: size-optimized, but without LTO and with the default codegen units and incremental
+# compilation, so that rebuilds stay fast. For production-grade builds, additionally set
+# `CARGO_PROFILE_WASM_RELEASE_LTO=true` and `CARGO_PROFILE_WASM_RELEASE_CODEGEN_UNITS=1`.
 [profile.wasm-release]
 inherits = "release"
-opt-level = 'z'
-lto = true
-codegen-units = 1
-panic = "abort"
+opt-level = "z"
+incremental = true
+debug-assertions = true
+overflow-checks = true
+
+# The server of release builds: the dev profile, slightly optimized.
+[profile.server-release]
+inherits = "dev"
+opt-level = 1

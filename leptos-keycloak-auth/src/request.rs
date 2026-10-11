@@ -1,8 +1,9 @@
 use std::{collections::HashMap, time::Duration as StdDuration};
 
 use reqwest::IntoUrl;
+use rootcause::{Report, prelude::ResultExt};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use thiserror::Error;
 
 use crate::{
     DiscoveryEndpoint,
@@ -11,22 +12,32 @@ use crate::{
     token::TokenData,
 };
 
-#[derive(Debug, Snafu)]
+/// Error contexts of the HTTP requests sent to Keycloak.
+///
+/// The underlying `reqwest` error, if any, is a child report.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum RequestError {
-    #[snafu(display("RequestError: Could not send request"))]
-    Send { source: reqwest::Error },
+    /// The request could not be sent, or no response was received.
+    #[error("Failed to send the request.")]
+    Send,
 
-    #[snafu(display("RequestError: Could not decode payload"))]
-    Decode { source: reqwest::Error },
+    /// The response body could not be decoded.
+    #[error("Failed to decode the response.")]
+    Decode,
 
-    #[snafu(display("RequestError: Received an error response"))]
-    ErrResponse { error_response: ErrorResponse },
+    /// Keycloak responded with an OAuth error response.
+    #[error("Received an error response: {error_response}")]
+    ErrResponse {
+        /// The error Keycloak responded with.
+        error_response: ErrorResponse,
+    },
 }
 
 pub(crate) async fn retrieve_jwk_set(
     jwk_set_endpoint: impl IntoUrl,
     timeout: StdDuration,
-) -> Result<jsonwebtoken::jwk::JwkSet, RequestError> {
+) -> Result<jsonwebtoken::jwk::JwkSet, Report<RequestError>> {
     #[derive(Deserialize)]
     pub struct RawJwkSet {
         pub keys: Vec<serde_json::Value>,
@@ -38,10 +49,10 @@ pub(crate) async fn retrieve_jwk_set(
         .timeout(timeout)
         .send()
         .await
-        .context(SendSnafu {})?
+        .context(RequestError::Send)?
         .json::<RawJwkSet>()
         .await
-        .context(DecodeSnafu {})?;
+        .context(RequestError::Decode)?;
     let mut set = jsonwebtoken::jwk::JwkSet { keys: Vec::new() };
     for key in raw_set.keys {
         match serde_json::from_value::<jsonwebtoken::jwk::Jwk>(key) {
@@ -55,7 +66,7 @@ pub(crate) async fn retrieve_jwk_set(
 pub(crate) async fn retrieve_oidc_config(
     discovery_endpoint: impl IntoUrl,
     timeout: StdDuration,
-) -> Result<OidcConfig, RequestError> {
+) -> Result<OidcConfig, Report<RequestError>> {
     reqwest::Client::builder()
         .build()
         .expect("reqwest::Client builder should not fail")
@@ -63,10 +74,10 @@ pub(crate) async fn retrieve_oidc_config(
         .timeout(timeout)
         .send()
         .await
-        .context(SendSnafu {})?
+        .context(RequestError::Send)?
         .json::<OidcConfig>()
         .await
-        .context(DecodeSnafu {})
+        .context(RequestError::Decode)
 }
 
 /// The grant type used to request token data.
@@ -101,7 +112,7 @@ pub(crate) async fn exchange_code_for_token(
     session_state: Option<&str>,
     discovery_endpoint: DiscoveryEndpoint,
     timeout: StdDuration,
-) -> Result<TokenData, RequestError> {
+) -> Result<TokenData, Report<RequestError>> {
     let mut params: HashMap<&str, &str> = HashMap::new();
     params.insert("grant_type", GrantType::AuthorizationCode.as_str());
     params.insert("client_id", client_id);
@@ -131,7 +142,7 @@ pub(crate) async fn refresh_token(
     refresh_token: &str,
     discovery_endpoint: DiscoveryEndpoint,
     timeout: StdDuration,
-) -> Result<TokenData, RequestError> {
+) -> Result<TokenData, Report<RequestError>> {
     let params = [
         ("grant_type", GrantType::RefreshToken.as_str()),
         ("client_id", client_id),
@@ -153,7 +164,7 @@ async fn request_token<T: Serialize + ?Sized>(
     grant_type: GrantType,
     discovery_endpoint: DiscoveryEndpoint,
     timeout: StdDuration,
-) -> Result<TokenData, RequestError> {
+) -> Result<TokenData, Report<RequestError>> {
     match reqwest::Client::builder()
         .build()
         .expect("reqwest::Client builder should not fail")
@@ -162,19 +173,18 @@ async fn request_token<T: Serialize + ?Sized>(
         .timeout(timeout)
         .send()
         .await
-        .context(SendSnafu {})?
+        .context(RequestError::Send)?
         .json::<TokenResponse>()
         .await
-        .context(DecodeSnafu {})?
+        .context(RequestError::Decode)?
     {
         TokenResponse::Success(success_token_response) => Ok(TokenData::from_token_response(
             success_token_response,
             grant_type,
             discovery_endpoint,
         )),
-        TokenResponse::Error(error) => Err(ErrResponseSnafu {
-            error_response: error,
+        TokenResponse::Error(error_response) => {
+            Err(Report::new(RequestError::ErrResponse { error_response }))
         }
-        .build()),
     }
 }

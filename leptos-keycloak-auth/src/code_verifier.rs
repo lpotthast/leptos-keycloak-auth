@@ -151,20 +151,20 @@ mod test {
     #[test]
     fn test_43() {
         let verifier = CodeVerifier::<43>::generate();
-        assert_that(verifier.code_verifier()).has_length(43);
+        assert_that!(verifier.code_verifier()).has_length(43);
 
         let challenge = verifier.to_code_challenge();
-        assert_that(challenge.code_challenge_method()).is_equal_to(CodeChallengeMethod::S256);
-        assert_that(challenge.code_challenge()).has_length(43);
+        assert_that!(challenge.code_challenge_method()).is_equal_to(CodeChallengeMethod::S256);
+        assert_that!(challenge.code_challenge()).has_length(43);
     }
 
     #[test]
     fn test_128() {
         let verifier = CodeVerifier::<128>::generate();
-        assert_that(verifier.code_verifier()).has_length(128);
+        assert_that!(verifier.code_verifier()).has_length(128);
 
         let challenge = verifier.to_code_challenge();
-        assert_that(challenge.code_challenge_method()).is_equal_to(CodeChallengeMethod::S256);
-        assert_that(challenge.code_challenge()).has_length(43);
+        assert_that!(challenge.code_challenge_method()).is_equal_to(CodeChallengeMethod::S256);
+        assert_that!(challenge.code_challenge()).has_length(43);
     }
 }

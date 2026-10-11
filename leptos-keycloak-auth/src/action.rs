@@ -1,6 +1,7 @@
 use std::time::Duration as StdDuration;
 
 use leptos::prelude::*;
+use rootcause::Report;
 use time::OffsetDateTime;
 
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
     TokenEndpoint,
     code_verifier::CodeVerifier,
     config::Options,
+    error::KeycloakAuthError,
     internal::{JwkSetWithTimestamp, OidcConfigWithTimestamp, token_manager::SessionVersion},
     request::{self, RequestError},
     token::TokenData,
@@ -15,7 +17,7 @@ use crate::{
 
 pub(crate) fn create_retrieve_oidc_config_action(
     set_oidc_config_wt: Callback<Option<OidcConfigWithTimestamp>>,
-    set_req_error: Callback<Option<RequestError>>,
+    handle_error: Callback<Report<KeycloakAuthError>>,
     timeout: StdDuration,
 ) -> Action<(DiscoveryEndpoint,), ()> {
     Action::new(move |(discovery_endpoint,): &(DiscoveryEndpoint,)| {
@@ -33,8 +35,10 @@ pub(crate) fn create_retrieve_oidc_config_action(
                         }));
                     }
                     Err(err) => {
+                        let err = err
+                            .context(KeycloakAuthError::RetrieveOidcConfig { discovery_endpoint });
                         tracing::error!(?err, "Could not retrieve OIDC config through discovery.");
-                        set_req_error.run(Some(err));
+                        handle_error.run(err);
                     }
                 }
             });
@@ -44,7 +48,7 @@ pub(crate) fn create_retrieve_oidc_config_action(
 
 pub(crate) fn create_retrieve_jwk_set_action(
     set_jwk_set_wt: Callback<Option<JwkSetWithTimestamp>>,
-    set_req_error: Callback<Option<RequestError>>,
+    handle_error: Callback<Report<KeycloakAuthError>>,
     timeout: StdDuration,
 ) -> Action<(JwkSetEndpoint, DiscoveryEndpoint), ()> {
     Action::new(
@@ -53,7 +57,7 @@ pub(crate) fn create_retrieve_jwk_set_action(
             let discovery_endpoint = discovery_endpoint.clone();
             async move {
                 leptos::task::spawn_local(async move {
-                    let result = request::retrieve_jwk_set(jwk_set_endpoint, timeout).await;
+                    let result = request::retrieve_jwk_set(jwk_set_endpoint.clone(), timeout).await;
                     match result {
                         Ok(jwk_set) => {
                             set_jwk_set_wt.run(Some(JwkSetWithTimestamp {
@@ -63,8 +67,10 @@ pub(crate) fn create_retrieve_jwk_set_action(
                             }));
                         }
                         Err(err) => {
+                            let err =
+                                err.context(KeycloakAuthError::RetrieveJwkSet { jwk_set_endpoint });
                             tracing::error!(?err, "Could not retrieve JWK set.");
-                            set_req_error.run(Some(err));
+                            handle_error.run(err);
                         }
                     }
                 });
@@ -84,7 +90,7 @@ pub struct ExchangeCodeForTokenInput {
 pub(crate) fn create_exchange_code_for_token_action(
     options: StoredValue<Options>,
     set_token: Callback<Option<TokenData>>,
-    set_req_error: Callback<Option<RequestError>>,
+    handle_error: Callback<Report<KeycloakAuthError>>,
 ) -> Action<ExchangeCodeForTokenInput, ()> {
     Action::new(move |input: &ExchangeCodeForTokenInput| {
         let token_endpoint = input.token_endpoint.clone();
@@ -98,7 +104,7 @@ pub(crate) fn create_exchange_code_for_token_action(
         async move {
             leptos::task::spawn_local(async move {
                 let result = request::exchange_code_for_token(
-                    token_endpoint,
+                    token_endpoint.clone(),
                     &client_id,
                     redirect_uri.read_untracked().as_ref(),
                     &auth_code,
@@ -113,7 +119,9 @@ pub(crate) fn create_exchange_code_for_token_action(
                         set_token.run(Some(token));
                     }
                     Err(err) => {
-                        set_req_error.run(Some(err));
+                        handle_error.run(
+                            err.context(KeycloakAuthError::ExchangeCodeForToken { token_endpoint }),
+                        );
                     }
                 }
                 finally.run(());
@@ -134,7 +142,7 @@ pub(crate) async fn refresh_token_with_session_check(
     timeout: StdDuration,
     expected_session_version: SessionVersion,
     session_version: Signal<SessionVersion>,
-) -> Option<Result<TokenData, RequestError>> {
+) -> Option<Result<TokenData, Report<RequestError>>> {
     let response = request::refresh_token(
         token_endpoint,
         client_id,
@@ -171,13 +179,13 @@ pub(crate) async fn refresh_token_with_session_check(
 pub(crate) fn create_refresh_token_action(
     options: StoredValue<Options>,
     on_success: Callback<Option<TokenData>>,
-    on_error: Callback<Option<RequestError>>,
+    on_error: Callback<Report<KeycloakAuthError>>,
     session_version: Signal<SessionVersion>,
 ) -> Action<
     (
         TokenEndpoint,
         RefreshToken,
-        Callback<RequestError, RequestError>,
+        Callback<Report<RequestError>, Report<RequestError>>,
     ),
     (),
 > {
@@ -185,7 +193,7 @@ pub(crate) fn create_refresh_token_action(
         move |(token_endpoint, refresh_token, on_refresh_error): &(
             TokenEndpoint,
             RefreshToken,
-            Callback<RequestError, RequestError>,
+            Callback<Report<RequestError>, Report<RequestError>>,
         )| {
             let token_endpoint = token_endpoint.clone();
             let client_id = options.read_value().client_id.clone();
@@ -199,7 +207,7 @@ pub(crate) fn create_refresh_token_action(
             async move {
                 leptos::task::spawn_local(async move {
                     match refresh_token_with_session_check(
-                        token_endpoint,
+                        token_endpoint.clone(),
                         &client_id,
                         &refresh_token,
                         options.read_value().discovery_endpoint(),
@@ -214,7 +222,9 @@ pub(crate) fn create_refresh_token_action(
                         }
                         Some(Err(err)) => {
                             if let Some(err) = on_refresh_error.try_run(err) {
-                                on_error.try_run(Some(err));
+                                on_error.try_run(
+                                    err.context(KeycloakAuthError::RefreshToken { token_endpoint }),
+                                );
                             }
                         }
                         None => { /* stale, already logged */ }

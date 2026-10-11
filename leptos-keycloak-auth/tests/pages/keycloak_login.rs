@@ -1,55 +1,48 @@
-use assertr::prelude::*;
-use thirtyfour::{By, WebDriver};
+use std::collections::HashMap;
 
-use crate::pages::BaseActions;
+use assertr::{matchers::string::StartsWith, prelude::*};
+use url::Url;
 
-pub(crate) struct KeycloakLogin<'d> {
-    pub driver: &'d WebDriver,
+use crate::{
+    CLIENT_ID, REALM,
+    pages::{Page, my_account},
+};
 
-    pub keycloak_port: u16,
-}
-
-impl BaseActions for KeycloakLogin<'_> {
-    fn driver(&self) -> &WebDriver {
-        self.driver
-    }
+pub struct KeycloakLogin<'d> {
+    pub page: Page<'d>,
+    pub keycloak_server_url: Url,
 }
 
 impl KeycloakLogin<'_> {
-    pub async fn wait_for_navigation(&self) -> anyhow::Result<()> {
-        let expected_url = format!(
-            "http://localhost:{}/realms/test-realm/protocol/openid-connect/auth",
-            self.keycloak_port
-        );
-        tracing::info!("Wait for navigation to: {expected_url}");
-        let current_url = self.driver.current_url().await?.as_str().to_owned();
-        assert_that(current_url)
-            .starts_with(expected_url)
-            .contains("?response_type=code")
-            .contains("&code_challenge=")
-            .contains("&code_challenge_method=S256")
-            .contains("&client_id=test-client")
-            .contains("&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fmy-account")
-            .contains("&scope=openid");
-        Ok(())
+    /// Wait for the navigation to Keycloak's login page, expecting the parameters of an
+    /// authorization code flow with PKCE, redirecting back to the 'My Account' page.
+    pub async fn wait_for_navigation(&self) {
+        let auth_endpoint = self
+            .keycloak_server_url
+            .join(&format!("realms/{REALM}/protocol/openid-connect/auth"))
+            .expect("Joining the Keycloak auth endpoint URL");
+        let url = self
+            .page
+            .wait_for_url(StartsWith::new(auth_endpoint.as_str()))
+            .await;
+
+        let query: HashMap<String, String> = url.query_pairs().into_owned().collect();
+        assert_that!(query)
+            .contains_entry("response_type", "code")
+            .contains_key("code_challenge")
+            .contains_entry("code_challenge_method", "S256")
+            .contains_entry("client_id", CLIENT_ID)
+            .contains_entry("redirect_uri", self.page.url(my_account::PATH))
+            .contains_entry("scope", "openid");
     }
 
-    pub async fn enter_username(&self, username: &str) -> anyhow::Result<()> {
-        tracing::info!("Enter username.");
-        let username_input = self.driver.find(By::Id("username")).await?;
-        username_input.send_keys(username).await?;
-        Ok(())
-    }
-
-    pub async fn enter_password(&self, password: &str) -> anyhow::Result<()> {
-        tracing::info!("Enter username.");
-        let username_input = self.driver.find(By::Id("password")).await?;
-        username_input.send_keys(password).await?;
-        Ok(())
-    }
-
-    pub async fn click_sign_in(&self) -> anyhow::Result<()> {
-        self.click_element_with_id("kc-login").await?;
-        Ok(())
+    pub async fn sign_in(&self, username: &str, password: &str) {
+        self.page
+            .type_into_element_with_id("username", username)
+            .await;
+        self.page
+            .type_into_element_with_id("password", password)
+            .await;
+        self.page.click_element_with_id("kc-login").await;
     }
 }

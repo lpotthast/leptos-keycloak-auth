@@ -137,33 +137,37 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         NavigateOptions,
         hooks::{use_navigate, use_query},
     };
+    use rootcause::{Report, markers::Cloneable};
     use time::OffsetDateTime;
 
     use crate::{
         Authenticated, KeycloakAuth, KeycloakAuthState, NotAuthenticated,
         config::Options,
         error::KeycloakAuthError,
-        internal::{derived_urls::DerivedUrls, token_manager::OnRefreshError},
+        internal::derived_urls::DerivedUrls,
         login, logout,
-        request::RequestError,
         response::CallbackResponse,
         state::RefreshContext,
         token_claims::KeycloakIdTokenClaims,
         token_validation,
-        token_validation::IdTokenClaimsError,
+        token_validation::{IdTokenClaimsError, JwtValidationError},
     };
+
+    /// A JWK set younger than this is not refetched when a token references an unknown key.
+    /// Prevents refetching in a loop when a token keeps referencing a key unknown to Keycloak.
+    const MIN_JWK_SET_AGE_FOR_REFETCH: time::Duration = time::Duration::seconds(10);
 
     let options = Options::new(options);
     let options = StoredValue::new(options);
 
     let hydration_manager = internal::hydration_manager::HydrationManager::new();
 
-    let (auth_error, set_auth_error) = signal::<Option<KeycloakAuthError>>(None);
-    let handle_req_error = Callback::new(move |request_error: Option<RequestError>| {
-        set_auth_error.set(request_error.map(|err| KeycloakAuthError::Request { source: err }));
+    let (auth_error, set_auth_error) = signal::<Option<Report<KeycloakAuthError, Cloneable>>>(None);
+    let handle_error = Callback::new(move |err: Report<KeycloakAuthError>| {
+        set_auth_error.set(Some(err.into_cloneable()));
     });
 
-    let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(options, handle_req_error);
+    let oidc_mgr = internal::oidc_config_manager::OidcConfigManager::new(options, handle_error);
 
     let derived_urls = oidc_mgr.derive_urls();
     let DerivedUrls {
@@ -174,10 +178,10 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     } = derived_urls;
 
     let jwk_set_mgr =
-        internal::jwk_set_manager::JwkSetManager::new(options, jwks_endpoint, handle_req_error);
+        internal::jwk_set_manager::JwkSetManager::new(options, jwks_endpoint, handle_error);
 
     let token_mgr =
-        internal::token_manager::TokenManager::new(options, handle_req_error, token_endpoint);
+        internal::token_manager::TokenManager::new(options, handle_error, token_endpoint);
 
     let code_mgr = internal::code_verifier_manager::CodeVerifierManager::new();
 
@@ -201,11 +205,37 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
         dismiss_suspicious_logout_warning.run(());
     });
 
+    // Keycloak only ever redirects login responses (successful or not) to the
+    // `post_login_redirect_url`. `code` or `error` query parameters on any other path belong to the
+    // application and must not be interpreted by us.
+    let is_at_post_login_redirect_path = move || {
+        let expected_path = options
+            .read_value()
+            .post_login_redirect_url
+            .read_untracked()
+            .path()
+            .to_owned();
+        window()
+            .location()
+            .pathname()
+            .is_ok_and(|current_path| current_path == expected_path)
+    };
+
     // Handle changes in our url parameters.
     // THIS EFFECT MAINLY DRIVES THIS SYSTEM!
     Effect::new(move |_| {
         match url_state.get() {
             Ok(state) => match state {
+                CallbackResponse::NoCallback => {
+                    /* Nothing to do. This is the case for most page loads. */
+                }
+                CallbackResponse::SuccessfulLogin(_) | CallbackResponse::Error(_)
+                    if !is_at_post_login_redirect_path() =>
+                {
+                    tracing::trace!(
+                        "Ignoring login callback parameters outside of the `post_login_redirect_url` path."
+                    );
+                }
                 CallbackResponse::SuccessfulLogin(login_state) => {
                     tracing::trace!(?login_state, "Login successful");
                     set_pending_login.set(true);
@@ -297,86 +327,83 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                         NavigateOptions::default(),
                     );
                 }
-                CallbackResponse::Error(err_state) => {
-                    set_auth_error.set(Some(KeycloakAuthError::Request {
-                        source: RequestError::ErrResponse {
-                            error_response: err_state,
-                        },
-                    }));
+                CallbackResponse::Error(error_response) => {
+                    handle_error.run(Report::new_sendsync(
+                        KeycloakAuthError::AuthorizationErrorResponse { error_response },
+                    ));
                 }
             },
             Err(err) => {
-                // Save to be ignored. This just means that we currently do not have the required
-                // parameters to do meaningful work.
-                // You might want to debug this error if things don't work.
-                set_auth_error.set(Some(KeycloakAuthError::Params { err }));
+                // Callback parameters are present but could not be parsed.
+                handle_error
+                    .run(Report::new_sendsync(err).context(KeycloakAuthError::ParseCallbackParams));
             }
         }
     });
 
-    let verified_and_decoded_id_token: Memo<Result<KeycloakIdTokenClaims, IdTokenClaimsError>> =
-        Memo::new(move |_| {
-            let options = options.read_value();
-            let expected_audiences = options.id_token_validation.expected_audiences.get();
-            let expected_issuers = options.id_token_validation.expected_issuers.get();
-            let nonce_validation_requested = options.advanced.nonce_validation;
+    let validate_id_token = move || -> Result<KeycloakIdTokenClaims, Report<IdTokenClaimsError>> {
+        let options = options.read_value();
+        let expected_audiences = options.id_token_validation.expected_audiences.get();
+        let expected_issuers = options.id_token_validation.expected_issuers.get();
+        let nonce_validation_requested = options.advanced.nonce_validation;
 
-            let token_data = token_validation::validate_token_data_presence(token_mgr.token.get())?;
-            let jwk_set = token_validation::validate_jwk_set_presence(jwk_set_mgr.jwk_set.get())?;
+        let token_data = token_validation::validate_token_data_presence(token_mgr.token.get())?;
+        let jwk_set = token_validation::validate_jwk_set_presence(jwk_set_mgr.jwk_set.get())?;
 
-            // Do not require a nonce in the ID token when the token data source was a refresh.
-            // As stated in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>,
-            // refresh tokens SHOULD NOT have a `nonce` claim, and Keycloak generally respects that.
-            // A backwards compatibility claim mapper can be enabled to still include nonce claims in
-            // refresh tokens, but this is not required from a security perspective. If the mapper is
-            // enabled, also enabling nonce claims in ID tokens returned from a refresh, we again
-            // validate against the initial nonce value, as this value is only regenerated on logout.
-            let expected_nonce = nonce_mgr.nonce().read_untracked();
-            let nonce_validation_required =
-                nonce_validation_requested && token_data.grant_type != GrantType::RefreshToken;
-            let nonce_validation = match (nonce_validation_requested, nonce_validation_required) {
-                (true, true) => NonceValidation::Required {
-                    expected_nonce: expected_nonce.as_str(),
-                },
-                (true, false) => NonceValidation::IfPresent {
-                    expected_nonce: expected_nonce.as_str(),
-                },
-                (false, _) => NonceValidation::Disabled,
-            };
+        // Do not require a nonce in the ID token when the token data source was a refresh.
+        // As stated in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>,
+        // refresh tokens SHOULD NOT have a `nonce` claim, and Keycloak generally respects that.
+        // A backwards compatibility claim mapper can be enabled to still include nonce claims in
+        // refresh tokens, but this is not required from a security perspective. If the mapper is
+        // enabled, also enabling nonce claims in ID tokens returned from a refresh, we again
+        // validate against the initial nonce value, as this value is only regenerated on logout.
+        let expected_nonce = nonce_mgr.nonce().read_untracked();
+        let nonce_validation_required =
+            nonce_validation_requested && token_data.grant_type != GrantType::RefreshToken;
+        let nonce_validation = match (nonce_validation_requested, nonce_validation_required) {
+            (true, true) => NonceValidation::Required {
+                expected_nonce: expected_nonce.as_str(),
+            },
+            (true, false) => NonceValidation::IfPresent {
+                expected_nonce: expected_nonce.as_str(),
+            },
+            (false, _) => NonceValidation::Disabled,
+        };
 
-            let result: Result<KeycloakIdTokenClaims, IdTokenClaimsError>;
-
-            let first_try = token_validation::validate(
+        let validate_with = |jwk_set: &jsonwebtoken::jwk::JwkSet| {
+            token_validation::validate(
                 &token_data,
-                &jwk_set.jwk_set,
+                jwk_set,
                 expected_audiences.as_deref(),
                 expected_issuers.as_deref(),
                 nonce_validation,
-            );
+            )
+        };
 
-            if first_try.is_ok() {
-                result = first_try;
-            } else {
-                // If validation with the current JWK set fails, we should not try to validate with a
-                // missing old set. This would just lead to a `NoJwkSet` error being ultimately stored,
-                // hiding the real reason why validation failed in the first place.
-                if let Some(jwk_set_old) = jwk_set_mgr.jwk_set_old.read().as_ref() {
-                    let second_try = token_validation::validate(
-                        &token_data,
-                        &jwk_set_old.jwk_set,
-                        expected_audiences.as_deref(),
-                        expected_issuers.as_deref(),
-                        nonce_validation,
-                    );
-                    result = second_try;
-                } else {
-                    result = first_try;
-                }
+        // Should validation with the current JWK set fail, the token may have been signed with a
+        // key of the previous JWK set. Without a previous set, we keep the first error: retrying
+        // would only report a `NoJwkSet` error, hiding why validation failed in the first place.
+        let result = validate_with(&jwk_set.jwk_set).or_else(|err| {
+            match jwk_set_mgr.jwk_set_old.read().as_ref() {
+                Some(jwk_set_old) => validate_with(&jwk_set_old.jwk_set),
+                None => Err(err),
             }
-
-            tracing::trace!(?result, "ID token validation result");
-            result
         });
+
+        tracing::trace!(?result, "ID token validation result");
+        result
+    };
+    // Reports are not comparable. Every error is propagated as a change, so that effects observing
+    // validation failures see each validation attempt, e.g. one made after refetching the JWK set.
+    let verified_and_decoded_id_token: Memo<
+        Result<KeycloakIdTokenClaims, Report<IdTokenClaimsError, Cloneable>>,
+    > = Memo::new_with_compare(
+        move |_| validate_id_token().map_err(Report::into_cloneable),
+        |prev, next| match (prev, next) {
+            (Some(Ok(prev)), Some(Ok(next))) => prev != next,
+            _ => true,
+        },
+    );
 
     let (last_refresh_from_error, set_last_refresh_from_error) =
         signal::<Option<OffsetDateTime>>(None);
@@ -390,7 +417,7 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
                 // If the last error is old.
                 |it| (OffsetDateTime::now_utc() - it).whole_seconds() > 1,
             ) {
-                token_mgr.refresh_token(OnRefreshError::DropToken);
+                token_mgr.refresh_token();
                 set_last_refresh_from_error.set(Some(OffsetDateTime::now_utc()));
             }
         }
@@ -441,6 +468,8 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
             update_token: token_mgr.update_token,
             request_timeout: options.read_value().advanced.request_timeout,
             session_version: token_mgr.session_version,
+            handle_error,
+            in_flight: StoredValue::new_local(None),
         },
     });
 
@@ -514,32 +543,61 @@ fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
     // TODO: Make this configurable.
     Effect::new(move |_| {
-        if let Err(err) = verified_and_decoded_id_token.read().as_ref() {
-            match err {
-                IdTokenClaimsError::NoToken | IdTokenClaimsError::NoJwkSet => {
-                    /* Ignored. We are just missing some data. */
-                }
-                IdTokenClaimsError::Validation { .. }
-                | IdTokenClaimsError::NonceMismatch
-                | IdTokenClaimsError::MissingNonce => {
-                    // Note: This will end our session when the ID token expires. The specification
-                    // states in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>
-                    // that re-issued ID tokens must always use the original ID token expiration
-                    // time, meaning that refreshes won't help us.
-
-                    // Note: It does not seem to be enough to just drop token data at this point,
-                    // as the Keycloak session might still be present. This could lead to the user
-                    // repeatedly starting the login flow without ever getting logged in (trusted)
-                    // on our end as we repeatedly just throw away the received token.
-                    tracing::warn!(
-                        ?err,
-                        "ID token could not be verified. Ending session to force reauthentication."
+        let Err(err) = verified_and_decoded_id_token.get() else {
+            return;
+        };
+        match err.current_context() {
+            IdTokenClaimsError::NoToken | IdTokenClaimsError::NoJwkSet => {
+                /* Ignored. We are just missing some data. */
+            }
+            IdTokenClaimsError::Validation
+            | IdTokenClaimsError::NonceMismatch
+            | IdTokenClaimsError::MissingNonce => {
+                let unknown_key = err.iter_reports().find_map(|report| {
+                    match report.downcast_current_context::<JwtValidationError>() {
+                        Some(JwtValidationError::NoMatchingJwk { token_kid }) => {
+                            Some(token_kid.clone())
+                        }
+                        _ => None,
+                    }
+                });
+                if let Some(token_kid) = unknown_key
+                    && jwk_set_mgr
+                        .jwk_set
+                        .read_untracked()
+                        .as_ref()
+                        .is_some_and(|it| {
+                            OffsetDateTime::now_utc() - it.retrieved > MIN_JWK_SET_AGE_FOR_REFETCH
+                        })
+                {
+                    // Keycloak may have rotated its keys since we last fetched the JWK set.
+                    // Fetch it again before giving up on the token. Should the token still
+                    // reference an unknown key with the fresh JWK set at hand, the JWK set is too
+                    // young for another refetch, and we end the session below.
+                    tracing::debug!(
+                        ?token_kid,
+                        "ID token references an unknown key. Refetching the JWK set."
                     );
-                    auth.end_session();
+                    jwk_set_mgr.refetch.run(());
+                    return;
                 }
+
+                // Note: This will end our session when the ID token expires. The specification
+                // states in <https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse>
+                // that re-issued ID tokens must always use the original ID token expiration
+                // time, meaning that refreshes won't help us.
+
+                // Note: It does not seem to be enough to just drop token data at this point,
+                // as the Keycloak session might still be present. This could lead to the user
+                // repeatedly starting the login flow without ever getting logged in (trusted)
+                // on our end as we repeatedly just throw away the received token.
+                tracing::warn!(
+                    ?err,
+                    "ID token could not be verified. Ending session to force reauthentication."
+                );
+                auth.end_session();
             }
         }
     });
-
     auth
 }

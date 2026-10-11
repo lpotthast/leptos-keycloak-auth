@@ -3,11 +3,12 @@ use std::{fmt::Debug, time::Duration as StdDuration};
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
+use rootcause::Report;
 
 use crate::{
     config::Options,
+    error::KeycloakAuthError,
     internal::{OidcConfigWithTimestamp, derived_urls::DerivedUrls, track_age_of},
-    request::RequestError,
     storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
 };
 
@@ -50,7 +51,7 @@ impl OidcConfigManager {
     #[cfg(not(feature = "ssr"))]
     pub(crate) fn new(
         options: StoredValue<Options>,
-        handle_req_error: Callback<Option<RequestError>>,
+        handle_error: Callback<Report<KeycloakAuthError>>,
     ) -> Self {
         let UseStorageReturn {
             read: oidc_config,
@@ -95,7 +96,7 @@ impl OidcConfigManager {
 
         let retrieve_oidc_config_action = crate::action::create_retrieve_oidc_config_action(
             Callback::new(move |val| set_oidc_config.run(val)),
-            handle_req_error,
+            handle_error,
             options.read_value().advanced.request_timeout,
         );
 

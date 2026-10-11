@@ -3,12 +3,13 @@ use std::time::Duration as StdDuration;
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::storage::StorageType;
+use rootcause::Report;
 
 use crate::{
     JwkSetEndpoint, action,
     config::Options,
-    internal::{JwkSetWithTimestamp, derived_urls::DerivedUrlError, track_age_of},
-    request::RequestError,
+    error::KeycloakAuthError,
+    internal::{JwkSetWithTimestamp, derived_urls::DerivedUrl, track_age_of},
     storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
 };
 
@@ -38,6 +39,10 @@ pub struct JwkSetManager {
     pub jwk_set_expires_in: Signal<StdDuration>,
     #[allow(unused)]
     pub jwk_set_too_old: Signal<bool>,
+
+    /// Immediately fetch the JWK set, regardless of its age. Used when a token references a key
+    /// unknown to the current JWK set, which happens after a key rotation in Keycloak.
+    pub(crate) refetch: Callback<()>,
 }
 
 impl JwkSetManager {
@@ -51,14 +56,15 @@ impl JwkSetManager {
             jwk_set_age: Signal::default(),
             jwk_set_expires_in: Signal::default(),
             jwk_set_too_old: Signal::default(),
+            refetch: Callback::new(|()| {}),
         }
     }
 
     #[cfg(not(feature = "ssr"))]
     pub(crate) fn new(
         options: StoredValue<Options>,
-        jwk_set_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
-        handle_req_error: Callback<Option<RequestError>>,
+        jwk_set_endpoint: Signal<DerivedUrl<JwkSetEndpoint>>,
+        handle_error: Callback<Report<KeycloakAuthError>>,
     ) -> Self {
         let UseStorageReturn {
             read: jwk_set_old,
@@ -150,24 +156,28 @@ impl JwkSetManager {
         // Fetch a token from the OIDC provider using an authorization code and an optional session state.
         let retrieve_jwk_set_action = action::create_retrieve_jwk_set_action(
             handle_jwk_set,
-            handle_req_error,
+            handle_error,
             options.read_value().advanced.request_timeout,
         );
+
+        let refetch = Callback::new(move |()| match jwk_set_endpoint.read_untracked().as_ref() {
+            Ok(jwk_set_endpoint) => {
+                retrieve_jwk_set_action.dispatch((
+                    jwk_set_endpoint.clone(),
+                    options.read_value().discovery_endpoint(),
+                ));
+            }
+            Err(err) => {
+                tracing::trace!(reason = ?err, "JWK set should be updated, but no jwks_endpoint_url is known yet. Skipping update...");
+            }
+        });
 
         // Obtain the JWK set. Updating any previously stored config.
         Effect::new(move |_| {
             if jwk_set_too_old.get() {
-                match jwk_set_endpoint.read().as_ref() {
-                    Ok(jwk_set_endpoint) => {
-                        retrieve_jwk_set_action.dispatch((
-                            jwk_set_endpoint.clone(),
-                            options.read_value().discovery_endpoint(),
-                        ));
-                    }
-                    Err(err) => {
-                        tracing::trace!(reason = ?err, "JWK set should be updated, as it is too old, but no jwks_endpoint_url is known yet. Skipping update...");
-                    }
-                }
+                // Track the endpoint, so that we fetch as soon as it becomes known.
+                jwk_set_endpoint.track();
+                refetch.run(());
             }
         });
 
@@ -179,6 +189,7 @@ impl JwkSetManager {
             jwk_set_age: jwk_set_age.into(),
             jwk_set_expires_in: jwk_set_expires_in.into(),
             jwk_set_too_old: jwk_set_too_old.into(),
+            refetch,
         }
     }
 

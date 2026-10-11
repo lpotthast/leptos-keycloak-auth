@@ -1,0 +1,3 @@
+[build]
+# Leptonic uses `web-sys` APIs (partly through `leptos-use`) that require this opt-in.
+rustflags = ["--cfg=web_sys_unstable_apis"]

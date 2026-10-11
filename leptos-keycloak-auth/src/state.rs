@@ -1,10 +1,12 @@
 use std::{fmt::Debug, ops::Deref, time::Duration as StdDuration};
 
+use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use leptos::prelude::*;
 use leptos_router::{
     NavigateOptions,
     hooks::{use_navigate, use_url},
 };
+use rootcause::{Report, markers::Cloneable};
 use url::Url;
 
 use crate::{
@@ -12,9 +14,11 @@ use crate::{
     authenticated_client::AuthenticatedClient,
     config::Options,
     error::KeycloakAuthError,
-    internal::{derived_urls::DerivedUrlError, token_manager::SessionVersion},
+    internal::{
+        derived_urls::DerivedUrl,
+        token_manager::{SessionVersion, drop_token_if_session_ended},
+    },
     logout,
-    request::RequestError,
     token::TokenData,
     token_claims::KeycloakIdTokenClaims,
     token_validation::IdTokenClaimsError,
@@ -379,23 +383,14 @@ impl KeycloakAuthState {
                 last_id_token_error,
                 last_error,
             }) => {
-                #[derive(Debug)]
-                #[expect(unused)]
-                struct Pretty {
-                    has_token_data: bool,
-                    last_id_token_error: Option<String>,
-                    last_error: Option<String>,
-                }
+                let format_optional_report = |report: Option<String>| {
+                    report.map_or_else(|| "None".to_owned(), |report| format!("\n{report}"))
+                };
                 format!(
-                    "KeycloakAuthState::NotAuthenticated {:#?}",
-                    Pretty {
-                        has_token_data: has_token_data.get(),
-                        last_id_token_error: last_id_token_error
-                            .read()
-                            .as_ref()
-                            .map(|err| format!("{err:?}")),
-                        last_error: last_error.read().as_ref().map(|err| format!("{err:?}")),
-                    }
+                    "KeycloakAuthState::NotAuthenticated\nhas_token_data: {}\nlast_id_token_error: {}\nlast_error: {}",
+                    has_token_data.get(),
+                    format_optional_report(last_id_token_error.read().as_ref().map(format_report)),
+                    format_optional_report(last_error.read().as_ref().map(format_report)),
                 )
             }
             KeycloakAuthState::Indeterminate => "KeycloakAuthState::Indeterminate".to_string(),
@@ -403,15 +398,31 @@ impl KeycloakAuthState {
     }
 }
 
+/// A refresh started by one `AuthenticatedClient` request, awaitable by all others.
+pub(crate) type SharedRefresh = Shared<LocalBoxFuture<'static, ()>>;
+
+/// Formats a report as its tree, indented for display below a label.
+pub(crate) fn format_report<C: ?Sized, O, T>(report: &Report<C, O, T>) -> String {
+    report
+        .to_string()
+        .trim_matches('\n')
+        .lines()
+        .map(|line| format!("    {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Context needed by `AuthenticatedClient` to perform a direct token refresh.
 #[derive(Clone, Copy)]
 pub(crate) struct RefreshContext {
     pub(crate) token_data: Signal<Option<TokenData>>,
-    pub(crate) token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
+    pub(crate) token_endpoint: Signal<DerivedUrl<TokenEndpoint>>,
     pub(crate) options: StoredValue<Options>,
     pub(crate) update_token: Callback<Option<TokenData>>,
     pub(crate) request_timeout: StdDuration,
     pub(crate) session_version: Signal<SessionVersion>,
+    pub(crate) handle_error: Callback<Report<KeycloakAuthError>>,
+    pub(crate) in_flight: StoredValue<Option<SharedRefresh>, LocalStorage>,
 }
 
 impl Debug for RefreshContext {
@@ -423,20 +434,49 @@ impl Debug for RefreshContext {
 }
 
 impl RefreshContext {
-    /// Attempt to refresh the token using the current refresh token and token endpoint. Automatically publishes the new token data (when refresh succeeded to the reactive system).
+    /// Refresh the token, joining an already in-flight refresh instead of starting another one.
     ///
-    /// Returns `None` when a refresh is impossible (no refresh token or no token endpoint),
-    /// or when the session version changed during the refresh (stale response).
-    /// Returns `Some(Ok(()))` on success and `Some(Err(..))` when the refresh request fails.
-    pub(crate) async fn try_refresh(&self) -> Option<Result<(), RequestError>> {
-        let refresh_token = self
+    /// Concurrent refreshes would all use the same refresh token. With refresh token rotation
+    /// enabled in Keycloak, all but the first would fail, potentially ending the session.
+    ///
+    /// Drops all token data if the refresh shows that the session ended. Keeps the current
+    /// token on any other failure.
+    pub(crate) async fn refresh_shared(&self) {
+        let refresh = match self.in_flight.get_value() {
+            Some(refresh) => refresh,
+            None => {
+                let this = *self;
+                let refresh = async move {
+                    this.refresh().await;
+                    this.in_flight.set_value(None);
+                }
+                .boxed_local()
+                .shared();
+                self.in_flight.set_value(Some(refresh.clone()));
+                refresh
+            }
+        };
+        refresh.await;
+    }
+
+    /// Refresh the token using the current refresh token and token endpoint, publishing the new
+    /// token data. Does nothing when no refresh is possible (no refresh token or no token endpoint
+    /// known), and discards the response when the session changed during the refresh.
+    async fn refresh(&self) {
+        let Some(refresh_token) = self
             .token_data
             .read_untracked()
             .as_ref()
-            .map(|t| t.refresh_token.clone())?;
+            .map(|it| it.refresh_token.clone())
+        else {
+            return;
+        };
+        let Ok(token_endpoint) = self.token_endpoint.read_untracked().as_ref().cloned() else {
+            return;
+        };
 
-        let new_token = action::refresh_token_with_session_check(
-            self.token_endpoint.read_untracked().as_ref().ok()?.clone(),
+        let response = action::refresh_token_with_session_check(
+            token_endpoint.clone(),
             &self.options.read_value().client_id,
             &refresh_token,
             self.options.read_value().discovery_endpoint(),
@@ -446,15 +486,14 @@ impl RefreshContext {
         )
         .await;
 
-        match new_token {
-            None => None,
-            Some(new_token) => match new_token {
-                Ok(new_token) => {
-                    self.update_token.run(Some(new_token));
-                    Some(Ok(()))
-                }
-                Err(err) => Some(Err(err)),
-            },
+        match response {
+            Some(Ok(new_token)) => self.update_token.run(Some(new_token)),
+            Some(Err(err)) => {
+                drop_token_if_session_ended(&err, self.update_token);
+                self.handle_error
+                    .run(err.context(KeycloakAuthError::RefreshToken { token_endpoint }));
+            }
+            None => { /* Stale response, already logged. */ }
         }
     }
 }
@@ -603,11 +642,11 @@ pub struct NotAuthenticated {
     ///
     /// Use this to debug why ID token validation failed (e.g., invalid signature, wrong audience,
     /// expired token, etc.).
-    pub last_id_token_error: Signal<Option<IdTokenClaimsError>>,
+    pub last_id_token_error: Signal<Option<Report<IdTokenClaimsError, Cloneable>>>,
 
     /// Reactive signal containing the last general authentication error, if any.
     ///
     /// This includes errors from OIDC discovery, token exchange, token refresh, and other
     /// authentication operations.
-    pub last_error: Signal<Option<KeycloakAuthError>>,
+    pub last_error: Signal<Option<Report<KeycloakAuthError, Cloneable>>>,
 }

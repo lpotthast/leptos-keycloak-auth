@@ -1,5 +1,6 @@
 use leptos::prelude::{Signal, *};
-use snafu::{ResultExt, Snafu};
+use rootcause::{Report, markers::Cloneable, prelude::ResultExt};
+use thiserror::Error;
 use url::Url;
 
 use crate::{
@@ -7,21 +8,40 @@ use crate::{
     internal::OidcConfigWithTimestamp,
 };
 
-#[derive(Debug, Clone, Snafu)]
+/// Error contexts of deriving an endpoint URL from the OIDC configuration.
+///
+/// The underlying `url` parsing error, if any, is a child report.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum DerivedUrlError {
-    #[snafu(display("DerivedUrlError: Could not parse"))]
-    Parsing { source: url::ParseError },
+    /// The endpoint URL from the OIDC configuration could not be parsed.
+    #[error("Failed to parse the endpoint URL.")]
+    Parsing,
 
-    #[snafu(display("DerivedUrlError: No config data to read from"))]
+    /// No OIDC configuration is known yet.
+    #[error("No OIDC configuration is known.")]
     NoConfig,
 
-    #[snafu(display("DerivedUrlError: oidc_config.standard_claims.token_endpoint is None"))]
+    /// The OIDC configuration does not specify a token endpoint.
+    #[error("The OIDC configuration does not specify a token endpoint.")]
     NoTokenEndpoint,
 
-    #[snafu(display(
-        "DerivedUrlError: oidc_config.rp_initialized_claims.end_session_endpoint is None"
-    ))]
+    /// The OIDC configuration does not specify an end session endpoint.
+    #[error("The OIDC configuration does not specify an end session endpoint.")]
     NoEndSessionEndpoint,
+}
+
+/// The outcome of deriving an endpoint URL.
+pub(crate) type DerivedUrl<U = Url> = Result<U, Report<DerivedUrlError, Cloneable>>;
+
+fn parse(url: &str) -> DerivedUrl {
+    Url::parse(url)
+        .context(DerivedUrlError::Parsing)
+        .map_err(Report::into_cloneable)
+}
+
+fn derived_url_error(error: DerivedUrlError) -> DerivedUrl {
+    Err(Report::new_sendsync(error).into_cloneable())
 }
 
 /// Reactive OIDC endpoint URLs derived from discovery configuration, automatically updating when
@@ -40,34 +60,32 @@ pub enum DerivedUrlError {
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::struct_field_names)] // Allow all field names to end with `_endpoint`.
 pub struct DerivedUrls {
-    pub(crate) jwks_endpoint: Signal<Result<JwkSetEndpoint, DerivedUrlError>>,
-    pub(crate) authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
-    pub(crate) token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
-    pub(crate) end_session_endpoint: Signal<Result<EndSessionEndpoint, DerivedUrlError>>,
+    pub(crate) jwks_endpoint: Signal<DerivedUrl<JwkSetEndpoint>>,
+    pub(crate) authorization_endpoint: Signal<DerivedUrl<AuthorizationEndpoint>>,
+    pub(crate) token_endpoint: Signal<DerivedUrl<TokenEndpoint>>,
+    pub(crate) end_session_endpoint: Signal<DerivedUrl<EndSessionEndpoint>>,
 }
 
 impl DerivedUrls {
     pub(crate) fn new(oidc_config: Signal<Option<OidcConfigWithTimestamp>>) -> Self {
-        let jwks_endpoint_url: Signal<Result<Url, DerivedUrlError>> =
+        let jwks_endpoint_url: Signal<DerivedUrl> =
             Signal::derive(move || match oidc_config.read().as_ref() {
-                Some(oidc_config) => Url::parse(&oidc_config.oidc_config.standard_claims.jwks_uri)
-                    .context(ParsingSnafu {}),
-                None => Err(NoConfigSnafu {}.build()),
+                Some(oidc_config) => parse(&oidc_config.oidc_config.standard_claims.jwks_uri),
+                None => derived_url_error(DerivedUrlError::NoConfig),
             });
 
-        let authorization_endpoint_url: Signal<Result<Url, DerivedUrlError>> =
+        let authorization_endpoint_url: Signal<DerivedUrl> =
             Signal::derive(move || match oidc_config.read().as_ref() {
-                Some(oidc_config) => Url::parse(
+                Some(oidc_config) => parse(
                     &oidc_config
                         .oidc_config
                         .standard_claims
                         .authorization_endpoint,
-                )
-                .context(ParsingSnafu {}),
-                None => Err(NoTokenEndpointSnafu {}.build()),
+                ),
+                None => derived_url_error(DerivedUrlError::NoConfig),
             });
 
-        let token_endpoint_url: Signal<Result<Url, DerivedUrlError>> =
+        let token_endpoint_url: Signal<DerivedUrl> =
             Signal::derive(move || match oidc_config.read().as_ref() {
                 Some(oidc_config) => {
                     match oidc_config
@@ -76,14 +94,14 @@ impl DerivedUrls {
                         .token_endpoint
                         .as_deref()
                     {
-                        Some(token_endpoint) => Url::parse(token_endpoint).context(ParsingSnafu {}),
-                        None => Err(NoConfigSnafu {}.build()),
+                        Some(token_endpoint) => parse(token_endpoint),
+                        None => derived_url_error(DerivedUrlError::NoTokenEndpoint),
                     }
                 }
-                None => Err(NoConfigSnafu {}.build()),
+                None => derived_url_error(DerivedUrlError::NoConfig),
             });
 
-        let end_session_endpoint_url: Signal<Result<Url, DerivedUrlError>> =
+        let end_session_endpoint_url: Signal<DerivedUrl> =
             Signal::derive(move || match oidc_config.read().as_ref() {
                 Some(oidc_config) => {
                     match oidc_config
@@ -92,13 +110,11 @@ impl DerivedUrls {
                         .end_session_endpoint
                         .as_deref()
                     {
-                        Some(end_session_endpoint) => {
-                            Url::parse(end_session_endpoint).context(ParsingSnafu {})
-                        }
-                        None => Err(NoEndSessionEndpointSnafu {}.build()),
+                        Some(end_session_endpoint) => parse(end_session_endpoint),
+                        None => derived_url_error(DerivedUrlError::NoEndSessionEndpoint),
                     }
                 }
-                None => Err(NoConfigSnafu {}.build()),
+                None => derived_url_error(DerivedUrlError::NoConfig),
             });
 
         Self {

@@ -386,6 +386,14 @@ pub fn DebugState() -> impl IntoView {
 }
 
 #[cfg(feature = "internals")]
+fn format_derived_url(derived_url: &crate::internal::derived_urls::DerivedUrl) -> String {
+    match derived_url {
+        Ok(url) => url.to_string(),
+        Err(err) => format!("\n{}", crate::state::format_report(err)),
+    }
+}
+
+#[cfg(feature = "internals")]
 #[component]
 fn DebugStateInner() -> impl IntoView {
     let auth = use_keycloak_auth();
@@ -393,67 +401,27 @@ fn DebugStateInner() -> impl IntoView {
     view! {
         <div style="width: 100%;">
             <h3>"Internal data: state"</h3>
-            <pre id="auth-state">{move || auth_state.read()()}</pre>
+            <pre id="leptos-keycloak-auth-debug-state">{move || auth_state.read()()}</pre>
         </div>
 
         <div style="width: 100%;">
             <h3>"Internal data: derived_urls"</h3>
-            <div>
+            <pre>
                 "jwks_endpoint: "
-                {move || {
-                    format!(
-                        "{:?}",
-                        auth
-                            .derived_urls()
-                            .jwks_endpoint
-                            .get()
-                            .map(|url| url.to_string())
-                            .map_err(|err| err.to_string()),
-                    )
-                }}
-            </div>
-            <div>
+                {move || format_derived_url(&auth.derived_urls().jwks_endpoint.read())}
+            </pre>
+            <pre>
                 "authorization_endpoint: "
-                {move || {
-                    format!(
-                        "{:?}",
-                        auth
-                            .derived_urls()
-                            .authorization_endpoint
-                            .get()
-                            .map(|url| url.to_string())
-                            .map_err(|err| err.to_string()),
-                    )
-                }}
-            </div>
-            <div>
+                {move || format_derived_url(&auth.derived_urls().authorization_endpoint.read())}
+            </pre>
+            <pre>
                 "token_endpoint: "
-                {move || {
-                    format!(
-                        "{:?}",
-                        auth
-                            .derived_urls()
-                            .token_endpoint
-                            .get()
-                            .map(|url| url.to_string())
-                            .map_err(|err| err.to_string()),
-                    )
-                }}
-            </div>
-            <div>
+                {move || format_derived_url(&auth.derived_urls().token_endpoint.read())}
+            </pre>
+            <pre>
                 "end_session_endpoint: "
-                {move || {
-                    format!(
-                        "{:?}",
-                        auth
-                            .derived_urls()
-                            .end_session_endpoint
-                            .get()
-                            .map(|url| url.to_string())
-                            .map_err(|err| err.to_string()),
-                    )
-                }}
-            </div>
+                {move || format_derived_url(&auth.derived_urls().end_session_endpoint.read())}
+            </pre>
         </div>
 
         <div style="width: 100%;">

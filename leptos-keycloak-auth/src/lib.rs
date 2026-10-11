@@ -31,9 +31,13 @@ mod token_validation;
 // Library exports (additional to pub modules).
 pub use authenticated_client::*;
 pub use config::*;
+pub use error::KeycloakAuthError;
 pub use hooks::*;
 pub use leptos_use::storage::StorageType;
+pub use request::RequestError;
+pub use response::{ErrorResponse, KnownOidcErrorCode, OidcErrorCode};
 pub use state::*;
+pub use token_validation::{IdTokenClaimsError, JwtValidationError};
 pub mod url {
     pub use url::Url;
 }

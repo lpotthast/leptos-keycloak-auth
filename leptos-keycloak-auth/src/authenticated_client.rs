@@ -1,5 +1,5 @@
 use http::StatusCode;
-use leptos::prelude::{Callable, ReadUntracked};
+use leptos::prelude::GetUntracked;
 
 use crate::Authenticated;
 
@@ -432,48 +432,30 @@ impl AuthenticatedClient {
         url: impl reqwest::IntoUrl + Clone,
         with: impl Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder + Clone,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        let req = self.create_request(
-            method.clone(),
-            url.clone(),
-            with.clone(),
-            self.auth.access_token.read_untracked().as_str(),
-        )?;
+        let access_token = self.auth.access_token.get_untracked();
+        let req = self.create_request(method.clone(), url.clone(), with.clone(), &access_token)?;
         let resp = self.client.execute(req).await?;
 
-        if resp.status() == StatusCode::UNAUTHORIZED {
-            // When a 401 occurs despite having a valid (non-expired, decodable) token,
-            // it could mean that:
-            // - the token was revoked on Keycloak side (admin action, password change).
-            // - the token rotation/invalidation happened due to a security event.
-            // - the users session was terminated server-side.
-            // - the token was blacklisted for suspicious activity.
-            // We directly refresh the token and retry the request once.
-
-            match self.auth.refresh_context.try_refresh().await {
-                Some(Ok(())) => {
-                    // Retry the request with the fresh token.
-                    let req2 = self.create_request(
-                        method,
-                        url,
-                        with,
-                        self.auth.access_token.read_untracked().as_str(),
-                    )?;
-                    let resp2 = self.client.execute(req2).await?;
-                    Ok(resp2)
-                }
-                Some(Err(err)) => {
-                    tracing::warn!(?err, "Token refresh on 401 failed. Logging user out.");
-                    // Drop token data — effectively logs the user out.
-                    self.auth.refresh_context.update_token.run(None);
-                    Ok(resp)
-                }
-                None => {
-                    // Can't refresh — no refresh token, no endpoint, or stale session.
-                    Ok(resp)
-                }
-            }
-        } else {
-            Ok(resp)
+        if resp.status() != StatusCode::UNAUTHORIZED {
+            return Ok(resp);
         }
+
+        // When a 401 occurs despite having a valid (non-expired, decodable) token,
+        // it could mean that:
+        // - the token was revoked on Keycloak side (admin action, password change).
+        // - the token rotation/invalidation happened due to a security event.
+        // - the users session was terminated server-side.
+        // - the token was blacklisted for suspicious activity.
+        // We directly refresh the token (or join a refresh already in-flight).
+        self.auth.refresh_context.refresh_shared().await;
+
+        // Retry the request once, should we now have a different access token. We might not have
+        // one when the refresh failed or was impossible, e.g. due to a missing token endpoint.
+        let refreshed_access_token = self.auth.access_token.get_untracked();
+        if refreshed_access_token == access_token {
+            return Ok(resp);
+        }
+        let req2 = self.create_request(method, url, with, &refreshed_access_token)?;
+        self.client.execute(req2).await
     }
 }

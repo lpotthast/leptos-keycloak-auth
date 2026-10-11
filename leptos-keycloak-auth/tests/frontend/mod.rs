@@ -1,109 +1,35 @@
-use std::{env, time::Duration};
+use std::path::{Path, PathBuf};
 
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    process::Command,
-};
-use tokio_process_tools::{
-    Inspector, LineParsingOptions, Next, Process, TerminateOnDrop, broadcast::BroadcastOutputStream,
-};
+/// Where cargo-leptos serves the test-frontend. Must match `site-addr` in its `Cargo.toml`.
+pub const ADDR: &str = "127.0.0.1:3000";
 
-pub struct Frontend {
-    #[expect(unused)]
-    cargo_leptos_process: TerminateOnDrop<BroadcastOutputStream>,
-    #[expect(unused)]
-    stdout_replay: Inspector,
-    #[expect(unused)]
-    stderr_replay: Inspector,
+/// The test-frontend's origin. Must match `BASE_URL` in its `routes.rs`.
+pub fn origin() -> String {
+    format!("http://{ADDR}")
 }
 
-pub async fn start_frontend(keycloak_port: u16) -> Frontend {
-    let fe_dir = env::current_dir()
-        .unwrap()
+/// Resolve the absolute path to the `test-frontend` crate directory.
+pub fn dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../test-frontend")
         .canonicalize()
-        .unwrap();
+        .expect("Resolving the test-frontend directory")
+}
 
-    let dotenv_template = fe_dir.join(".env.template");
-    let mut dotenv_content = String::new();
-    tokio::fs::OpenOptions::new()
-        .read(true)
-        .open(&dotenv_template)
-        .await
-        .unwrap()
-        .read_to_string(&mut dotenv_content)
-        .await
-        .unwrap();
-
-    let dotenv_content =
-        dotenv_content.replace("{kc_port_placeholder}", &keycloak_port.to_string());
-
+/// Materialize a `.env` file in the test-frontend directory from `.env.template`, substituting
+/// `{kc_port_placeholder}` with the running Keycloak container port.
+///
+/// The frontend's `dotenv_codegen::dotenv!` macro reads this file at compile time, so it must
+/// exist on disk before `cargo leptos serve` is invoked. Changes don't trigger a recompilation, so
+/// the frontend's server reads the Keycloak port at runtime instead.
+pub fn write_dotenv(fe_dir: &Path, keycloak_port: u16) {
+    let template = fe_dir.join(".env.template");
     let dotenv = fe_dir.join(".env");
-    tokio::fs::OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(&dotenv)
-        .await
-        .unwrap()
-        .write_all(dotenv_content.as_bytes())
-        .await
-        .unwrap();
 
-    tracing::info!("Starting frontend in {fe_dir:?}");
-    let mut cmd = Command::new("cargo");
-    cmd.arg("leptos")
-        .arg("watch") // serve
-        .env("RUST_BACKTRACE", "1")
-        .current_dir(fe_dir);
+    let rendered = std::fs::read_to_string(&template)
+        .unwrap_or_else(|err| panic!("Reading {}: {err:?}", template.display()))
+        .replace("{kc_port_placeholder}", &keycloak_port.to_string());
 
-    let fe_process = Process::new(cmd)
-        .spawn_broadcast()
-        .unwrap()
-        .terminate_on_drop(Duration::from_secs(3), Duration::from_secs(8));
-
-    let stdout_replay = fe_process.stdout().inspect_lines(
-        |line| {
-            // Only visible when tests are run with the `--nocapture` flag.
-            println!("{line}");
-            Next::Continue
-        },
-        LineParsingOptions::default(),
-    );
-    let stderr_replay = fe_process.stderr().inspect_lines(
-        |line| {
-            // Only visible when tests are run with the `--nocapture` flag.
-            eprintln!("{line}");
-            Next::Continue
-        },
-        LineParsingOptions::default(),
-    );
-
-    // TODO: Also wait for stderr_line: "warning: build failed, waiting for other jobs to finish..." and fail if it occurs.
-
-    let fe_start_timeout = Duration::from_secs(60 * 10);
-    tracing::info!("Waiting {fe_start_timeout:?} for frontend to start...");
-    match fe_process
-        .stdout()
-        .wait_for_line_with_timeout(
-            |line| line.contains("listening on http://127.0.0.1:3000"),
-            LineParsingOptions::default(),
-            fe_start_timeout,
-        )
-        .await
-    {
-        Ok(_wait_for) => {}
-        Err(_elapsed) => {
-            tracing::error!(
-                "Frontend failed to start in {fe_start_timeout:?}. Expected to see 'listening on http://127.0.0.1:3000' on stdout. Compilation might not be ready yet. A restart might work as it will pick up the previously done compilation work."
-            );
-        }
-    }
-
-    tracing::info!("Frontend started!");
-    Frontend {
-        cargo_leptos_process: fe_process,
-        stdout_replay,
-        stderr_replay,
-    }
+    std::fs::write(&dotenv, rendered)
+        .unwrap_or_else(|err| panic!("Writing {}: {err:?}", dotenv.display()));
 }

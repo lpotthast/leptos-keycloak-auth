@@ -2,7 +2,7 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
-    use frontend::app::*;
+    use frontend::app::{App, shell};
     use leptos::{logging::log, prelude::*};
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use tracing_subscriber::{

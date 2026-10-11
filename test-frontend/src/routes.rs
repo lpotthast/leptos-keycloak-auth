@@ -9,9 +9,8 @@ use leptos_routes::routes;
 
 use crate::app::{Home, Login, MainLayout, MyAccountPage};
 
-const BASE_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("http://127.0.0.1:3000").unwrap());
+static BASE_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("http://127.0.0.1:3000").unwrap());
 
-#[allow(clippy::module_inception)]
 #[routes]
 pub mod routes {
     fallback!(|| view! { "Page not found." });

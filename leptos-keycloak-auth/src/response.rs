@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use leptos_router::params::{ParamsError, ParamsMap};
 use serde::{Deserialize, Serialize};
 
@@ -5,6 +7,8 @@ use serde::{Deserialize, Serialize};
 /// authentication process.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum CallbackResponse {
+    /// The URL carries none of the query parameters Keycloak responds with.
+    NoCallback,
     SuccessfulLogin(SuccessLoginResponse),
     SuccessfulLogout(SuccessLogoutResponse),
     Error(ErrorResponse),
@@ -96,6 +100,30 @@ pub enum OidcErrorCode {
     Unknown(String),
 }
 
+impl KnownOidcErrorCode {
+    /// The error code as transmitted by the OIDC provider.
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            KnownOidcErrorCode::InvalidRequest => "invalid_request",
+            KnownOidcErrorCode::InvalidClient => "invalid_client",
+            KnownOidcErrorCode::InvalidGrant => "invalid_grant",
+            KnownOidcErrorCode::UnauthorizedClient => "unauthorized_client",
+            KnownOidcErrorCode::UnsupportedGrantType => "unsupported_grant_type",
+            KnownOidcErrorCode::InvalidScope => "invalid_scope",
+        }
+    }
+}
+
+impl Display for OidcErrorCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OidcErrorCode::Known(known) => f.write_str(known.as_str()),
+            OidcErrorCode::Unknown(unknown) => f.write_str(unknown),
+        }
+    }
+}
+
 /// OAuth/OIDC error response received from Keycloak.
 ///
 /// This structure represents error responses returned by Keycloak during
@@ -125,8 +153,22 @@ pub struct ErrorResponse {
     pub error_uri: Option<String>,
 }
 
+impl Display for ErrorResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error)?;
+        if let Some(error_description) = &self.error_description {
+            write!(f, " ({error_description})")?;
+        }
+        if let Some(error_uri) = &self.error_uri {
+            write!(f, ", see {error_uri}")?;
+        }
+        Ok(())
+    }
+}
+
 impl ErrorResponse {
     /// Check if this represents an invalid or expired refresh token.
+    #[must_use]
     pub fn is_invalid_refresh_token(&self) -> bool {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
             && self
@@ -138,6 +180,7 @@ impl ErrorResponse {
 
     /// Check if this represents a "Session not active" error.
     /// In that case, any still known refresh token can be dropped, as the user was logged out.
+    #[must_use]
     pub fn is_session_not_active(&self) -> bool {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
             && self
@@ -150,6 +193,7 @@ impl ErrorResponse {
     /// Check if this error likely indicates the session has ended, regardless of the specific
     /// error description. Any `invalid_grant` error suggests the session or token is no longer
     /// valid. Use this as a fallback when the specific error description is not recognized.
+    #[must_use]
     pub fn is_likely_session_ended(&self) -> bool {
         self.error == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
     }
@@ -229,19 +273,23 @@ impl leptos_router::params::Params for ErrorResponse {
 /// A trait for converting parameters from a map to a structure for `CallbackResponse`.
 impl leptos_router::params::Params for CallbackResponse {
     fn from_map(map: &ParamsMap) -> Result<Self, ParamsError> {
+        // This is the expected code path for most page loads.
+        if ["code", "destroy_session", "error"]
+            .iter()
+            .all(|key| map.get_str(key).is_none())
+        {
+            return Ok(CallbackResponse::NoCallback);
+        }
+
         match SuccessLoginResponse::from_map(map) {
             Ok(response) => Ok(CallbackResponse::SuccessfulLogin(response)),
             Err(_) => match SuccessLogoutResponse::from_map(map) {
                 Ok(response) => Ok(CallbackResponse::SuccessfulLogout(response)),
                 Err(_) => match ErrorResponse::from_map(map) {
                     Ok(response) => Ok(CallbackResponse::Error(response)),
-                    Err(err) => {
-                        // Note: This is the expected code path when there are no query parameters!
-                        // We therefore do not log anything error here.
-                        Err(ParamsError::MissingParam(format!(
-                            "Could not parse query parameters into any expected Keycloak response: {err}"
-                        )))
-                    }
+                    Err(err) => Err(ParamsError::MissingParam(format!(
+                        "Could not parse query parameters into any expected Keycloak response: {err}"
+                    ))),
                 },
             },
         }
@@ -250,7 +298,7 @@ impl leptos_router::params::Params for CallbackResponse {
 
 #[cfg(test)]
 mod tests {
-    use assertr::{assert_that, prelude::*};
+    use assertr::prelude::*;
 
     use crate::response::{ErrorResponse, KnownOidcErrorCode, OidcErrorCode};
 
@@ -258,14 +306,46 @@ mod tests {
     fn deserialize_known_error_code() {
         let error = "invalid_grant";
         let parsed = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")).unwrap();
-        assert_that(parsed).is_equal_to(OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant));
+        assert_that!(parsed).is_equal_to(OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant));
     }
 
     #[test]
     fn deserialize_unknown_error_code() {
         let error = "some_unknown_error";
         let parsed = serde_json::from_str::<OidcErrorCode>(&format!("\"{error}\"")).unwrap();
-        assert_that(parsed).is_equal_to(OidcErrorCode::Unknown(error.to_owned()));
+        assert_that!(parsed).is_equal_to(OidcErrorCode::Unknown(error.to_owned()));
+    }
+
+    #[test]
+    fn known_error_code_as_str_matches_serde_name() {
+        for code in [
+            KnownOidcErrorCode::InvalidRequest,
+            KnownOidcErrorCode::InvalidClient,
+            KnownOidcErrorCode::InvalidGrant,
+            KnownOidcErrorCode::UnauthorizedClient,
+            KnownOidcErrorCode::UnsupportedGrantType,
+            KnownOidcErrorCode::InvalidScope,
+        ] {
+            let serialized = serde_json::to_string(&code).unwrap();
+            assert_that!(serialized).is_equal_to(format!("\"{}\"", code.as_str()));
+        }
+    }
+
+    #[test]
+    fn error_response_display() {
+        let err = ErrorResponse {
+            error: OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant),
+            error_description: Some("Session not active".to_owned()),
+            error_uri: None,
+        };
+        assert_that!(err.to_string()).is_equal_to("invalid_grant (Session not active)");
+
+        let err = ErrorResponse {
+            error: OidcErrorCode::Unknown("access_denied".to_owned()),
+            error_description: None,
+            error_uri: Some("https://example.com/help".to_owned()),
+        };
+        assert_that!(err.to_string()).is_equal_to("access_denied, see https://example.com/help");
     }
 
     fn make_error_response(description: &str) -> ErrorResponse {
@@ -279,25 +359,25 @@ mod tests {
     #[test]
     fn is_invalid_refresh_token_exact_match() {
         let err = make_error_response("Invalid refresh token");
-        assert_that(err.is_invalid_refresh_token()).is_true();
+        assert_that!(err.is_invalid_refresh_token()).is_true();
     }
 
     #[test]
     fn is_invalid_refresh_token_case_insensitive() {
         let err = make_error_response("invalid refresh token");
-        assert_that(err.is_invalid_refresh_token()).is_true();
+        assert_that!(err.is_invalid_refresh_token()).is_true();
 
         let err = make_error_response("INVALID REFRESH TOKEN");
-        assert_that(err.is_invalid_refresh_token()).is_true();
+        assert_that!(err.is_invalid_refresh_token()).is_true();
 
         let err = make_error_response("Invalid Refresh Token");
-        assert_that(err.is_invalid_refresh_token()).is_true();
+        assert_that!(err.is_invalid_refresh_token()).is_true();
     }
 
     #[test]
     fn is_invalid_refresh_token_wrong_description() {
         let err = make_error_response("Token is not active");
-        assert_that(err.is_invalid_refresh_token()).is_false();
+        assert_that!(err.is_invalid_refresh_token()).is_false();
     }
 
     #[test]
@@ -307,7 +387,7 @@ mod tests {
             error_description: None,
             error_uri: None,
         };
-        assert_that(err.is_invalid_refresh_token()).is_false();
+        assert_that!(err.is_invalid_refresh_token()).is_false();
     }
 
     #[test]
@@ -317,34 +397,34 @@ mod tests {
             error_description: Some("Invalid refresh token".to_string()),
             error_uri: None,
         };
-        assert_that(err.is_invalid_refresh_token()).is_false();
+        assert_that!(err.is_invalid_refresh_token()).is_false();
     }
 
     #[test]
     fn is_session_not_active_exact_match() {
         let err = make_error_response("Session not active");
-        assert_that(err.is_session_not_active()).is_true();
+        assert_that!(err.is_session_not_active()).is_true();
     }
 
     #[test]
     fn is_session_not_active_case_insensitive() {
         let err = make_error_response("session not active");
-        assert_that(err.is_session_not_active()).is_true();
+        assert_that!(err.is_session_not_active()).is_true();
 
         let err = make_error_response("SESSION NOT ACTIVE");
-        assert_that(err.is_session_not_active()).is_true();
+        assert_that!(err.is_session_not_active()).is_true();
     }
 
     #[test]
     fn is_session_not_active_wrong_description() {
         let err = make_error_response("Invalid refresh token");
-        assert_that(err.is_session_not_active()).is_false();
+        assert_that!(err.is_session_not_active()).is_false();
     }
 
     #[test]
     fn is_likely_session_ended_any_invalid_grant() {
         let err = make_error_response("Some completely unknown message");
-        assert_that(err.is_likely_session_ended()).is_true();
+        assert_that!(err.is_likely_session_ended()).is_true();
     }
 
     #[test]
@@ -354,7 +434,7 @@ mod tests {
             error_description: Some("whatever".to_string()),
             error_uri: None,
         };
-        assert_that(err.is_likely_session_ended()).is_false();
+        assert_that!(err.is_likely_session_ended()).is_false();
     }
 
     #[test]
@@ -364,6 +444,6 @@ mod tests {
             error_description: Some("whatever".to_string()),
             error_uri: None,
         };
-        assert_that(err.is_likely_session_ended()).is_false();
+        assert_that!(err.is_likely_session_ended()).is_false();
     }
 }

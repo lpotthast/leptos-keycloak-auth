@@ -1,50 +1,43 @@
 use std::time::Duration;
 
-use axum::{
-    Extension, Json, Router,
-    response::{IntoResponse, Response},
-    routing::get,
-};
+use axum::{Extension, Json, Router, response::Response, routing::get};
 use axum_keycloak_auth::{
     PassthroughMode,
     decode::KeycloakToken,
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
 };
-use http::{
-    Method, StatusCode,
-    header::{ACCEPT, AUTHORIZATION},
-};
+use http::{Method, StatusCode, header};
 use serde::Serialize;
-use tokio::{net::TcpListener, task::JoinHandle};
+use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
-    sensitive_headers::{SetSensitiveRequestHeadersLayer, SetSensitiveResponseHeadersLayer},
     timeout::TimeoutLayer,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing::{Level, Span};
 use url::Url;
 
-pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<()> {
+use crate::{REALM, frontend};
+
+/// The backend's port. Must match `API_PORT` in the test-frontend's `.env.template`, which the
+/// frontend compiles in.
+const PORT: u16 = 9999;
+
+/// Start the backend. It serves until the test ends.
+pub async fn start(keycloak_url: Url) {
     let keycloak_auth_instance = KeycloakAuthInstance::new(
         KeycloakConfig::builder()
             .server(keycloak_url)
-            .realm(realm)
+            .realm(REALM.to_owned())
             .build(),
     );
 
-    let router = Router::new().route("/who-am-i", get(who_am_i));
-
-    let router = router.layer(
-        // NOTE: The earlier layers of a ServiceBuilder are the OUTERMOST ones, and executed first.
-        // The later layers are the INNERMOST ones, and executed last when receiving a request.
-        // This differs to adding one layer at a time to a router, where the first ones ore INNERMOST.
+    // The earlier layers of a ServiceBuilder are the OUTERMOST ones, seeing a request first.
+    let router = Router::new().route("/who-am-i", get(who_am_i)).layer(
         ServiceBuilder::new()
-            // Add high level tracing to all requests.
-            // Tracing as innermost layer so it can capture the request after / response before
-            // (including) all other middleware.
+            // Outermost, to trace the whole request handling, including all other middleware.
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(
@@ -60,29 +53,20 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
                         );
                     }),
             )
-            // Sensitive headers should be set before tracing to ensure
-            // sensitive data doesn't leak into logs.
-            .layer(SetSensitiveRequestHeadersLayer::new([
-                http::header::AUTHORIZATION,
-                http::header::COOKIE,
-            ]))
-            .layer(SetSensitiveResponseHeadersLayer::new([]))
-            // Timeout should be near the bottom to ensure the entire
-            // request pipeline respects the timeout.
             .layer(TimeoutLayer::with_status_code(
                 StatusCode::REQUEST_TIMEOUT,
                 Duration::from_secs(10),
             ))
-            // CORS should usually be early to handle preflight requests
-            // before other middleware.
+            // Before authentication, to answer preflight requests, which carry no token.
             .layer(
                 CorsLayer::new()
-                    .allow_origin(AllowOrigin::list(vec![
-                        "http://127.0.0.1:3000".parse().expect("valid url"),
-                    ]))
-                    .allow_methods([Method::GET, Method::POST])
-                    .allow_headers([AUTHORIZATION, ACCEPT])
-                    .allow_credentials(true),
+                    .allow_origin(AllowOrigin::exact(
+                        frontend::origin()
+                            .parse()
+                            .expect("Parsing the frontend origin"),
+                    ))
+                    .allow_methods([Method::GET])
+                    .allow_headers([header::AUTHORIZATION, header::ACCEPT]),
             )
             .layer(
                 KeycloakAuthLayer::<String>::builder()
@@ -94,35 +78,30 @@ pub async fn start_axum_backend(keycloak_url: Url, realm: String) -> JoinHandle<
             ),
     );
 
-    let listener = TcpListener::bind("127.0.0.1:9999")
+    let listener = TcpListener::bind(("127.0.0.1", PORT))
         .await
-        .expect("TcpListener");
+        .expect("Binding the backend's listener");
 
     tokio::spawn(async move {
-        tracing::info!("Serving test backend...");
-        axum::serve(listener, router.into_make_service())
+        tracing::info!("Serving test backend on port {PORT}...");
+        axum::serve(listener, router)
             .await
-            .expect("Server to start successfully");
-        tracing::info!("Test backend stopped!");
-    })
+            .expect("Serving the test backend");
+    });
 }
 
-pub async fn who_am_i(Extension(token): Extension<KeycloakToken<String>>) -> Response {
-    #[derive(Debug, Serialize)]
-    struct Response {
-        username: String,
-        keycloak_uuid: uuid::Uuid,
-        token_valid_for_whole_seconds: i64,
-    }
+#[derive(Debug, Serialize)]
+struct WhoAmI {
+    username: String,
+    keycloak_uuid: uuid::Uuid,
+    token_valid_for_whole_seconds: i64,
+}
 
-    (
-        StatusCode::OK,
-        Json(Response {
-            username: token.extra.profile.preferred_username,
-            keycloak_uuid: uuid::Uuid::try_parse(&token.subject).expect("uuid"),
-            token_valid_for_whole_seconds: (token.expires_at - time::OffsetDateTime::now_utc())
-                .whole_seconds(),
-        }),
-    )
-        .into_response()
+async fn who_am_i(Extension(token): Extension<KeycloakToken<String>>) -> Json<WhoAmI> {
+    Json(WhoAmI {
+        username: token.extra.profile.preferred_username,
+        keycloak_uuid: uuid::Uuid::try_parse(&token.subject).expect("Parsing the subject as UUID"),
+        token_valid_for_whole_seconds: (token.expires_at - time::OffsetDateTime::now_utc())
+            .whole_seconds(),
+    })
 }

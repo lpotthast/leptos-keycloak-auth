@@ -6,30 +6,21 @@ use std::{
 use codee::string::JsonSerdeCodec;
 use leptos::prelude::*;
 use leptos_use::{UseIntervalReturn, storage::StorageType, use_interval};
+use rootcause::Report;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     AuthorizationCode, SessionState, TokenEndpoint, action,
     action::ExchangeCodeForTokenInput,
     code_verifier::CodeVerifier,
-    config::Options,
-    internal::derived_urls::DerivedUrlError,
+    config::{LifeLeft, Options},
+    error::KeycloakAuthError,
+    internal::derived_urls::DerivedUrl,
     request::RequestError,
-    response::{KnownOidcErrorCode, OidcErrorCode},
     storage::{UseStorageReturn, use_storage_with_options_and_error_handler},
     time_ext::TimeDurationExt,
     token::TokenData,
 };
-
-/// Strategy for handling token refresh failures.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum OnRefreshError {
-    /// Don't take any action. Keep the current (possibly expired) token.
-    DoNothing,
-
-    /// Drop the token, effectively logging the user out.
-    DropToken,
-}
 
 /// Session version identifier. Internally represented using a numeric value.
 ///
@@ -113,18 +104,24 @@ pub struct TokenManager {
     pub access_token_expired: Signal<bool>,
 
     /// Duration for which the refresh token is valid, as configured in Keycloak's realm settings.
+    ///
+    /// `Duration::ZERO` if the expiry of the refresh token is unknown, e.g. for offline tokens,
+    /// for which Keycloak reports `refresh_expires_in: 0`.
     pub refresh_token_lifetime: Signal<StdDuration>,
 
     /// The duration for which the refresh token is still valid.
     /// Periodically recomputed. Slowly approaching zero.
+    /// `Duration::ZERO` if the expiry of the refresh token is unknown.
     pub refresh_token_expires_in: Signal<StdDuration>,
 
     /// Whether the refresh token is about to expire. How much token lifetime
     /// must be "left over" for this to switch from `false` to `true` depends on configuration.
     /// Used to control automatic token refreshes.
+    /// Always `false` if the expiry of the refresh token is unknown.
     pub refresh_token_nearly_expired: Signal<bool>,
 
-    /// Whether the refresh token is expired / no longer usable. When this is `true`:
+    /// Whether the refresh token is expired / no longer usable.
+    /// Always `false` if the expiry of the refresh token is unknown. When this is `true`:
     /// - `refresh_token_expires_in` will always report `Duration::ZERO`
     /// - `refresh_token_nearly_expired` will always report `true`
     pub refresh_token_expired: Signal<bool>,
@@ -136,7 +133,7 @@ pub struct TokenManager {
         Callback<()>,
     )>,
 
-    trigger_refresh: Callback<(OnRefreshError,)>,
+    trigger_refresh: Callback<()>,
 }
 
 impl Debug for TokenManager {
@@ -178,7 +175,7 @@ impl TokenManager {
             refresh_token_expires_in: Signal::default(),
             refresh_token_nearly_expired: Signal::default(),
             refresh_token_expired: Signal::default(),
-            trigger_refresh: Callback::new(|_| ()),
+            trigger_refresh: Callback::new(|()| ()),
             trigger_exchange_code_for_token: Callback::new(|_| ()),
         }
     }
@@ -187,8 +184,8 @@ impl TokenManager {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn new(
         options: StoredValue<Options>,
-        handle_req_error: Callback<Option<RequestError>>,
-        token_endpoint: Signal<Result<TokenEndpoint, DerivedUrlError>>,
+        handle_error: Callback<Report<KeycloakAuthError>>,
+        token_endpoint: Signal<DerivedUrl<TokenEndpoint>>,
     ) -> Self {
         let UseStorageReturn {
             read: token,
@@ -229,11 +226,11 @@ impl TokenManager {
         let refresh_token_action = action::create_refresh_token_action(
             options,
             update_token,
-            handle_req_error,
+            handle_error,
             session_version,
         );
 
-        let trigger_refresh = Callback::new(move |(on_refresh_error,)| {
+        let trigger_refresh = Callback::new(move |()| {
             let token_endpoint = match token_endpoint.read_untracked().as_ref() {
                 Ok(it) => it.clone(),
                 Err(err) => {
@@ -255,47 +252,8 @@ impl TokenManager {
                 }
             };
 
-            let on_refresh_error = Callback::new(move |err: RequestError| {
-                match on_refresh_error {
-                    OnRefreshError::DoNothing => {
-                        // Even if we haven't gotten an external request to always drop the token
-                        // when an error was received, we may still want to drop the taken,
-                        // based on the error that we got.
-                        match &err {
-                            RequestError::Send { .. } | RequestError::Decode { .. } => {}
-                            RequestError::ErrResponse { error_response } => {
-                                if error_response.is_invalid_refresh_token() {
-                                    tracing::trace!(
-                                        "The known refresh_token is not valid. Dropping the refresh token. No additional refreshes will be performed."
-                                    );
-                                    // Drop all token data, including our access_token.
-                                    update_token.run(None);
-                                } else if error_response.is_session_not_active() {
-                                    tracing::trace!(
-                                        "The known refresh_token might be valid but the user has no Keycloak session anymore. User was logged out. Dropping the refresh_token. No additional refreshes will be performed."
-                                    );
-                                    // Drop all token data, including our access_token.
-                                    update_token.run(None);
-                                } else if error_response.error
-                                    == OidcErrorCode::Known(KnownOidcErrorCode::InvalidGrant)
-                                {
-                                    tracing::warn!(
-                                        "Received an unexpected `invalid_grant` error. Did Keycloak's error messages change? If you see this, report at `https://github.com/lpotthast/leptos-keycloak-auth/issues`."
-                                    );
-                                    // Drop all token data, including our access_token.
-                                    update_token.run(None);
-                                } else {
-                                    tracing::warn!(
-                                        "Token refresh failed due to unexpected Keycloak error response: {error_response:?}"
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    OnRefreshError::DropToken => {
-                        update_token.run(None);
-                    }
-                }
+            let on_refresh_error = Callback::new(move |err: Report<RequestError>| {
+                drop_token_if_session_ended(&err, update_token);
                 err
             });
 
@@ -303,7 +261,7 @@ impl TokenManager {
         });
 
         let exchange_code_for_token_action =
-            action::create_exchange_code_for_token_action(options, update_token, handle_req_error);
+            action::create_exchange_code_for_token_action(options, update_token, handle_error);
 
         let trigger_exchange_code_for_token = Callback::new(
             move |(auth_code, code_verifier, session_state, finally): (
@@ -363,8 +321,8 @@ impl TokenManager {
             life_left.nearly_expired(access_token_lifetime.get(), access_token_expires_in.get())
         });
 
-        // True when a token is present and the access token is expired.
-        // Defaults to `false` if no token data is present.
+        // True when the access token is expired.
+        // Also `true` if no token data is present, as `access_token_expires_in` is then zero.
         let access_token_expired = Memo::new(move |_| access_token_expires_in.get().is_zero());
 
         let refresh_token_lifetime = Memo::new(move |_| {
@@ -403,12 +361,18 @@ impl TokenManager {
 
         let refresh_token_nearly_expired = Memo::new(move |_| {
             let life_left = options.with_value(|o| o.advanced.refresh_token_nearly_expired_having);
-            life_left.nearly_expired(refresh_token_lifetime.get(), refresh_token_expires_in.get())
+            is_refresh_token_nearly_expired(
+                life_left,
+                refresh_token_lifetime.get(),
+                refresh_token_expires_in.get(),
+            )
         });
 
-        // True when a token is present and the refresh token is expired.
+        // True when the refresh token has a known expiry and is expired.
         // Defaults to `false` if no token data is present.
-        let refresh_token_expired = Memo::new(move |_| refresh_token_expires_in.get().is_zero());
+        let refresh_token_expired = Memo::new(move |_| {
+            is_refresh_token_expired(refresh_token_lifetime.get(), refresh_token_expires_in.get())
+        });
 
         // If either the access or the refresh token is about to expire
         // (although the refresh token *should* always outlive the access token...),
@@ -430,7 +394,7 @@ impl TokenManager {
                     refresh_token_nearly_expired,
                     "Refreshing token..."
                 );
-                trigger_refresh.run((OnRefreshError::DoNothing,));
+                trigger_refresh.run(());
             }
         });
 
@@ -480,8 +444,8 @@ impl TokenManager {
         ));
     }
 
-    pub(crate) fn refresh_token(&self, on_refresh_error: OnRefreshError) {
-        self.trigger_refresh.run((on_refresh_error,));
+    pub(crate) fn refresh_token(&self) {
+        self.trigger_refresh.run(());
     }
 
     /// Forget any known token. This is a local operation, not hitting Keycloak in any way.
@@ -493,6 +457,63 @@ impl TokenManager {
     }
 }
 
+/// Drop all token data if a failed refresh shows that the session ended.
+///
+/// Any other failure, e.g. a network error, keeps the current (possibly expired) token, so that
+/// a later refresh can still succeed.
+pub(crate) fn drop_token_if_session_ended(
+    err: &Report<RequestError>,
+    update_token: Callback<Option<TokenData>>,
+) {
+    match err.current_context() {
+        RequestError::ErrResponse { error_response }
+            if error_response.is_likely_session_ended() =>
+        {
+            if error_response.is_invalid_refresh_token() || error_response.is_session_not_active() {
+                tracing::trace!(
+                    %error_response,
+                    "The refresh token is invalid or the user has no Keycloak session anymore. Dropping all token data. No additional refreshes will be performed."
+                );
+            } else {
+                tracing::warn!(
+                    %error_response,
+                    "Received an unexpected `invalid_grant` error. Did Keycloak's error messages change? If you see this, report at `https://github.com/lpotthast/leptos-keycloak-auth/issues`. Dropping all token data."
+                );
+            }
+            update_token.run(None);
+        }
+        RequestError::ErrResponse { error_response } => {
+            tracing::warn!(
+                %error_response,
+                "Token refresh failed due to an unexpected Keycloak error response. Keeping the current token."
+            );
+        }
+        RequestError::Send | RequestError::Decode => {
+            tracing::debug!(?err, "Token refresh failed. Keeping the current token.");
+        }
+    }
+}
+
+/// Whether a refresh token is about to expire.
+///
+/// A zero `lifetime` means that the expiry is unknown, either because the token response did not
+/// state one or because Keycloak reported `refresh_expires_in: 0`, which it does for offline
+/// tokens not limited by a maximum offline session lifespan. Such a refresh token is never
+/// considered nearly expired. Treating it as such would trigger a refresh after every refresh.
+fn is_refresh_token_nearly_expired(
+    life_left: LifeLeft,
+    lifetime: StdDuration,
+    left: StdDuration,
+) -> bool {
+    !lifetime.is_zero() && life_left.nearly_expired(lifetime, left)
+}
+
+/// Whether a refresh token is expired. Refresh tokens with an unknown expiry (zero `lifetime`)
+/// never are. See [`is_refresh_token_nearly_expired`].
+fn is_refresh_token_expired(lifetime: StdDuration, left: StdDuration) -> bool {
+    !lifetime.is_zero() && left.is_zero()
+}
+
 #[cfg(test)]
 mod tests {
     use assertr::prelude::*;
@@ -501,19 +522,68 @@ mod tests {
 
     #[test]
     fn session_version_default_is_zero() {
-        assert_that(SessionVersion::default()).is_equal_to(SessionVersion::ZERO);
-        assert_that(SessionVersion::ZERO).is_equal_to(SessionVersion(0));
+        assert_that!(SessionVersion::default()).is_equal_to(SessionVersion::ZERO);
+        assert_that!(SessionVersion::ZERO).is_equal_to(SessionVersion(0));
     }
 
     #[test]
     fn session_version_increment() {
         let v = SessionVersion(0);
-        assert_that(v.increment()).is_equal_to(SessionVersion(1));
+        assert_that!(v.increment()).is_equal_to(SessionVersion(1));
     }
 
     #[test]
     fn session_version_increment_wraps_around() {
         let v = SessionVersion(u64::MAX);
-        assert_that(v.increment()).is_equal_to(SessionVersion(0));
+        assert_that!(v.increment()).is_equal_to(SessionVersion(0));
+    }
+
+    #[test]
+    fn refresh_token_with_unknown_expiry_is_never_nearly_expired() {
+        let life_left = LifeLeft::Percentage(0.25);
+        assert_that!(is_refresh_token_nearly_expired(
+            life_left,
+            StdDuration::ZERO,
+            StdDuration::ZERO
+        ))
+        .is_false();
+    }
+
+    #[test]
+    fn refresh_token_with_unknown_expiry_is_never_expired() {
+        assert_that!(is_refresh_token_expired(
+            StdDuration::ZERO,
+            StdDuration::ZERO
+        ))
+        .is_false();
+    }
+
+    #[test]
+    fn refresh_token_with_known_expiry_can_be_nearly_expired() {
+        let life_left = LifeLeft::Percentage(0.25);
+        let lifetime = StdDuration::from_secs(1800);
+        assert_that!(is_refresh_token_nearly_expired(
+            life_left,
+            lifetime,
+            StdDuration::from_secs(1200)
+        ))
+        .is_false();
+        assert_that!(is_refresh_token_nearly_expired(
+            life_left,
+            lifetime,
+            StdDuration::from_secs(300)
+        ))
+        .is_true();
+    }
+
+    #[test]
+    fn refresh_token_with_known_expiry_can_be_expired() {
+        let lifetime = StdDuration::from_secs(1800);
+        assert_that!(is_refresh_token_expired(
+            lifetime,
+            StdDuration::from_secs(1)
+        ))
+        .is_false();
+        assert_that!(is_refresh_token_expired(lifetime, StdDuration::ZERO)).is_true();
     }
 }

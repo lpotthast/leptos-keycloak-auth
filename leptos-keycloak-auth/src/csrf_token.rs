@@ -33,14 +33,14 @@ impl Default for CsrfToken {
 mod tests {
     use std::collections::HashSet;
 
-    use assertr::{assert_that, prelude::*};
+    use assertr::prelude::*;
 
     use super::*;
 
     #[test]
     fn generate_logout_token_on_creation() {
         let token = CsrfToken::new();
-        assert_that(token.as_str()).is_not_empty().has_length(43);
+        assert_that!(token.as_str()).is_not_empty().has_length(43);
     }
 
     #[test]
@@ -48,7 +48,7 @@ mod tests {
         let mut tokens = HashSet::new();
 
         for _ in 0..100 {
-            assert_that(tokens.insert(CsrfToken::new()))
+            assert_that!(tokens.insert(CsrfToken::new()))
                 .with_detail_message("Generated duplicate token.")
                 .with_detail_message(format!("{tokens:?}"))
                 .is_true();

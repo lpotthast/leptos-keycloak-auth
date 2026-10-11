@@ -9,9 +9,9 @@ use crate::{
 
 /// Manages [`Nonce`](Nonce)'s  for `OpenID Connect` ID token validation.
 ///
-/// Nonces are stored in session storage because the authorization flow involves
+/// Nonces are stored in local storage because the authorization flow involves
 /// navigating away from the application to Keycloak's login page and then being redirected
-/// back, which causes a full page reload. Session storage survives same-tab navigations.
+/// back, which causes a full page reload.
 ///
 /// # Internal Use
 /// This is an internal component exposed via the `internals` feature flag for advanced
@@ -28,10 +28,10 @@ pub struct NonceManager {
 impl NonceManager {
     /// Create a new nonce manager.
     ///
-    /// The nonce is stored in session storage to survive full page reloads during the
+    /// The nonce is stored in local storage to survive full page reloads during the
     /// OAuth/OIDC authorization flow.
     pub fn new() -> Self {
-        // We keep the nonce in session storage because our authorization flow includes
+        // We keep the nonce in local storage because our authorization flow includes
         // navigating away from our Leptos application to the auth provider's login page
         // and then being redirected back to our application, meaning that we do a full reload!
         // We include the nonce in the authorization request and need the same nonce later
@@ -42,9 +42,10 @@ impl NonceManager {
             remove: _remove_nonce_from_storage,
             ..
         } = use_storage_with_options_and_error_handler::<Nonce, JsonSerdeCodec>(
-            // Forcing session storage, because this data point must be as secure as possible,
-            // and we do not care that we may lose the nonce from a page-refresh or tab-close.
-            StorageType::Session,
+            // Local storage, not session storage: All tabs share the token data (local storage),
+            // and every tab validates the shared ID token against the nonce. With a nonce per tab,
+            // opening the application in another tab after logging in would end the session.
+            StorageType::Local,
             "leptos_keycloak_auth__nonce",
             move || {
                 tracing::trace!("Create initial nonce");

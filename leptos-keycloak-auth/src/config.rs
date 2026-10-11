@@ -1,7 +1,8 @@
 use std::time::Duration as StdDuration;
 
 use leptos::prelude::{RwSignal, Signal};
-use snafu::Snafu;
+use rootcause::{Report, bail};
+use thiserror::Error;
 use url::{PathSegmentsMut, Url};
 
 use crate::DiscoveryEndpoint;
@@ -330,23 +331,23 @@ impl BaseUrl {
     }
 }
 
-#[derive(Debug, Snafu)]
-#[snafu(display(
-    "'{}' must not be a cannot-be-a-base URL. This URL must be usable as a base to prefix other relative urls with. Did you specify a 'data:' or 'mailto:' address?",
-    url.as_str()
-))]
+/// A URL that must be usable as a base URL is a cannot-be-a-base URL.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error(
+    "'{url}' must not be a cannot-be-a-base URL. This URL must be usable as a base to prefix other relative urls with. Did you specify a 'data:' or 'mailto:' address?"
+)]
 pub struct NotABaseUrlError {
     url: Url,
 }
 
 trait UrlExt {
-    fn expect_base_url(self) -> Result<BaseUrl, NotABaseUrlError>;
+    fn expect_base_url(self) -> Result<BaseUrl, Report<NotABaseUrlError>>;
 }
 
 impl UrlExt for Url {
-    fn expect_base_url(self) -> Result<BaseUrl, NotABaseUrlError> {
+    fn expect_base_url(self) -> Result<BaseUrl, Report<NotABaseUrlError>> {
         if self.cannot_be_a_base() {
-            return Err(NotABaseUrlError { url: self });
+            bail!(NotABaseUrlError { url: self });
         }
         Ok(BaseUrl(self))
     }
@@ -367,7 +368,7 @@ mod tests {
         fn nearly_expired_can_handle_zero_lifetime_when_computing_percentage() {
             let ll = LifeLeft::Percentage(0.25);
             let result = ll.nearly_expired(Duration::ZERO, Duration::from_secs(10));
-            assert_that(result).is_true();
+            assert_that!(result).is_true();
         }
 
         #[test]
@@ -375,7 +376,7 @@ mod tests {
             let ll = LifeLeft::Percentage(0.25);
             // 60 min lifetime, 30 min left = 50% > 25%
             let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(1800));
-            assert_that(result).is_false();
+            assert_that!(result).is_false();
         }
 
         #[test]
@@ -383,7 +384,7 @@ mod tests {
             let ll = LifeLeft::Percentage(0.25);
             // 60 min lifetime, 10 min left = ~16.7% < 25%
             let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(600));
-            assert_that(result).is_true();
+            assert_that!(result).is_true();
         }
 
         #[test]
@@ -391,38 +392,38 @@ mod tests {
             let ll = LifeLeft::Percentage(0.25);
             // 100s lifetime, 25s left = exactly 25% => <=, so it's "nearly expired"
             let result = ll.nearly_expired(Duration::from_secs(100), Duration::from_secs(25));
-            assert_that(result).is_true();
+            assert_that!(result).is_true();
         }
 
         #[test]
         fn duration_not_expired_when_plenty_of_time_left() {
             let ll = LifeLeft::Duration(Duration::from_secs(60));
             let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(120));
-            assert_that(result).is_false();
+            assert_that!(result).is_false();
         }
 
         #[test]
         fn duration_expired_when_little_time_left() {
             let ll = LifeLeft::Duration(Duration::from_secs(60));
             let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(30));
-            assert_that(result).is_true();
+            assert_that!(result).is_true();
         }
 
         #[test]
         fn duration_boundary_at_exactly_threshold() {
             let ll = LifeLeft::Duration(Duration::from_secs(60));
             let result = ll.nearly_expired(Duration::from_secs(3600), Duration::from_secs(60));
-            assert_that(result).is_true();
+            assert_that!(result).is_true();
         }
 
         #[test]
         fn zero_time_left_is_always_nearly_expired() {
             let percentage = LifeLeft::Percentage(0.25);
-            assert_that(percentage.nearly_expired(Duration::from_secs(100), Duration::ZERO))
+            assert_that!(percentage.nearly_expired(Duration::from_secs(100), Duration::ZERO))
                 .is_true();
 
             let duration = LifeLeft::Duration(Duration::from_secs(60));
-            assert_that(duration.nearly_expired(Duration::from_secs(100), Duration::ZERO))
+            assert_that!(duration.nearly_expired(Duration::from_secs(100), Duration::ZERO))
                 .is_true();
         }
     }
@@ -437,7 +438,7 @@ mod tests {
         #[test]
         fn default_request_timeout_is_30_seconds() {
             let opts = AdvancedOptions::default();
-            assert_that(opts.request_timeout).is_equal_to(Duration::from_secs(30));
+            assert_that!(opts.request_timeout).is_equal_to(Duration::from_secs(30));
         }
     }
 }

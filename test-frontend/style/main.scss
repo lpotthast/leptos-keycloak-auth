@@ -1,26 +1,222 @@
-@use "leptonic/leptonic-themes";
+// Simple custom styles for the test-frontend. Leptonic's atoms are unstyled: they are styled here through their
+// default classes (`leptonic-Button`, ...) and the data attributes they render for their state (`data-hovered`,
+// `data-pressed`, `data-focus-visible`, `data-disabled`, ...).
+
+:root {
+    --bg: #f7f5f2;
+    --surface: #ffffff;
+    --text: #1f1d1a;
+    --text-muted: #6b665e;
+    --border: #d9d4cc;
+    --accent: #0f766e;
+    --accent-hover: #115e59;
+    --accent-text: #ffffff;
+    --danger: #c0392b;
+    --danger-hover: #a93226;
+    --focus-ring: #0f766e;
+    --backdrop: rgb(0 0 0 / 40%);
+    --radius: 6px;
+
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #181715;
+        --surface: #22201d;
+        --text: #ece9e4;
+        --text-muted: #a39e96;
+        --border: #3a3733;
+        --accent: #4fb8a8;
+        --accent-hover: #6fcabb;
+        --accent-text: #181715;
+        --danger: #e5675a;
+        --danger-hover: #ec8a80;
+        --focus-ring: #6fcabb;
+        --backdrop: rgb(0 0 0 / 60%);
+    }
+}
 
 * {
-    font-family: Roboto, sans-serif;
+    box-sizing: border-box;
 }
 
 html {
     font-size: 16px;
-    height: 100%;
 }
 
 body {
     margin: 0;
-    min-height: var(--leptonic-vh, 100vh);
-    height: 100%;
+    min-height: 100vh;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+}
+
+h1,
+h2 {
+    margin: 0 0 0.5rem;
+    line-height: 1.2;
+}
+
+.page {
     display: flex;
     flex-direction: column;
+    gap: 1rem;
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
 }
 
-[data-theme="light"] {
-    --brand-color: #8856e6;
+.muted {
+    color: var(--text-muted);
 }
 
-[data-theme="dark"] {
-    --brand-color: #8856e6;
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+// Landmarks become focusable while navigated to (F6).
+[role="banner"],
+[role="main"],
+[role="region"] {
+    &:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 4px;
+        border-radius: var(--radius);
+    }
+}
+
+.leptonic-Separator {
+    width: 100%;
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--border);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.back-to-root {
+    margin-top: 2rem;
+}
+
+// Buttons, and links looking like buttons.
+.leptonic-Button,
+.leptonic-Link.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 120ms, border-color 120ms, transform 60ms;
+
+    &[data-hovered] {
+        border-color: var(--accent);
+    }
+
+    &[data-pressed] {
+        transform: scale(0.97);
+    }
+
+    &[data-focus-visible] {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
+
+    &[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+        border-color: var(--border);
+        transform: none;
+    }
+
+    &[data-variant="primary"] {
+        border-color: var(--accent);
+        background-color: var(--accent);
+        color: var(--accent-text);
+
+        &[data-hovered] {
+            border-color: var(--accent-hover);
+            background-color: var(--accent-hover);
+        }
+    }
+
+    &[data-variant="danger"] {
+        border-color: var(--danger);
+        color: var(--danger);
+
+        &[data-hovered] {
+            border-color: var(--danger-hover);
+            color: var(--danger-hover);
+        }
+    }
+}
+
+// The suspicious logout dialog.
+.leptonic-ModalBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background-color: var(--backdrop);
+}
+
+.leptonic-ModalContent {
+    width: min(28rem, 100%);
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 2);
+    background-color: var(--surface);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 25%);
+}
+
+.leptonic-Dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    outline: none;
+}
+
+.leptonic-DialogTitle {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.leptonic-DialogDescription {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.debug-state {
+    overflow-x: auto;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--surface);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+
+    pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
 }

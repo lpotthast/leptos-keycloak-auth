@@ -6,11 +6,11 @@ use url::Url;
 
 use crate::{
     AuthorizationEndpoint, code_verifier::CodeChallenge, config::Options,
-    internal::derived_urls::DerivedUrlError, nonce::Nonce,
+    internal::derived_urls::DerivedUrl, nonce::Nonce,
 };
 
 pub(crate) fn create_login_url_signal(
-    authorization_endpoint: Signal<Result<AuthorizationEndpoint, DerivedUrlError>>,
+    authorization_endpoint: Signal<DerivedUrl<AuthorizationEndpoint>>,
     options: StoredValue<Options>,
     code_challenge: Memo<CodeChallenge>,
     nonce: Signal<Nonce>,

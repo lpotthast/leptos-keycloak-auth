@@ -2,12 +2,12 @@ use leptos::prelude::*;
 use url::Url;
 
 use crate::{
-    EndSessionEndpoint, config::Options, csrf_token::CsrfToken,
-    internal::derived_urls::DerivedUrlError, token::TokenData,
+    EndSessionEndpoint, config::Options, csrf_token::CsrfToken, internal::derived_urls::DerivedUrl,
+    token::TokenData,
 };
 
 pub(crate) fn create_logout_url_signal(
-    end_session_endpoint: Signal<Result<EndSessionEndpoint, DerivedUrlError>>,
+    end_session_endpoint: Signal<DerivedUrl<EndSessionEndpoint>>,
     token: Signal<Option<TokenData>>,
     options: StoredValue<Options>,
     csrf_token: Signal<CsrfToken>,
