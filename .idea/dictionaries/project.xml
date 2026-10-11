@@ -2,6 +2,7 @@
   <dictionary name="project">
     <words>
       <w>backchannel</w>
+      <w>leptosfmt</w>
       <w>pkce</w>
       <w>reqwest</w>
     </words>
