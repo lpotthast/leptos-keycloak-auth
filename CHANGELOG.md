@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.14.0] - 2026-08-11
+## [0.14.1] - 2026-10-12
+
+### Changed
+
+- A `keycloak_server_url` that can't be a base URL (e.g. a `mailto:` URL) still panics, but now with a message naming
+  the setting and the given URL.
+
+### Fixed
+
+- Logging in through an `AuthProvider` without `post_login_redirect_url` panicked with "Tried to access reactive URL
+  outside a <Router> component.". The token exchange read the default redirect URL, which depends on the router, from an
+  async task without reactive owner.
+- Redirect URL signals depending on context (e.g. a `Signal::derive` calling `use_url`) panicked when read without
+  reactive owner, e.g. by `end_session` called from a timeout. All redirect URL signals are now read under the owner of
+  `AuthProvider` or of the `init_keycloak_auth` call, so they can use any context available there.
+- A `keycloak_server_url` with a path and a trailing slash (e.g. `https://host/auth/`, as used by Keycloak versions
+  before 17) led to an OIDC discovery URL containing `//` (`https://host/auth//realms/...`).
+
+## [0.14.0] - 2026-10-12
 
 ### Added
 
@@ -464,8 +482,9 @@ for details.
 - Initial release. OIDC authorization-code flow against a Keycloak realm from a Leptos client, including discovery, JWK
   retrieval, ID token validation, automatic refresh, and login/logout helpers.
 
-[Unreleased]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.14.0...HEAD
-[0.13.0]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.13.0...v0.14.0
+[Unreleased]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.12.0...v0.13.0
 [0.12.1]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/lpotthast/leptos-keycloak-auth/compare/v0.11.2...v0.12.0

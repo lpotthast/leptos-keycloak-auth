@@ -95,7 +95,9 @@ pub(crate) fn create_exchange_code_for_token_action(
     Action::new(move |input: &ExchangeCodeForTokenInput| {
         let token_endpoint = input.token_endpoint.clone();
         let client_id = options.read_value().client_id.clone();
-        let redirect_uri = options.read_value().post_login_redirect_url;
+        // Read when dispatched, while still at the login callback: the token request's
+        // `redirect_uri` must match the one of the authorization request.
+        let redirect_uri = options.read_value().post_login_redirect_url.get_untracked();
         let auth_code = input.auth_code.clone();
         let code_verifier = input.code_verifier.code_verifier().to_owned();
         let session_state = input.session_state.clone();
@@ -106,7 +108,7 @@ pub(crate) fn create_exchange_code_for_token_action(
                 let result = request::exchange_code_for_token(
                     token_endpoint.clone(),
                     &client_id,
-                    redirect_uri.read_untracked().as_ref(),
+                    redirect_uri.as_ref(),
                     &auth_code,
                     &code_verifier,
                     session_state.as_deref(),

@@ -1,6 +1,6 @@
 use std::time::Duration as StdDuration;
 
-use leptos::prelude::{RwSignal, Signal};
+use leptos::prelude::{Get, Memo, RwSignal, Signal};
 use rootcause::{Report, bail};
 use thiserror::Error;
 use url::{PathSegmentsMut, Url};
@@ -143,12 +143,18 @@ pub struct UseKeycloakAuthOptions {
     ///
     /// It is MANDATORY that this redirects to a URL where `init_keycloak_auth` is called in order
     /// to be able to complete the login flow.
+    ///
+    /// The signal is always read under the owner calling `init_keycloak_auth`, so it may use the
+    /// context available there (e.g. the router's, through `use_url`).
     pub post_login_redirect_url: Signal<Url>,
 
     /// Url to which you want to be redirected after a successful logout.
     ///
     /// It is MANDATORY that this redirects to a URL where `init_keycloak_auth` is called in order
     /// to be able to complete the login flow.
+    ///
+    /// The signal is always read under the owner calling `init_keycloak_auth`, so it may use the
+    /// context available there (e.g. the router's, through `use_url`).
     pub post_logout_redirect_url: Signal<Url>,
 
     /// The additional scopes (permissions / access-levels) requested from Keycloak.
@@ -285,16 +291,27 @@ pub(crate) struct Options {
 }
 
 impl Options {
+    /// # Panics
+    ///
+    /// Panics when `keycloak_server_url` is not usable as a base URL.
+    #[track_caller]
     pub(crate) fn new(options: UseKeycloakAuthOptions) -> Self {
+        // A `match`, not `unwrap_or_else`: a closure would make the panic report its own location
+        // instead of the caller's.
+        let keycloak_server_url = match options.keycloak_server_url.expect_base_url() {
+            Ok(url) => url,
+            Err(err) => panic!(
+                "Invalid `keycloak_server_url`, expected the URL of your Keycloak server (e.g. \
+                'https://keycloak.example.com'): {}",
+                err.current_context()
+            ),
+        };
         Self {
-            keycloak_server_url: options
-                .keycloak_server_url
-                .expect_base_url()
-                .expect("`keycloak_server_url` to be a base URL."),
+            keycloak_server_url,
             realm: options.realm,
             client_id: options.client_id,
-            post_login_redirect_url: options.post_login_redirect_url,
-            post_logout_redirect_url: options.post_logout_redirect_url,
+            post_login_redirect_url: owned(options.post_login_redirect_url),
+            post_logout_redirect_url: owned(options.post_logout_redirect_url),
             scope: options.scope,
             id_token_validation: ValidationOptionsInternal {
                 expected_audiences: RwSignal::new(options.id_token_validation.expected_audiences),
@@ -306,7 +323,9 @@ impl Options {
 
     pub(crate) fn discovery_endpoint(&self) -> DiscoveryEndpoint {
         let mut url = self.keycloak_server_url.clone();
-        url.path_segments_mut().extend(&[
+        // `pop_if_empty` drops the empty segment of a trailing slash (e.g. of "https://host/auth/"),
+        // which would otherwise lead to a "//" in the path.
+        url.path_segments_mut().pop_if_empty().extend(&[
             "realms",
             &self.realm,
             ".well-known",
@@ -314,6 +333,15 @@ impl Options {
         ]);
         url.into_inner()
     }
+}
+
+/// Reads `signal` through a memo owned by the current owner (the one calling `init_keycloak_auth`).
+///
+/// A memo computes under the owner it was created with, so a signal requiring context (e.g. a
+/// derived signal calling `use_url`) stays readable where no reactive owner leads to that context
+/// (async tasks, callbacks without owner).
+fn owned(signal: Signal<Url>) -> Signal<Url> {
+    Signal::from(Memo::new(move |_| signal.get()))
 }
 
 #[derive(Debug, Clone)]
@@ -333,9 +361,7 @@ impl BaseUrl {
 
 /// A URL that must be usable as a base URL is a cannot-be-a-base URL.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error(
-    "'{url}' must not be a cannot-be-a-base URL. This URL must be usable as a base to prefix other relative urls with. Did you specify a 'data:' or 'mailto:' address?"
-)]
+#[error("'{url}' cannot be a base URL, so no paths can be appended to it.")]
 pub struct NotABaseUrlError {
     url: Url,
 }
@@ -425,6 +451,66 @@ mod tests {
             let duration = LifeLeft::Duration(Duration::from_secs(60));
             assert_that!(duration.nearly_expired(Duration::from_secs(100), Duration::ZERO))
                 .is_true();
+        }
+    }
+
+    mod options {
+        use assertr::prelude::*;
+        use leptos::prelude::Signal;
+        use url::Url;
+
+        use crate::{
+            AdvancedOptions, IdTokenValidationOptions, UseKeycloakAuthOptions, config::Options,
+        };
+
+        fn options(keycloak_server_url: &str) -> UseKeycloakAuthOptions {
+            let url = Url::parse("http://localhost:3000").expect("valid url");
+            UseKeycloakAuthOptions {
+                keycloak_server_url: Url::parse(keycloak_server_url).expect("valid url"),
+                realm: "test-realm".to_owned(),
+                client_id: "test-client".to_owned(),
+                post_login_redirect_url: Signal::stored(url.clone()),
+                post_logout_redirect_url: Signal::stored(url),
+                scope: vec![],
+                id_token_validation: IdTokenValidationOptions {
+                    expected_audiences: None,
+                    expected_issuers: None,
+                },
+                advanced: AdvancedOptions::default(),
+            }
+        }
+
+        #[test]
+        #[should_panic(
+            expected = "Invalid `keycloak_server_url`, expected the URL of your Keycloak server (e.g. 'https://keycloak.example.com'): 'mailto:admin@example.com' cannot be a base URL, so no paths can be appended to it."
+        )]
+        fn new_panics_with_clear_message_when_keycloak_server_url_is_not_a_base_url() {
+            let _ = Options::new(options("mailto:admin@example.com"));
+        }
+
+        #[test]
+        fn discovery_endpoint_ignores_trailing_slash_of_keycloak_server_url() {
+            for (keycloak_server_url, expected) in [
+                (
+                    "http://localhost:8443",
+                    "http://localhost:8443/realms/test-realm/.well-known/openid-configuration",
+                ),
+                (
+                    "http://localhost:8443/",
+                    "http://localhost:8443/realms/test-realm/.well-known/openid-configuration",
+                ),
+                (
+                    "http://localhost:8443/auth",
+                    "http://localhost:8443/auth/realms/test-realm/.well-known/openid-configuration",
+                ),
+                (
+                    "http://localhost:8443/auth/",
+                    "http://localhost:8443/auth/realms/test-realm/.well-known/openid-configuration",
+                ),
+            ] {
+                let options = Options::new(options(keycloak_server_url));
+                assert_that!(options.discovery_endpoint().as_str()).is_equal_to(expected);
+            }
         }
     }
 

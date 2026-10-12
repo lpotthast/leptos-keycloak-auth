@@ -79,6 +79,11 @@ pub fn try_use_authenticated() -> Option<Authenticated> {
 ///
 /// This HAS TO BE called from inside a `<Router>` component, as `use_keycloak_auth` requires
 /// reactive access to the current url of the page.
+///
+/// # Panics
+///
+/// Panics when `keycloak_server_url` is not usable as a base URL.
+#[track_caller]
 pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     tracing::trace!("Initializing Keycloak auth...");
 
@@ -98,6 +103,7 @@ pub fn init_keycloak_auth(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 }
 
 #[cfg(feature = "ssr")]
+#[track_caller]
 fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use leptos::prelude::*;
 
@@ -129,6 +135,7 @@ fn ssr_stub(options: UseKeycloakAuthOptions) -> KeycloakAuth {
 
 #[cfg(not(feature = "ssr"))]
 #[allow(clippy::too_many_lines)]
+#[track_caller]
 fn real(options: UseKeycloakAuthOptions) -> KeycloakAuth {
     use std::ops::Deref;
 

@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "leptos-keycloak-auth"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "assertr",
  "async-trait",

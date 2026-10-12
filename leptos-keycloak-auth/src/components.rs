@@ -15,6 +15,10 @@ use crate::{
 ///
 /// By default, users are redirected to the current page after login/logout.
 ///
+/// # Panics
+///
+/// Panics when `keycloak_server_url` is not usable as a base URL (e.g. a 'mailto:' URL).
+///
 /// # Example
 /// ```no_run
 /// use leptos::prelude::*;
@@ -54,11 +58,15 @@ pub fn AuthProvider(
 
     /// Default post-login redirect behavior.
     /// Defaults to reactive tracking of the current page.
+    /// The signal is always read under this component's owner, so it may use the context
+    /// available here (e.g. the router's, through `use_url`).
     #[prop(into, optional)]
     post_login_redirect_url: Option<Signal<Url>>,
 
     /// Default post-logout redirect behavior.
     /// Defaults to reactive tracking of the current page.
+    /// The signal is always read under this component's owner, so it may use the context
+    /// available here (e.g. the router's, through `use_url`).
     #[prop(into, optional)]
     post_logout_redirect_url: Option<Signal<Url>>,
 
@@ -80,7 +88,7 @@ pub fn AuthProvider(
 
     children: Children,
 ) -> impl IntoView {
-    // Resolve initial redirect URLs based on default behavior
+    // Resolve initial redirect URLs based on default behavior.
     let post_login_redirect_url =
         post_login_redirect_url.unwrap_or_else(|| Signal::derive(current_url));
     let post_logout_redirect_url =
