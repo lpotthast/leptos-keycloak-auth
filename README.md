@@ -31,7 +31,7 @@ For `wasm32-unknown-unknown`, the target of our hydrating client, a special `get
 2. Add `leptos-keycloak-auth` as a dependency and enable its `ssr` feature when running on the server.
    ```toml
    [dependencies]
-   leptos-keycloak-auth = "0.13"
+   leptos-keycloak-auth = "0.14"
    
    [features]
    hydrate = [ 
