@@ -21,26 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Breaking**: `reqwest`'s `rustls` feature is no longer always enabled. Only the selected TLS feature enables a TLS
   backend now, so dependents disabling the default features get none on native targets. WASM builds are unaffected.
-
-- **Breaking**: Switch error handling from `snafu` to `rootcause` reports with `thiserror`-derived error types.
-  `NotAuthenticated::last_error` is now a `Signal<Option<Report<KeycloakAuthError, Cloneable>>>` and
-  `NotAuthenticated::last_id_token_error` a `Signal<Option<Report<IdTokenClaimsError, Cloneable>>>`. The error types
-  only describe the failed operation (e.g. `KeycloakAuthError::RefreshToken { token_endpoint }`), underlying errors
-  (e.g. a `RequestError`, a `reqwest` or `jsonwebtoken` error) are child reports. `KeycloakAuthError` names the
-  operation that failed (OIDC discovery, JWK set retrieval, code exchange, token refresh, an error response from
-  Keycloak, unparsable callback parameters) instead of only distinguishing request and parameter errors.
+- **Breaking**: Switch error handling from `snafu` to `rootcause` reports with `thiserror`-derived error types. The
+  error types only describe the failed operation (e.g. `KeycloakAuthError::RefreshToken { token_endpoint }`). Underlying
+  errors (e.g. a `RequestError`, a `reqwest` or `jsonwebtoken` error) are children of the rootcause `Report`.
+- `KeycloakAuthError` names the operation that failed (OIDC discovery, JWK set retrieval, code exchange, token refresh,
+  an error response from Keycloak, unparsable callback parameters) instead of only distinguishing request and parameter
+  errors.
 - **Breaking**: Bump `leptos-use` to 0.19 (`StorageType` is re-exported from it).
 - **Breaking**: Bump `jsonwebtoken` to 11 (its `Algorithm` and `KeyAlgorithm` appear in `JwtValidationError`).
 - **Breaking**: Raise the MSRV to 1.89.0 (required by `rootcause`).
 - Bump `sha2` to 0.11 and `base64` to 0.23 (both used internally for PKCE, not exposed in the public API).
 - Bump `itertools` to 0.15 and the other dependencies to their latest compatible versions.
-- Add direct dependencies on `rootcause`, `thiserror` and `futures` (the latter already a transitive dependency through
-  `leptos`).
-- `<DebugState>` renders error reports as readable trees, and its state element is now identified as
-  `leptos-keycloak-auth-debug-state` instead of `auth-state`, which easily clashed with ids of the application.
-- Test infrastructure (no library-API impact): migrate the integration tests to `browser-test`, `leptos-browser-test`,
-  `rootcause` and assertr's thirtyfour assertions. A failing browser test now fails `cargo test`. Previously, failures
-  were only logged.
+- **Breaking**: `<DebugState>` renders error reports as readable trees, and its state element is now identified as
+  `leptos-keycloak-auth-debug-state` instead of `auth-state`, which easily clashed with ids of an application.
+- Migrate the integration tests to new versions of `browser-test`, `leptos-browser-test`, `rootcause` and `assertr` and
+  switch to assertr's native thirtyfour assertions. A failing browser test now fails `cargo test`.
 - Rebuild the test-frontend's UI with leptonic's atoms and hooks (`hooks` branch) and custom styles, and adopt
   leptonic's recommended build profiles for it.
 - Reformat sources.
@@ -50,8 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Store the PKCE code verifier, the nonce and the logout CSRF token in local storage instead of session storage. Chrome
   could hand a page a stale session storage (values from earlier in the session) when pages of the redirect to Keycloak
   and back were kept in its back/forward cache. Logging in after a logout then failed with "PKCE verification failed:
-  Code mismatch", and the nonce validation and the logout CSRF detection were affected alike. Logins in progress while
-  the application is updated fail once, as the values in session storage are no longer read.
+  Code mismatch", and the nonce validation and the logout CSRF detection were affected alike.
 - Opening the application in another tab after logging in no longer ends the session. All tabs share the token data,
   but each tab had a nonce of its own, so the other tab rejected the ID token received with the login.
 - `IdTokenValidationOptions::expected_audiences: None` now skips audience validation, as documented. Previously, every
@@ -79,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Only verify ID tokens using asymmetric algorithms and, should the JWK declare one, using the algorithm of the JWK. The
   algorithm was previously taken from the (untrusted) token header alone. Algorithm confusion was already prevented by
-  `jsonwebtoken` rejecting keys of the wrong type, so this is hardening.
+  `jsonwebtoken` rejecting keys of the wrong type though.
 
 ## [0.13.0] - 2026-02-13
 
